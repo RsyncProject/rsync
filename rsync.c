@@ -774,7 +774,7 @@ int set_file_attrs(const char *fname, struct file_struct *file, stat_x *sxp,
 		if (!same_time(sxp->crtime, 0L, file_crtime, 0L)) {
 			if (
 #ifdef HAVE_GETATTRLIST
-			     do_setattrlist_crtime(fname, file_crtime) == 0
+			     do_setattrlist_crtime(dfd, leaf, fname, file_crtime) == 0
 #elif defined __CYGWIN__
 			     do_SetFileTime(fname, file_crtime) == 0
 #else

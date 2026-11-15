@@ -2467,7 +2467,6 @@ OFF_T do_lseek(int fd, OFF_T offset, int whence)
 #ifdef HAVE_SETATTRLIST
 int do_setattrlist_times(const char *path, STRUCT_STAT *stp)
 {
-	extern int am_daemon, am_chrooted;
 	struct attrlist attrList;
 	struct timespec ts[2];
 
@@ -2477,7 +2476,7 @@ int do_setattrlist_times(const char *path, STRUCT_STAT *stp)
 
 	/* setattrlist() takes a raw path and follows parent symlinks
 	 * (FSOPT_NOFOLLOW only blocks the final component). On a
-	 * daemon-no-chroot deployment, return ENOSYS so set_times()'
+	 * confined receiver, return ENOSYS so set_times()'
 	 * tier walk falls through to do_utimensat_at(), which routes
 	 * the timestamp update through a secure parent dirfd. The
 	 * macOS-specific attribute set this function would have used
@@ -2502,26 +2501,13 @@ int do_setattrlist_times(const char *path, STRUCT_STAT *stp)
 }
 
 #ifdef SUPPORT_CRTIMES
-int do_setattrlist_crtime(const char *path, time_t crtime)
+int do_setattrlist_crtime(int dfd, const char *leaf, const char *path, time_t crtime)
 {
-	extern int am_daemon, am_chrooted;
 	struct attrlist attrList;
 	struct timespec ts;
 
 	if (dry_run) return 0;
 	RETURN_ERROR_IF_RO_OR_LO;
-
-	/* Same path-follows-parent-symlinks concern as
-	 * do_setattrlist_times. There is no portable at-aware variant
-	 * of setattrlist that targets ATTR_CMN_CRTIME, so on a
-	 * daemon-no-chroot deployment we return -1 and accept that
-	 * crtime preservation is silently dropped for that file (the
-	 * caller treats this as "crtime not updated"). The transfer
-	 * itself continues normally. */
-	if (secure_relpath_active()) {
-		errno = ENOSYS;
-		return -1;
-	}
 
 	ts.tv_sec = crtime;
 	ts.tv_nsec = 0;
@@ -2529,6 +2515,22 @@ int do_setattrlist_crtime(const char *path, time_t crtime)
 	memset(&attrList, 0, sizeof attrList);
 	attrList.bitmapcount = ATTR_BIT_MAP_COUNT;
 	attrList.commonattr = ATTR_CMN_CRTIME;
+
+#ifdef HAVE_SETATTRLISTAT
+	if (dfd >= 0)
+		return setattrlistat(dfd, leaf, &attrList, &ts, sizeof ts, FSOPT_NOFOLLOW);
+#else
+	(void)dfd;
+	(void)leaf;
+#endif
+
+	/* The raw path form follows parent symlinks, so confined receivers need
+	 * the held-parent form above. */
+	if (secure_relpath_active()) {
+		errno = ENOSYS;
+		return -1;
+	}
+
 	return setattrlist(path, &attrList, &ts, sizeof ts, FSOPT_NOFOLLOW);
 }
 #endif
@@ -2538,15 +2540,14 @@ int do_setattrlist_crtime(const char *path, time_t crtime)
 time_t get_create_time(const char *path, STRUCT_STAT *stp)
 {
 #ifdef HAVE_GETATTRLIST
-	extern int am_daemon, am_chrooted;
 	static struct create_time attrBuf;
 	struct attrlist attrList;
 
 	(void)stp;
 	/* getattrlist() is also path-based and follows parent
-	 * symlinks. In daemon-no-chroot, refuse rather than read the
+	 * symlinks. In a confined receiver, refuse rather than read the
 	 * crtime of a file the parent-symlink chain might point at
-	 * outside the module. The caller's "no crtime available"
+	 * outside the transfer root. The caller's "no crtime available"
 	 * path returns 0; the file gets a fresh crtime instead of
 	 * preserving the source's. */
 	if (secure_relpath_active())

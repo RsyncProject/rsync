@@ -874,7 +874,7 @@ AC_CHECK_FUNCS(waitpid wait4 getcwd chown chmod lchmod mknod mkfifo fdopendir \
     strlcat strlcpy strtol mallinfo mallinfo2 getgroups setgroups geteuid getegid \
     setlocale setmode open64 lseek64 mkstemp64 mtrace va_copy __va_copy \
     seteuid strerror putenv iconv_open locale_charset nl_langinfo getxattr \
-    extattr_get_link sigaction sigprocmask setattrlist getgrouplist \
+    extattr_get_link sigaction sigprocmask setattrlist setattrlistat getgrouplist \
     initgroups utimensat futimens posix_fallocate attropen setvbuf nanosleep usleep \
     setenv unsetenv mbrtowc)
 
