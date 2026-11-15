@@ -29,12 +29,16 @@ fi
 
 copy_as_root=`mktemp -d "${TMPDIR:-/tmp}/rsync-copy-as.XXXXXX"` \
 	|| test_skipped "Cannot create the copy-as fixture"
-trap 'chmod -R u+rwX "$copy_as_root"; rm -rf "$copy_as_root"' 0
+destination=`mktemp -d "${TMPDIR:-/tmp}/rsync-copy-as-destination.XXXXXX"` \
+	|| {
+		rmdir "$copy_as_root"
+		test_skipped "Cannot create the copy-as destination"
+	}
+trap 'chmod -R u+rwX "$copy_as_root" "$destination"; rm -rf "$copy_as_root" "$destination"' 0
 chmod 0711 "$copy_as_root"
 
 protected="$copy_as_root/protected"
-destination="$copy_as_root/destination"
-makepath "$protected" "$destination"
+makepath "$protected"
 echo accessible-via-supplementary-group >"$protected/file"
 chown root:"$supplementary_gid" "$protected" "$protected/file"
 chmod 0750 "$protected"
