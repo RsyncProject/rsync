@@ -2,9 +2,9 @@ name: LTS CI
 
 on:
   push:
-    branches: [lts/3.2.7]
+    branches: [lts/3.2]
   pull_request:
-    branches: [lts/3.2.7]
+    branches: [lts/3.2]
   workflow_dispatch:
 
 permissions:

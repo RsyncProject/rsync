@@ -8,7 +8,7 @@ Current stable line | Security and correctness fixes
 3.2.x LTS | Security fixes only
 Other releases | Unsupported
 
-The `lts/3.2.7` branch is based on rsync 3.2.7 and receives fixes for
+The `lts/3.2` branch is based on rsync 3.2.7 and receives fixes for
 vulnerabilities which affect that line. It does not receive new features,
 performance changes or general bug fixes except where a change is required to
 apply or verify a security fix.
