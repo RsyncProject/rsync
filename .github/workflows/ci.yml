@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [master]
+    branches: [master, stable/3.5]
   pull_request:
     types: [opened, synchronize, reopened]
   workflow_dispatch:
