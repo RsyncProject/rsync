@@ -1,3 +1,77 @@
+# NEWS for rsync 3.2.8 (15 Nov 2026)
+
+This is the first release in the 3.2 LTS line. It supersedes rsync 3.2.7 and
+the temporary `3.2.7-sec-patches*` snapshots. It contains security fixes plus
+the narrow compatibility and robustness corrections needed to ship and verify
+them. It adds no general features and retains protocol 31.
+
+Users who do not need the compatibility retained by the 3.2 LTS line should
+use the current stable release.
+
+## Changes in this version:
+
+### SECURITY FIXES:
+
+This release includes the fixes from 3.4.3, 3.5.0 and 3.5.2 which apply to
+3.2.7. The [published advisories](https://github.com/RsyncProject/rsync/security/advisories)
+describe their impact, affected configurations and credits.
+
+From 3.4.3: CVE-2026-29518, CVE-2026-43617, CVE-2026-43618,
+CVE-2026-43619, CVE-2026-43620 and CVE-2026-45232.
+
+From 3.5.0: CVE-2026-53783, CVE-2026-53784, CVE-2026-53785,
+CVE-2026-53786, CVE-2026-53788, CVE-2026-53789, CVE-2026-53790,
+CVE-2026-53791, CVE-2026-53792, CVE-2026-53793, CVE-2026-53794,
+CVE-2026-53795, CVE-2026-53796, CVE-2026-53797, CVE-2026-53798,
+CVE-2026-53799, CVE-2026-53800, CVE-2026-53801, CVE-2026-53802,
+CVE-2026-53803, CVE-2026-70452, CVE-2026-70453, CVE-2026-70454,
+CVE-2026-70456, CVE-2026-70457, CVE-2026-70458, CVE-2026-70459,
+CVE-2026-70460, CVE-2026-70461, CVE-2026-70462, CVE-2026-70463 and
+CVE-2026-70464.
+
+From 3.5.2: CVE-2026-119741.
+
+The fixes:
+- Kept source, destination, daemon module and operator-supplied paths inside
+  their intended roots. This covers scans, content opens, destination
+  creation, alternate destinations, partial and backup paths, metadata,
+  source removal and configuration, filter, password, batch and log files.
+
+- Hardened `rrsync` restricted directories with inode-bound descriptor paths
+  and a smaller option set. Restricted subdirectories now fail closed where
+  `/proc/self/fd` does not provide inode-bound paths.
+
+- Rejected or bounded malformed argument lists, indices, counts, lengths,
+  checksum blocks, xattr data, proxy responses and pre-transfer handshakes.
+
+- Fixed daemon access control, name conversion, filter handling, delete
+  scope, PROXY-protocol trust and shell-hook quoting.
+
+- Made `rsync-ssl` verify the certificate chain and hostname unless its
+  explicit insecure opt-out is selected.
+
+- Limited checksum collision and alignment work to prevent excessive CPU use,
+  signed overflow and out-of-range basis access.
+
+### COMPATIBILITY FIXES:
+
+- Provided `--insecure-links` and daemon `insecure links` opt-outs for
+  deployments which need the old symlink behaviour.
+
+- Fixed restricted uploads to existing files, daemon `--files-from` entries
+  beneath module subdirectories and password files with an empty first line.
+
+- Preserved Cygwin UNC roots, macOS creation times and builds on systems
+  without `O_CLOEXEC` or `O_DIRECTORY`.
+
+- Fixed bundled-popt argument copying, current C compiler compatibility and
+  several checksum, SIMD, xattr and file-list bounds errors.
+
+- Kept signal handlers async-signal-safe and replaced an `FD_SETSIZE`-limited
+  I/O wait with `poll()`.
+
+------------------------------------------------------------------------------
+
 # NEWS for rsync 3.2.7 (20 Oct 2022)
 
 ## Changes in this version:
@@ -4692,6 +4766,7 @@
 
 | RELEASE DATE | VER.   | DATE OF COMMIT\* | PROTOCOL    |
 |--------------|--------|------------------|-------------|
+| 15 Nov 2026  | 3.2.8  |                  | 31          |
 | 20 Oct 2022  | 3.2.7  |                  | 31          |
 | 09 Sep 2022  | 3.2.6  |                  | 31          |
 | 14 Aug 2022  | 3.2.5  |                  | 31          |
