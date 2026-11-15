@@ -18,6 +18,9 @@ metadata(features={'compression', 'daemon', 'remote-shell'}, transports={'pipe',
 DAEMON_PORT = 12894
 FILESIZE = 512 * 1024
 _SUMMARY = re.compile(r'(?:sent|wrote) ([\d,]+) bytes\s+(?:received|read) ([\d,]+) bytes')
+_STATS_SENT = re.compile(r'^Total bytes (?:sent|written):\s*([\d,]+)\s*$', re.MULTILINE)
+_STATS_RECEIVED = re.compile(
+    r'^Total bytes (?:received|read):\s*([\d,]+)\s*$', re.MULTILINE)
 
 TODIR = TMPDIR / 'to'
 
@@ -36,11 +39,15 @@ def peer_client(args, label):
                           env={**os.environ, 'LC_ALL': 'C'})
     print(proc.stdout, end='')
     if proc.returncode != 0:
-        test_fail(f"{label}: old client exited {proc.returncode}")
-    m = _SUMMARY.search(proc.stdout)
-    if not m:
-        test_fail(f"{label}: could not parse sent/received from client output")
-    return int(m.group(1).replace(',', '')), int(m.group(2).replace(',', ''))
+        test_fail(f"{label}: client exited {proc.returncode}")
+    sent = _STATS_SENT.search(proc.stdout)
+    received = _STATS_RECEIVED.search(proc.stdout)
+    if sent and received:
+        return int(sent.group(1).replace(',', '')), int(received.group(1).replace(',', ''))
+    summary = _SUMMARY.search(proc.stdout)
+    if not summary:
+        test_fail(f"{label}: could not parse transfer totals from client output")
+    return int(summary.group(1).replace(',', '')), int(summary.group(2).replace(',', ''))
 
 def assert_delta(label, moved):
     if moved >= FILESIZE // 2:
@@ -52,7 +59,7 @@ def run_push(compress):
     basis = TODIR / f'{tag}.dat'
     source = src / f'{tag}.dat'
     make_versions(basis, source)
-    opts = ['-a', '-v'] + (['-z'] if compress else [])
+    opts = ['-a', '-v', '--stats'] + (['-z'] if compress else [])
     sent, _ = peer_client(opts + [str(source), f'{url}test-to/'], tag)
     if not filecmp.cmp(source, basis, shallow=False):
         test_fail(f"{tag}: daemon-side file does not match source after push")
@@ -64,7 +71,7 @@ def run_pull(compress):
     served = FROMDIR / f'{tag}.dat'
     local = dst / f'{tag}.dat'
     make_versions(local, served)
-    opts = ['-a', '-v'] + (['-z'] if compress else [])
+    opts = ['-a', '-v', '--stats'] + (['-z'] if compress else [])
     _, received = peer_client(
         opts + [f'{url}test-from/{tag}.dat', str(dst) + '/'], tag)
     if not filecmp.cmp(served, local, shallow=False):
