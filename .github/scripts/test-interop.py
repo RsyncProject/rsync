@@ -677,14 +677,18 @@ class Network(unittest.TestCase):
         item = dict(name='ready', id=1, expired=False, archive_download_url='https://attacker.invalid')
         listing = json.dumps(dict(artifacts=[item], total_count=1)).encode()
         responses = [(listing, {'ETag': 'v1'}), network.NetworkError('Connection failed', retryable=True),
+                     network.NetworkError('Not modified', 304),
+                     network.NetworkError('Service unavailable', 503, retryable=True),
                      network.NetworkError('Not modified', 304), network.NetworkError('Not ready', 404),
                      network.NetworkError('Not modified', 304), (buffer.getvalue(), {})]
-        with patch.object(network, 'fetch', side_effect=responses) as fetch, patch.object(time, 'sleep'):
+        with patch.object(network, 'fetch', side_effect=responses) as fetch, \
+                patch.object(time, 'sleep') as sleep:
             value = network.download_records('123', {'ready': 'linux'})
         self.assertEqual(value['linux'][0], record)
         self.assertEqual(fetch.call_args_list[2][1]['headers'], {'If-None-Match': 'v1'})
         self.assertEqual(fetch.call_args[0][0], 'https://api.github.com/repos/RsyncProject/rsync/actions/artifacts/1/zip')
-        for code in (None, 401, 403, 500):
+        self.assertEqual(sleep.call_count, 3)
+        for code in (None, 401, 403, 422):
             with self.subTest(code=code), patch.object(network, 'fetch', side_effect=[(listing, {}), network.NetworkError('Failed', code)]), patch.object(time, 'sleep') as sleep:
                 with self.assertRaises(network.NetworkError):
                     network.download_records('123', {'ready': 'linux'})
@@ -716,6 +720,7 @@ class Network(unittest.TestCase):
                 network.fetch('https://example.test', 'fixture-bearer')
         self.assertEqual(str(caught.exception), 'Network request: HTTP 403')
         self.assertEqual(caught.exception.code, 403)
+        self.assertFalse(caught.exception.retryable)
         with patch.object(network.urllib.request, 'build_opener', return_value=Opener()):
             with self.assertRaisesRegex(network.NetworkError, 'Worker acl access probe: HTTP 403'):
                 network.fetch('https://example.test', 'fixture-bearer', operation='Worker acl access probe')
@@ -729,6 +734,20 @@ class Network(unittest.TestCase):
             network.fetch('https://example.test', 'fixture-bearer')
         self.assertTrue(caught.exception.retryable)
         self.assertEqual(str(caught.exception), 'Network request: connection failed')
+
+    def test_transient_http_errors_are_retryable(self):
+        class Opener:
+            def __init__(self, code):
+                self.code = code
+            def open(self, request, **kwargs):
+                raise urllib.error.HTTPError(request.full_url, self.code, 'fixture', {}, io.BytesIO())
+        for code in network.RETRYABLE_HTTP:
+            with self.subTest(code=code), \
+                    patch.object(network.urllib.request, 'build_opener', return_value=Opener(code)), \
+                    self.assertRaises(network.NetworkError) as caught:
+                network.fetch('https://example.test')
+            self.assertEqual(caught.exception.code, code)
+            self.assertTrue(caught.exception.retryable)
 
     def test_artifact_redirect_drops_authorisation(self):
         requests = []
