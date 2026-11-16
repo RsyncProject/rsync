@@ -80,7 +80,7 @@ jobs:
           python3 -B -S .github/scripts/test-transfers.py
       - name: Tests
         id: test
-        run: python3 -B -S testsuite/tools/check.py . ./rsync pipe,root,self-peer,linux,non-asan,no-userns test-results/python37 metadata profile process cli-transfers runner check-recipe -j2
+        run: python3 -B -S testsuite/tools/check.py . ./rsync pipe,root,self-peer,linux,non-asan,no-userns test-results/python37 metadata profile process mutation cli-transfers runner check-recipe -j2
       - name: Upload results
         if: ${{ !cancelled() && (steps.test.outcome == 'success' || steps.test.outcome == 'failure') }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2

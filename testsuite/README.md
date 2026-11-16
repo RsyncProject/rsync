@@ -34,6 +34,8 @@ Tests declare applicability with `@requires(...)` or a top-level `metadata(...)`
 
 Regression tests should fail against the faulty implementation and check the affected behaviour directly. Fixtures must keep their data inside the test's scratch directory, tolerate parallel execution and stop their child processes. Sleeps cannot establish ordering or prove that a race was exercised.
 
+Tests which build mutated executables may report unavailable build capabilities as unsupported. Missing or ambiguous source replacement targets, missing compiler-flag replacements and failed configured builds are test failures rather than unavailable capabilities.
+
 Profiles under profiles/ distinguish tests which do not apply from missing capabilities. Root and nonroot profiles must match the effective UID. Peer profiles identify the archived release and wire protocol. Historical binaries and their build records are under [old_versions](../old_versions/README.md); --rsync-bin2 selects the secondary executable and --archived-role identifies which side runs the archived release.
 
 The tools/check.py launcher takes a build directory, binary, profile list and fresh output directory followed by runner options. It saves run.log and receipt.json, then checks the receipt against the executable and profiles.
