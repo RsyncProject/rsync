@@ -12,6 +12,7 @@ from interop_policy import QUARANTINE, TAILNET, ROLES
 
 CLIENT_ID = 'TG2FEugs2S11CNTRL-kx3fW8WXMt11CNTRL'
 TAILNET_API = 'https://api.tailscale.com/api/v2/tailnet/-'
+RETRYABLE_HTTP = (408, 500, 502, 503, 504)
 
 
 class NetworkError(ValueError):
@@ -56,7 +57,8 @@ def fetch(url, token=None, data=None, headers=None, allowed_redirect=False, meth
                     or parts.username or parts.password or parts.port not in (None, 443)):
                 raise NetworkError('Unexpected artifact download host') from None
             return fetch(target, operation=operation)
-        raise NetworkError(operation + ': HTTP ' + str(error.code), error.code) from None
+        raise NetworkError(operation + ': HTTP ' + str(error.code), error.code,
+                           retryable=error.code in RETRYABLE_HTTP) from None
     except (OSError, urllib.error.URLError):
         raise NetworkError(operation + ': connection failed', retryable=True) from None
 
