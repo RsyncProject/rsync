@@ -521,40 +521,28 @@ static int ona_open(const char *path, int flags, mode_t mode, char *out_abs, siz
 		memcpy(comp, remaining, comp_len);
 		comp[comp_len] = '\0';
 		int is_last = (slash == NULL);
+		int next = -1;
+		mode_t comp_mode;
 
 		/* Inspect this component without following symlinks. */
 		STRUCT_STAT lst;
 		if (fstatat(dfd, comp, &lst, AT_SYMLINK_NOFOLLOW) < 0) {
-			/* An intermediate mount container (e.g. Android's
-			 * /storage/emulated) may fail fstatat()/getattr() with
-			 * ENOENT even though the directory entry exists in VFS
-			 * and can be traversed via openat(O_DIRECTORY | O_NOFOLLOW). */
-			if (errno == ENOENT && !is_last) {
-				int next = openat(dfd, comp, dir_traverse_flags | O_NOFOLLOW);
-				if (next >= 0) {
-					if (abspath_step(abspath, sizeof abspath, comp, comp_len) < 0) {
-						saved_errno = errno;
-						close(next);
-						goto out;
-					}
-					if (!pin_transit && abspath_outside_confinement(abspath, 0)) {
-						saved_errno = ELOOP;
-						close(next);
-						goto out;
-					}
-					if (dfd_owns) close(dfd);
-					dfd = next;
-					dfd_owns = 1;
-					char *p = slash;
-					while (*p == '/') p++;
-					memmove(remaining, p, strlen(p) + 1);
-					continue;
+			int stat_errno = errno;
+			/* Android mount containers can be traversable even when getattr
+			 * reports ENOENT.  A directory fd still supplies the required type
+			 * and no-follow guarantees. */
+			if (stat_errno == ENOENT && !is_last) {
+				next = openat(dfd, comp, dir_traverse_flags | O_NOFOLLOW);
+				if (next < 0) {
+					saved_errno = errno;
+					goto out;
 				}
+				comp_mode = S_IFDIR; /* enforced by the open flags */
 			}
 			/* The leaf may not exist yet (O_CREAT case). Allow it
 			 * and openat with O_NOFOLLOW so a race-planted leaf
 			 * symlink at this instant is still refused. */
-			if (is_last && errno == ENOENT && (flags & O_CREAT)) {
+			else if (is_last && stat_errno == ENOENT && (flags & O_CREAT)) {
 				if (abspath_step(abspath, sizeof abspath, comp, comp_len) < 0) {
 					saved_errno = errno;
 					goto out;
@@ -567,11 +555,14 @@ static int ona_open(const char *path, int flags, mode_t mode, char *out_abs, siz
 				saved_errno = errno;
 				goto out;
 			}
-			saved_errno = errno;
-			goto out;
-		}
+			else {
+				saved_errno = stat_errno;
+				goto out;
+			}
+		} else
+			comp_mode = lst.st_mode;
 
-		if (S_ISLNK(lst.st_mode)) {
+		if (S_ISLNK(comp_mode)) {
 			/* Symlink: untrusted owner is refused; trusted owner is followed
 			 * via readlinkat + splice.  In a user namespace the /proc/self,
 			 * /dev/fd and /dev/std* symlinks may report the overflow uid, so
@@ -704,23 +695,27 @@ static int ona_open(const char *path, int flags, mode_t mode, char *out_abs, siz
 			goto out;
 		}
 
-		if (!S_ISDIR(lst.st_mode)) {
+		if (!S_ISDIR(comp_mode)) {
 			saved_errno = ENOTDIR;
 			goto out;
 		}
 		/* track the resolved path so a target outside the module is refused */
 		if (abspath_step(abspath, sizeof abspath, comp, comp_len) < 0) {
 			saved_errno = errno;
+			if (next >= 0) close(next);
 			goto out;
 		}
 		if (!pin_transit && abspath_outside_confinement(abspath, 0)) {
 			saved_errno = ELOOP;
+			if (next >= 0) close(next);
 			goto out;
 		}
-		int next = openat(dfd, comp, dir_traverse_flags | O_NOFOLLOW);
 		if (next < 0) {
-			saved_errno = errno;
-			goto out;
+			next = openat(dfd, comp, dir_traverse_flags | O_NOFOLLOW);
+			if (next < 0) {
+				saved_errno = errno;
+				goto out;
+			}
 		}
 		if (dfd_owns) close(dfd);
 		dfd = next;
