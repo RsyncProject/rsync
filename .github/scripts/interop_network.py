@@ -12,12 +12,14 @@ from interop_policy import QUARANTINE, TAILNET, ROLES
 
 CLIENT_ID = 'TG2FEugs2S11CNTRL-kx3fW8WXMt11CNTRL'
 TAILNET_API = 'https://api.tailscale.com/api/v2/tailnet/-'
+RETRYABLE_HTTP = (408, 500, 502, 503, 504)
 
 
 class NetworkError(ValueError):
-    def __init__(self, message, code=None):
+    def __init__(self, message, code=None, retryable=False):
         super().__init__(message)
         self.code = code
+        self.retryable = retryable
 
 
 class NoRedirect(urllib.request.HTTPRedirectHandler):
@@ -55,9 +57,10 @@ def fetch(url, token=None, data=None, headers=None, allowed_redirect=False, meth
                     or parts.username or parts.password or parts.port not in (None, 443)):
                 raise NetworkError('Unexpected artifact download host') from None
             return fetch(target, operation=operation)
-        raise NetworkError(operation + ': HTTP ' + str(error.code), error.code) from None
+        raise NetworkError(operation + ': HTTP ' + str(error.code), error.code,
+                           retryable=error.code in RETRYABLE_HTTP) from None
     except (OSError, urllib.error.URLError):
-        raise NetworkError(operation + ': connection failed') from None
+        raise NetworkError(operation + ': connection failed', retryable=True) from None
 
 
 def workflow_event():
@@ -131,23 +134,27 @@ def download_records(run_id, expected, timeout=600, progress=None):
         if progress is not None:
             progress()
         try:
-            body, headers = fetch(url, os.environ['GH_TOKEN'], headers={'If-None-Match': etag} if etag else {},
+            body, headers = fetch(url, os.environ['GH_TOKEN'],
+                                  headers={'If-None-Match': etag} if etag else {},
                                   operation='List GitHub artifacts')
-        except NetworkError as error:
-            if error.code != 304 or cached is None:
-                raise
-            records = cached
-        else:
             listing = decode(body)
             records = listing['artifacts']
             count = listing['total_count']
             if type(count) is not int or count < 0 or count > 1000:
                 raise NetworkError('Artifact listing exceeds rendezvous limit')
             for page in range(2, (count + 99) // 100 + 1):
-                body, _ = fetch(url + '&page=' + str(page), os.environ['GH_TOKEN'], operation='List GitHub artifacts')
+                body, _ = fetch(url + '&page=' + str(page), os.environ['GH_TOKEN'],
+                                operation='List GitHub artifacts')
                 records += decode(body)['artifacts']
             records = list({item['id']: item for item in records}.values())
             cached, etag = records, headers.get('ETag')
+        except NetworkError as error:
+            if error.retryable:
+                time.sleep(5)
+                continue
+            if error.code != 304 or cached is None:
+                raise
+            records = cached
         found = {name: [item for item in records if item['name'] == name and not item['expired']]
                  for name in expected}
         if any(len(items) > 1 for items in found.values()):
@@ -162,9 +169,10 @@ def download_records(run_id, expected, timeout=600, progress=None):
                 try:
                     data, _ = fetch(download, os.environ['GH_TOKEN'], allowed_redirect=True, operation='Download GitHub artifact')
                 except NetworkError as error:
-                    if error.code != 404:
+                    if error.code != 404 and not error.retryable:
                         raise
-                    # The listing can precede archive availability.
+                    # The listing can precede archive availability, and an
+                    # individual archive request can lose its connection.
                     result = None
                     break
                 with zipfile.ZipFile(io.BytesIO(data)) as archive:

@@ -1,4 +1,4 @@
-# NEWS for UNRELEASED
+# NEWS for rsync 4.0.0 (UNRELEASED)
 
 ## 3.5 maintenance line
 

@@ -40,12 +40,10 @@ jobs:
           persist-credentials: false
       - name: Install Cygwin
         run: .github/scripts/install-cygwin.ps1
-      - name: Install CommonMark
-        run: bash -c 'python3 -mpip install --user commonmark'
       - name: Platform
         run: bash -c 'python3 -S .github/scripts/check-platform.py cygwin --arch x86_64'
       - name: Configure
-        run: bash -c './configure --with-rrsync'
+        run: bash -c './configure --disable-md2man --with-rrsync'
       - name: Build
         id: build
         run: bash -c 'make check-progs'
@@ -117,7 +115,7 @@ jobs:
           release: '11.4'
           # v1.4.1 leaves its documented false default unset.
           sync-time: 'false'
-          cache-after-prepare: true
+          cache-after-prepare: false
           prepare: |
             pkg install bash automake gnu-m4 pkg://solaris/runtime/python-35 autoconf gcc git
           run: python3 -S .github/scripts/guest.py solaris

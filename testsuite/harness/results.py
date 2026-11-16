@@ -7,6 +7,8 @@ from collections import Counter
 from dataclasses import dataclass
 from pathlib import Path
 
+EXECUTABLE_VERSION_PATTERN = r'\d+(?:\.\d+)+(?:dev|(?:pre|alpha|beta|rc)\d*)?'
+
 class Exit(enum.IntEnum):
     PASS = 0
     FAIL = 1
@@ -99,7 +101,7 @@ def read_receipt(path):
         if not isinstance(run.get(field), str) or not run[field]:
             raise ValueError('invalid executable command')
     for field in ('primary_version', 'secondary_version'):
-        if not isinstance(run.get(field), str) or not re.fullmatch(r'\d+(?:\.\d+)+', run[field]):
+        if not isinstance(run.get(field), str) or not re.fullmatch(EXECUTABLE_VERSION_PATTERN, run[field]):
             raise ValueError('invalid executable version')
     archived_role, archived_version = run.get('archived_role'), run.get('archived_version')
     if archived_role not in (None, 'primary', 'secondary') or bool(archived_role) != bool(archived_version):
