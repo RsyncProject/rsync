@@ -14,6 +14,8 @@ from harness import metadata
 metadata(features={'dirfd_pinning', 'native_build', 'symlink'}, transports={'pipe'},
          mutates={'filesystem', 'process'}, tags={'path', 'regression', 'security'})
 
+# Fail only the metadata lookup; real openat calls must still enforce directory
+# traversal and no-follow checks while reproducing Android's ENOENT.
 PATCH_OLD = '\t\tif (fstatat(dfd, comp, &lst, AT_SYMLINK_NOFOLLOW) < 0) {'
 PATCH_NEW = '''\t\tif ((strcmp(comp, "emulated") == 0
 \t\t  ? (errno = ENOENT, -1)
@@ -39,19 +41,26 @@ def run(*args, cwd=None):
         cwd=cwd, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
     )
 
-def require_copy(label, destination, cwd=None):
+def require_copy(label, destination, copied, cwd=None):
     source = src / 'file'
     source.write_text(label + '\n')
     result = run(source, destination, cwd=cwd)
-    copied = docs / 'file'
     if result.returncode != 0 or not copied.is_file() or copied.read_text() != label + '\n':
         test_fail(f'{label}: transfer failed: rc={result.returncode}, stderr={result.stderr!r}')
 
 reset()
-require_copy('absolute', str(docs) + '/')
+require_copy('absolute', str(docs) + '/', docs / 'file')
 
 reset()
-require_copy('relative', './', cwd=docs)
+require_copy('relative', './', docs / 'file', cwd=docs)
+
+reset()
+require_copy('directory-leaf', storage_root, storage_root / 'file')
+
+reset()
+sdcard = base / 'sdcard'
+sdcard.symlink_to(storage_root)
+require_copy('trusted-symlink', str(sdcard / 'Documents') + '/', docs / 'file')
 
 reset()
 source = src / 'file'
@@ -70,11 +79,15 @@ real_storage = base / 'real-storage'
 rmtree(storage / 'emulated')
 (storage / 'emulated').symlink_to(real_storage)
 result = run(source, str(docs) + '/')
-errors = (os.strerror(errno.ENOTDIR).encode(), os.strerror(errno.ELOOP).encode())
+# NetBSD reports EFTYPE when O_NOFOLLOW refuses an intermediate symlink.
+refusal_codes = {errno.ENOTDIR, errno.ELOOP, getattr(errno, 'EFTYPE', errno.ELOOP)}
+errors = tuple(os.strerror(code).encode() for code in refusal_codes)
 if result.returncode == 0 or not any(error in result.stderr for error in errors):
     test_fail(f'intermediate symlink was not refused with the openat error: {result.stderr!r}')
 if os.strerror(errno.ENOENT).encode() in result.stderr:
     test_fail(f'openat error was replaced with ENOENT: {result.stderr!r}')
+if (real_storage / '0' / 'Documents' / 'file').exists():
+    test_fail('intermediate symlink refusal still delivered the file')
 
 reset()
 outside = base / 'outside'
@@ -87,7 +100,7 @@ result = run(
     '-r', f'--confine-root={storage_root}', f'--files-from={files_from}',
     storage_root, str(dest) + '/',
 )
-if (result.returncode == 0 or (dest / 'secret').exists()
+if (result.returncode == 0 or (dest / 'secret').exists() or (dest / 'escape' / 'secret').exists()
         or os.strerror(errno.ELOOP).encode() not in result.stderr):
     test_fail(f'confinement did not reject the escape: {result.stderr!r}')
 
