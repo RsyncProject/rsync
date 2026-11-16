@@ -676,14 +676,15 @@ class Network(unittest.TestCase):
             archive.writestr('ready.json', json.dumps(record))
         item = dict(name='ready', id=1, expired=False, archive_download_url='https://attacker.invalid')
         listing = json.dumps(dict(artifacts=[item], total_count=1)).encode()
-        responses = [(listing, {'ETag': 'v1'}), network.NetworkError('Not ready', 404),
+        responses = [(listing, {'ETag': 'v1'}), network.NetworkError('Connection failed', retryable=True),
+                     network.NetworkError('Not modified', 304), network.NetworkError('Not ready', 404),
                      network.NetworkError('Not modified', 304), (buffer.getvalue(), {})]
         with patch.object(network, 'fetch', side_effect=responses) as fetch, patch.object(time, 'sleep'):
             value = network.download_records('123', {'ready': 'linux'})
         self.assertEqual(value['linux'][0], record)
         self.assertEqual(fetch.call_args_list[2][1]['headers'], {'If-None-Match': 'v1'})
         self.assertEqual(fetch.call_args[0][0], 'https://api.github.com/repos/RsyncProject/rsync/actions/artifacts/1/zip')
-        for code in (401, 403, 500):
+        for code in (None, 401, 403, 500):
             with self.subTest(code=code), patch.object(network, 'fetch', side_effect=[(listing, {}), network.NetworkError('Failed', code)]), patch.object(time, 'sleep') as sleep:
                 with self.assertRaises(network.NetworkError):
                     network.download_records('123', {'ready': 'linux'})
@@ -691,6 +692,20 @@ class Network(unittest.TestCase):
         duplicate = json.dumps(dict(artifacts=[item, dict(item, id=2)], total_count=2)).encode()
         with patch.object(network, 'fetch', return_value=(duplicate, {})), self.assertRaisesRegex(network.NetworkError, 'Duplicate'):
             network.download_records('123', {'ready': 'linux'})
+
+    def test_artifact_listing_retries_connection_failures(self):
+        record = dict(self.state, role='linux')
+        buffer = io.BytesIO()
+        with zipfile.ZipFile(buffer, 'w') as archive:
+            archive.writestr('ready.json', json.dumps(record))
+        item = dict(name='ready', id=1, expired=False)
+        listing = json.dumps(dict(artifacts=[item], total_count=1)).encode()
+        responses = [network.NetworkError('Connection failed', retryable=True),
+                     (listing, {}), (buffer.getvalue(), {})]
+        with patch.object(network, 'fetch', side_effect=responses), patch.object(time, 'sleep') as sleep:
+            value = network.download_records('123', {'ready': 'linux'})
+        self.assertEqual(value['linux'][0], record)
+        sleep.assert_called_once_with(5)
 
     def test_redacted_http_errors(self):
         class Opener:
@@ -704,6 +719,16 @@ class Network(unittest.TestCase):
         with patch.object(network.urllib.request, 'build_opener', return_value=Opener()):
             with self.assertRaisesRegex(network.NetworkError, 'Worker acl access probe: HTTP 403'):
                 network.fetch('https://example.test', 'fixture-bearer', operation='Worker acl access probe')
+
+    def test_connection_errors_are_retryable(self):
+        class Opener:
+            def open(self, *args, **kwargs):
+                raise urllib.error.URLError('fixture connection failure')
+        with patch.object(network.urllib.request, 'build_opener', return_value=Opener()), \
+                self.assertRaises(network.NetworkError) as caught:
+            network.fetch('https://example.test', 'fixture-bearer')
+        self.assertTrue(caught.exception.retryable)
+        self.assertEqual(str(caught.exception), 'Network request: connection failed')
 
     def test_artifact_redirect_drops_authorisation(self):
         requests = []
