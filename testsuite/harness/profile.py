@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Optional
 
 from .process import file_digest
-from .results import unique_object
+from .results import EXECUTABLE_VERSION_PATTERN, unique_object
 
 @dataclass(frozen=True)
 class Profile:
@@ -71,7 +71,8 @@ def load_binaries(directory):
     return data
 
 def parse_peer_banner(text):
-    match = re.search(r'^rsync\s+version\s+(\d+(?:\.\d+)+)(?:-\S+)?\s+protocol\s+version\s+(\d+)\s*$',
+    match = re.search(rf'^rsync\s+version\s+({EXECUTABLE_VERSION_PATTERN})(?:-\S+)?'
+                      r'\s+protocol\s+version\s+(\d+)\s*$',
                       text, re.MULTILINE)
     if not match:
         raise ValueError('invalid rsync version banner')

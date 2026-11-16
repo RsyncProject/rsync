@@ -47,8 +47,17 @@ def test(context: TestContext):
     _, _, not_applicable, unsupported = merge_profiles([by_name['nonroot'], by_name['cygwin']])
     if 'device_nodes' not in not_applicable or 'device_nodes' in unsupported:
         test_fail('N/A did not take precedence over unsupported')
-    if parse_peer_banner('rsync  version 3.5.1-gabc  protocol version 33') != ('3.5.1', 33):
-        test_fail('version banner was not parsed')
+    banners = (
+        ('3.5.1-gabc', '3.5.1'),
+        ('4.0.0dev-gabc', '4.0.0dev'),
+        ('4.0.0pre1-gabc', '4.0.0pre1'),
+        ('4.0.0alpha1-gabc', '4.0.0alpha1'),
+        ('4.0.0beta1-gabc', '4.0.0beta1'),
+        ('4.0.0rc1-gabc', '4.0.0rc1'),
+    )
+    for banner, version in banners:
+        if parse_peer_banner(f'rsync  version {banner}  protocol version 33') != (version, 33):
+            test_fail(f'{version} banner was not parsed')
 
     n_a_path = context.scratch / 'n-a.json'
     n_a_path.write_text(json.dumps({'not_applicable': {'tcp': 'pipe transport'}}))
