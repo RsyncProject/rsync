@@ -420,7 +420,7 @@ static int ona_open_absolute_root(char *remaining, char *abspath, size_t abspath
 /* Core walk.  When out_abs is non-NULL and the path resolves to a directory
  * (O_DIRECTORY), the resolved absolute path is copied there -- owner_walk_parent
  * uses it to filter-check the (otherwise unchecked) leaf basename. */
-static int ona_open(const char *path, int flags, mode_t mode, char *out_abs, size_t out_cap)
+static int ona_open(const char *path, int flags, mode_t mode, char *out_abs, size_t out_cap, int enforce_root)
 {
 #if defined AT_FDCWD && defined O_NOFOLLOW && defined O_DIRECTORY
 	const int dir_traverse_flags = directory_traverse_flags() | O_CLOEXEC;
@@ -445,7 +445,7 @@ static int ona_open(const char *path, int flags, mode_t mode, char *out_abs, siz
 	char abspath[MAXPATHLEN] = {0};
 	if (am_daemon && module_dir && module_dir[0] == '/')
 		strlcpy(abspath, module_dir, sizeof abspath);	/* "/" for a path=/ module */
-	else if (confine_root) {
+	else if (enforce_root && confine_root) {
 		/* Unlike a daemon's, this cwd is not pinned to the root -- the receiver
 		 * chdir's into the destination -- so it has to be read, not assumed.
 		 * It must be the PHYSICAL cwd: curr_dir is the lexical name change_dir()
@@ -471,7 +471,7 @@ static int ona_open(const char *path, int flags, mode_t mode, char *out_abs, siz
 	 * following the link restarts the walk at its absolute target, and every
 	 * component of THAT is checked, so a pin aimed outside is still refused. */
 	const char *ptail = fd_pin_tail(path);
-	int pin_transit = !am_daemon && confine_root && ptail != NULL;
+	int pin_transit = enforce_root && !am_daemon && confine_root && ptail != NULL;
 
 	/* Path-walk state. `remaining` is the unconsumed tail; we splice
 	 * symlink targets back into it as we go. Sized 2x MAXPATHLEN so a
@@ -533,7 +533,7 @@ static int ona_open(const char *path, int flags, mode_t mode, char *out_abs, siz
 					saved_errno = errno;
 					goto out;
 				}
-				if (!pin_transit && abspath_outside_confinement(abspath, 1)) {
+				if (enforce_root && !pin_transit && abspath_outside_confinement(abspath, 1)) {
 					saved_errno = ELOOP;
 					goto out;
 				}
@@ -663,7 +663,7 @@ static int ona_open(const char *path, int flags, mode_t mode, char *out_abs, siz
 				saved_errno = errno;
 				goto out;
 			}
-			if (!pin_transit && abspath_outside_confinement(abspath, 1)) {
+			if (enforce_root && !pin_transit && abspath_outside_confinement(abspath, 1)) {
 				saved_errno = ELOOP;
 				goto out;
 			}
@@ -687,7 +687,7 @@ static int ona_open(const char *path, int flags, mode_t mode, char *out_abs, siz
 			saved_errno = errno;
 			goto out;
 		}
-		if (!pin_transit && abspath_outside_confinement(abspath, 0)) {
+		if (enforce_root && !pin_transit && abspath_outside_confinement(abspath, 0)) {
 			saved_errno = ELOOP;
 			goto out;
 		}
@@ -715,7 +715,7 @@ static int ona_open(const char *path, int flags, mode_t mode, char *out_abs, siz
 	 * an O_PATH fd is sufficient for traversal and fchdir but not operations
 	 * such as fchmod. */
 	if (flags & O_DIRECTORY) {
-		if (!pin_transit && abspath_outside_confinement(abspath, 1)) {
+		if (enforce_root && !pin_transit && abspath_outside_confinement(abspath, 1)) {
 			saved_errno = ELOOP;
 			goto out;
 		}
@@ -736,13 +736,20 @@ out:
 #else
 	/* Pre-AT_FDCWD / no O_NOFOLLOW systems: best-effort fallback. */
 	(void)out_abs; (void)out_cap;
+	(void)enforce_root;
 	return open(path, flags, mode);
 #endif
 }
 
 int open_no_attacker_symlinks(const char *path, int flags, mode_t mode)
 {
-	return ona_open(path, flags, mode, NULL, 0);
+	return ona_open(path, flags, mode, NULL, 0, 1);
+}
+
+/* A log's ownership check must not inherit file-list confinement. */
+int open_log_file(const char *path, int flags, mode_t mode)
+{
+	return ona_open(path, flags, mode, NULL, 0, 0);
 }
 
 /* Open a directory for traversal or as *at()/fchdir() authority.  Unlike an
@@ -750,7 +757,7 @@ int open_no_attacker_symlinks(const char *path, int flags, mode_t mode)
  * directory when the kernel provides a safe search-only descriptor. */
 int open_no_attacker_symlinks_dirfd(const char *path)
 {
-	return ona_open(path, directory_traverse_flags(), 0, NULL, 0);
+	return ona_open(path, directory_traverse_flags(), 0, NULL, 0, 1);
 }
 
 /* When set, the do_*_at() wrappers resolve their path as an OPERATOR-supplied
@@ -779,7 +786,7 @@ int owner_walk_parent(const char *path, const char **bname)
 	*bname = slash ? slash + 1 : path;
 	pabs[0] = '\0';
 	if (!slash)
-		dfd = ona_open(".", directory_traverse_flags(), 0, pabs, sizeof pabs);
+		dfd = ona_open(".", directory_traverse_flags(), 0, pabs, sizeof pabs, 1);
 	else {
 		dlen = slash == path ? 1 : (size_t)(slash - path); /* "/x" -> parent "/" */
 		if (dlen >= sizeof dir) {
@@ -788,7 +795,7 @@ int owner_walk_parent(const char *path, const char **bname)
 		}
 		memcpy(dir, path, dlen);
 		dir[dlen] = '\0';
-		dfd = ona_open(dir, directory_traverse_flags(), 0, pabs, sizeof pabs);
+		dfd = ona_open(dir, directory_traverse_flags(), 0, pabs, sizeof pabs, 1);
 	}
 	if (dfd < 0)
 		return -1;
