@@ -44,6 +44,11 @@ def test(context: TestContext):
     write_receipt(receipt, data)
     if read_receipt(receipt) != data:
         test_fail('a valid receipt changed while loading')
+    development = deepcopy(data)
+    development['run'].update(primary_version='4.0.0dev', secondary_version='4.0.0dev')
+    write_receipt(receipt, development)
+    if read_receipt(receipt) != development:
+        test_fail('a development receipt changed while loading')
     archived = deepcopy(data)
     archived['run'].update(profiles=['peer-3.4.1'], secondary_version='3.4.1',
                            archived_role='secondary', archived_version='3.4.1')
