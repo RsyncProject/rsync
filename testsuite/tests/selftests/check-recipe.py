@@ -33,15 +33,16 @@ def test(context: TestContext):
     env['whichtests'] = 'must-not-run'
     env['PYTHONUNBUFFERED'] = '1'
 
+    cancelled = False
+
+    def cancel(signum, frame):
+        nonlocal cancelled
+        cancelled = True
+
+    signal.signal(signal.SIGTERM, cancel)
+
     def invoke(args, success, message=None, timeout=180, input=None):
         print(f'recipe: {quote_command(args)}', flush=True)
-        cancelled = False
-
-        def cancel(signum, frame):
-            nonlocal cancelled
-            cancelled = True
-
-        previous = signal.signal(signal.SIGTERM, cancel)
         proc = None
         try:
             proc = subprocess.Popen(args, env=env, cwd=context.scratch, stdout=subprocess.PIPE,
@@ -87,7 +88,6 @@ def test(context: TestContext):
                 test_error(diagnostic)
             raise
         finally:
-            signal.signal(signal.SIGTERM, previous)
             if proc is not None:
                 proc.stdout.close()
                 proc.stderr.close()
