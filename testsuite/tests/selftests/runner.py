@@ -278,10 +278,22 @@ def test(context: TestContext):
     if executed.exists():
         test_fail('an archived symlink bypassed identity checks')
     banner = subprocess.run([binary, '--version'], capture_output=True, text=True, check=True).stdout
-    peer, protocol = parse_peer_banner(banner)
+    _, protocol = parse_peer_banner(banner)
+    peer = '3.5.2'
+    peer_binary = context.scratch / 'released-peer'
+    peer_binary.write_text(
+        f'#!{sys.executable}\n'
+        'import os, sys\n'
+        f'current = {binary!r}\n'
+        'if sys.argv[1:] == ["--version"]:\n'
+        f'    print("rsync  version {peer}  protocol version {protocol}")\n'
+        'else:\n'
+        '    os.execv(current, [current] + sys.argv[1:])\n'
+    )
+    peer_binary.chmod(0o755)
     profile = context.scratch / f'peer-{peer}.json'
     command = [sys.executable, str(context.repository / 'testsuite' / 'runtests.py'), 'cli-transfers',
-               f'--rsync-bin={binary}', f'--rsync-bin2={binary}', f'--tooldir={context.tools}',
+               f'--rsync-bin={binary}', f'--rsync-bin2={peer_binary}', f'--tooldir={context.tools}',
                f'--srcdir={context.repository}', f'--profiles={profile}', f'--receipt={receipt}']
     role = 'root' if os.geteuid() == 0 else 'nonroot'
     for names in ('root,nonroot', 'nonroot' if role == 'root' else 'root'):
