@@ -448,7 +448,8 @@ def test(context: TestContext):
     peer_profile.write_text(json.dumps({'version': peer, 'protocol': protocol}))
     selection = command.copy()
     selection[2:3] = ['conditional', 'qualified']
-    result = invoke(selection + [f'--profiles={peer_profile}', '--archived-role=secondary'])
+    result = invoke(selection + [f'--profiles={peer_profile}', f'--rsync-bin2={peer_binary}',
+                                 '--archived-role=secondary'])
     if result.returncode != Exit.ERROR or 'transport metadata' not in result.stderr or receipt.exists():
         test_fail('peer selection accepted an unclassified test')
     qualified.unlink()
