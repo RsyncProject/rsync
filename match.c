@@ -67,6 +67,15 @@ extern struct stats stats;
 #define MAX_CHAIN_LEN 1024
 #endif
 
+/* Average hash-bucket occupancy is kept <= 0.80 by build_hash_table(), and
+ * duplicate identical blocks are unlinked via last_false_sum2 without
+ * advancing chain_len.  Walking >= 64 non-unlinked entries in a single bucket
+ * only occurs during a hash-bucket or weak-checksum collision flood (including
+ * sub-cap chains where s->count <= MAX_CHAIN_LEN). */
+#ifndef DEEP_CHAIN_THRESHOLD
+#define DEEP_CHAIN_THRESHOLD 64
+#endif
+
 static uint32 tablesize;
 static int32 *hash_table;
 
@@ -219,7 +228,8 @@ static void hash_search(int f,struct sum_struct *s,
 		if (tablesize == TRADITIONAL_TABLESIZE) {
 			hash_entry = SUM2HASH2(s1,s2);
 			if ((i = hash_table[hash_entry]) < 0) {
-				consecutive_false_offsets = 0;
+				if (consecutive_false_offsets > 0)
+					consecutive_false_offsets--;
 				goto null_hash;
 			}
 			sum = (s1 & 0xffff) | (s2 << 16);
@@ -227,7 +237,8 @@ static void hash_search(int f,struct sum_struct *s,
 			sum = (s1 & 0xffff) | (s2 << 16);
 			hash_entry = BIG_SUM2HASH(sum);
 			if ((i = hash_table[hash_entry]) < 0) {
-				consecutive_false_offsets = 0;
+				if (consecutive_false_offsets > 0)
+					consecutive_false_offsets--;
 				goto null_hash;
 			}
 		}
@@ -247,6 +258,13 @@ static void hash_search(int f,struct sum_struct *s,
 			}
             l = (int32)MIN((OFF_T)s->blength, len-offset);
 			if (sum != s->sums[i].sum1 || l != s->sums[i].len) {
+			   /* Count hash-bucket collisions (where SUM2HASH/BIG_SUM2HASH
+				* collided on the bucket index, or block length differs, so
+				* sum1/len don't match) toward MAX_CHAIN_LEN as well, so a
+				* peer cannot craft a huge chain of distinct sum1 values that
+				* all fold into the same hash bucket for an unbounded walk. */
+				if (++chain_len > MAX_CHAIN_LEN)
+					break;
 				prev = &s->sums[i].chain;
 				continue;
 			}
@@ -357,15 +375,24 @@ static void hash_search(int f,struct sum_struct *s,
 			s2 = sum >> 16;
 			matches++;
 			matched_block = 1;
-			consecutive_false_offsets = 0;
+			if (s->sums[i].len >= BLOCK_SIZE)
+				consecutive_false_offsets = 0;
+			else if (chain_len < DEEP_CHAIN_THRESHOLD
+				 && consecutive_false_offsets > 0)
+				consecutive_false_offsets--;
 			break;
 		} while ((i = s->sums[i].chain) >= 0);
-		/* If we computed a strong checksum (weak collision) and the entire
-		 * chain failed to match, don't let repeated collisions force a
-		 * 1-byte walk with a full strong-checksum calculation on every byte. */
-		if (!matched_block && (done_csum2 || chain_len > MAX_CHAIN_LEN)) {
-			if (++consecutive_false_offsets >= 4 && k > 1) {
-				OFF_T skip = MIN((OFF_T)(k - 1), end - 1 - offset);
+		/* If we computed a strong checksum (weak collision) or walked a deep
+		 * hash-bucket chain (>= DEEP_CHAIN_THRESHOLD entries) without a full-block advance,
+		 * don't let repeated collisions force a byte-by-byte walk across the
+		 * file.  Enforce a minimum skip floor of BLOCK_SIZE - 1 so a
+		 * peer-supplied tiny blength (e.g. 1) cannot neutralize the stride. */
+		if ((!matched_block && (done_csum2 || chain_len >= DEEP_CHAIN_THRESHOLD))
+		 || (matched_block && chain_len >= DEEP_CHAIN_THRESHOLD
+		 && s->sums[i].len < BLOCK_SIZE)) {
+			if (++consecutive_false_offsets >= 4) {
+				OFF_T min_skip = MAX((OFF_T)(k - 1), (OFF_T)(BLOCK_SIZE - 1));
+				OFF_T skip = MIN(min_skip, end - 1 - offset);
 				if (skip > 0) {
 					offset += skip;
 					k = (int32)MIN((OFF_T)s->blength, len-offset);
@@ -377,8 +404,8 @@ static void hash_search(int f,struct sum_struct *s,
 				consecutive_false_offsets = 3;
 			}
 		}
-		else if (!matched_block)
-			consecutive_false_offsets = 0;
+		else if (!matched_block && consecutive_false_offsets > 0)
+			consecutive_false_offsets--;
 
 	  null_hash:
 		backup = (int32)(offset - last_match);

@@ -125,7 +125,138 @@ if hash_hits3 > MAX_EXPECTED_HITS1:
 
 assert_same(dst3, src3, label='Case 3: --inplace collision skip-boundary transfer')
 
+# Tiny blength weak collisions must still step by at least BLOCK_SIZE - 1.
+src4 = FROMDIR / 'tiny_blength_flood.bin'
+dst4 = TODIR / 'tiny_blength_flood.bin'
+
+TINY_B = 3
+tiny_colliding_block = bytes([C_BYTE + 1, C_BYTE - 2, C_BYTE + 1])
+N_TINY_FLOOD = 16
+expected_literal4 = N_TINY_FLOOD * BLOCK
+dst4.write_bytes(tiny_colliding_block * N_TINY_FLOOD)
+src4.write_bytes(bytes([C_BYTE]) * expected_literal4)
+
+proc4 = run_rsync('-a', '-I', '--no-whole-file', f'--block-size={TINY_B}',
+                  '--no-compress', '--stats', '--debug=deltasum1',
+                  f'{src4}', f'{dst4}', capture_output=True)
+
+hash_hits4, false_alarms4, literal4, matched4 = transfer_stats(
+    proc4.stdout + proc4.stderr
+)
+
+MAX_EXPECTED_HITS4 = N_TINY_FLOOD * 4
+if hash_hits4 > MAX_EXPECTED_HITS4 or matched4 != 0 or literal4 != expected_literal4:
+    test_fail(
+        f"Case 4 tiny blength={TINY_B} failed to enforce skip floor: "
+        f"hash_hits={hash_hits4} (expected <= {MAX_EXPECTED_HITS4}), "
+        f"matched={matched4} (expected 0), literal={literal4} (expected {expected_literal4})"
+    )
+
+assert_same(dst4, src4, label='Case 4: tiny block-size collision skip transfer')
+
+# Bucket collisions with mismatched sum1 must cap at MAX_CHAIN_LEN and skip.
+src5 = FROMDIR / 'bucket_chain_flood.bin'
+dst5 = TODIR / 'bucket_chain_flood.bin'
+
+BUCKET_B = 2
+bucket_colliding_block = bytes([C_BYTE - 2, C_BYTE + 3])
+N_BUCKET_BLOCKS = 1200  # > MAX_CHAIN_LEN (1024)
+expected_literal5 = N_TINY_FLOOD * BLOCK
+dst5.write_bytes(bucket_colliding_block * N_BUCKET_BLOCKS)
+src5.write_bytes(bytes([C_BYTE]) * expected_literal5)
+
+proc5 = run_rsync('-a', '-I', '--no-whole-file', f'--block-size={BUCKET_B}',
+                  '--no-compress', '--stats', '--debug=deltasum1',
+                  f'{src5}', f'{dst5}', capture_output=True)
+
+hash_hits5, false_alarms5, literal5, matched5 = transfer_stats(
+    proc5.stdout + proc5.stderr
+)
+
+MAX_EXPECTED_HITS5 = N_TINY_FLOOD * 4
+if (
+    hash_hits5 > MAX_EXPECTED_HITS5
+    or false_alarms5 != 0
+    or matched5 != 0
+    or literal5 != expected_literal5
+):
+    test_fail(
+        f"Case 5 bucket chain collision failed to cap and skip: "
+        f"hash_hits={hash_hits5} (expected <= {MAX_EXPECTED_HITS5}), "
+        f"false_alarms={false_alarms5} (expected 0), matched={matched5} (expected 0), "
+        f"literal={literal5} (expected {expected_literal5})"
+    )
+
+assert_same(dst5, src5, label='Case 5: bucket chain-cap skip transfer')
+
+# Sub-cap bucket chain (<= MAX_CHAIN_LEN) with mismatched sum1 must still skip.
+src6 = FROMDIR / 'subcap_bucket_flood.bin'
+dst6 = TODIR / 'subcap_bucket_flood.bin'
+
+N_SUBCAP_BLOCKS = 1024  # Exactly MAX_CHAIN_LEN (chain_len > MAX_CHAIN_LEN is False)
+expected_literal6 = N_TINY_FLOOD * BLOCK
+dst6.write_bytes(bucket_colliding_block * N_SUBCAP_BLOCKS)
+src6.write_bytes(bytes([C_BYTE]) * expected_literal6)
+
+proc6 = run_rsync('-a', '-I', '--no-whole-file', f'--block-size={BUCKET_B}',
+                  '--no-compress', '--stats', '--debug=deltasum1',
+                  f'{src6}', f'{dst6}', capture_output=True)
+
+hash_hits6, false_alarms6, literal6, matched6 = transfer_stats(
+    proc6.stdout + proc6.stderr
+)
+
+MAX_EXPECTED_HITS6 = N_TINY_FLOOD * 4
+if (
+    hash_hits6 > MAX_EXPECTED_HITS6
+    or false_alarms6 != 0
+    or matched6 != 0
+    or literal6 != expected_literal6
+):
+    test_fail(
+        f"Case 6 sub-cap bucket chain (1024) bypassed skip bound: "
+        f"hash_hits={hash_hits6} (expected <= {MAX_EXPECTED_HITS6}), "
+        f"false_alarms={false_alarms6} (expected 0), matched={matched6} (expected 0), "
+        f"literal={literal6} (expected {expected_literal6})"
+    )
+
+assert_same(dst6, src6, label='Case 6: sub-cap bucket chain skip transfer')
+
+# Deep collision chain ending in a tiny match must not walk the full chain per tiny step.
+src7 = FROMDIR / 'tail_match_chain_flood.bin'
+dst7 = TODIR / 'tail_match_chain_flood.bin'
+
+expected_total7 = N_TINY_FLOOD * BLOCK
+dst7.write_bytes(bytes([C_BYTE, C_BYTE]) + (bucket_colliding_block * 1023))
+src7.write_bytes(bytes([C_BYTE]) * expected_total7)
+
+proc7 = run_rsync('-a', '-I', '--no-whole-file', f'--block-size={BUCKET_B}',
+                  '--no-compress', '--stats', '--debug=deltasum1',
+                  f'{src7}', f'{dst7}', capture_output=True)
+
+hash_hits7, false_alarms7, literal7, matched7 = transfer_stats(
+    proc7.stdout + proc7.stderr
+)
+
+MAX_EXPECTED_HITS7 = N_TINY_FLOOD * 4
+if (
+    hash_hits7 > MAX_EXPECTED_HITS7
+    or false_alarms7 != 0
+    or matched7 + literal7 != expected_total7
+    or literal7 <= expected_total7 - (MAX_EXPECTED_HITS7 * BUCKET_B)
+):
+    test_fail(
+        f"Case 7 deep chain with tiny tail match bypassed skip bound: "
+        f"hash_hits={hash_hits7} (expected <= {MAX_EXPECTED_HITS7}), "
+        f"false_alarms={false_alarms7} (expected 0), "
+        f"matched={matched7}, literal={literal7} (total expected {expected_total7})"
+    )
+
+assert_same(dst7, src7, label='Case 7: deep chain tiny tail-match transfer')
+
 print(
     f"collision-skip test passed: boundary_hits={hash_hits1}, "
-    f"flood_hits={hash_hits2}, inplace_hits={hash_hits3}"
+    f"flood_hits={hash_hits2}, inplace_hits={hash_hits3}, "
+    f"tiny_blength_hits={hash_hits4}, bucket_chain_hits={hash_hits5}, "
+    f"subcap_hits={hash_hits6}, tail_match_hits={hash_hits7}"
 )
