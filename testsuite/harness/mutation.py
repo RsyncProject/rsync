@@ -329,9 +329,9 @@ def build_patched_rsync(name, replacements, append_cflags=None):
     for relpath, old, new in replacements:
         path = work / relpath
         text = path.read_text()
-        if old not in text:
-            test_skipped(f"{name}: could not find patch target in {relpath}: {old!r}",
-                         capability='native_build')
+        matches = text.count(old)
+        if matches != 1:
+            test_fail(f'{name}: expected one patch target in {relpath}, found {matches}')
         path.write_text(text.replace(old, new, 1))
 
         obj = (work / relpath).with_suffix('.o')
@@ -361,8 +361,7 @@ def build_patched_rsync(name, replacements, append_cflags=None):
         mk = mkpath.read_text()
         mk2 = re.sub(r'(?m)^(CFLAGS=.*)$', r'\1 ' + append_cflags, mk, count=1)
         if mk2 == mk:
-            test_skipped(f"{name}: could not append {append_cflags!r} to CFLAGS in the Makefile",
-                         capability='native_build')
+            test_fail(f"{name}: could not append {append_cflags!r} to CFLAGS in the Makefile")
         mkpath.write_text(mk2)
 
         for obj in work.rglob('*.o'):
@@ -373,8 +372,7 @@ def build_patched_rsync(name, replacements, append_cflags=None):
                            stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
     rsync = work / 'rsync'
     if build.returncode != 0 or not rsync.is_file() or not os.access(rsync, os.X_OK):
-        test_skipped(
+        test_fail(
             f"{name}: patched rsync build failed (rc={build.returncode}). "
-            "Tail of build output:\n" + '\n'.join(build.stdout.splitlines()[-20:]),
-            capability='native_build')
+            "Tail of build output:\n" + '\n'.join(build.stdout.splitlines()[-20:]))
     return rsync
