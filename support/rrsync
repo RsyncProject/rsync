@@ -153,6 +153,11 @@ pinned_dirs = {}
 # sender arg rsync transmits as the file's name (see sender_pinned_arg).
 client_relative = False
 
+# Drop missing args instead of refusing if client sends --ignore-missing-args
+client_ignore_missing_args = False
+# if args are dropped and none are left, refuse (or rsync would send ".").
+dropped_missing_args = False
+
 # The inode-pin trick needs /proc/self/fd/N to be a Linux-style magic symlink
 # whose readlink yields the open file's real path. macOS/BSD lack the directory
 # entirely; Solaris HAS /proc/self/fd but its entries are not such symlinks (its
@@ -567,7 +572,7 @@ def main():
     except OSError as e:
         die('unable to chdir to restricted dir:', str(e))
 
-    global client_relative
+    global client_relative, client_ignore_missing_args
     rsync_opts = [ '--server' ]
     rsync_args = [ ]
     saw_the_dot_arg = False
@@ -614,6 +619,8 @@ def main():
                     client_relative = True
                 elif opt == 'no-relative':
                     client_relative = False
+                elif opt == 'ignore-missing-args':
+                    client_ignore_missing_args = True
                 if ct == 0:
                     continue
                 opt = '--' + opt
@@ -673,6 +680,8 @@ def main():
       rsync_opts.append('--ignore-existing')
 
     if not rsync_args:
+        if dropped_missing_args:
+            die('nothing to transfer: all source args are missing')
         rsync_args = [ '.' ]
 
     cmd = (RSYNC, *rsync_opts, '--', '.', *rsync_args)
@@ -702,6 +711,7 @@ def main():
 
 
 def validated_arg(opt, arg, typ=3, wild=False):
+    global dropped_missing_args
     if opt != 'arg': # arg values already have their backslashes removed.
         arg = DE_BACKSLASH_RE.sub(r'\1', arg)
 
@@ -807,6 +817,20 @@ def validated_arg(opt, arg, typ=3, wild=False):
                     and not arg_has_trailing_slash_dot):
                 try:
                     lst = os.lstat(arg)
+                except FileNotFoundError:
+                    # if client asked rsync to skip this arg anyway, drop it if
+                    # just the leaf is missing, but treat it as an error when
+                    # rsync would fail to change_dir()
+                    if client_ignore_missing_args:
+                        if client_relative:
+                            chdir = arg.partition('/./')[0] if '/./' in arg else ''
+                        else:
+                            chdir = os.path.dirname(arg)
+                        if not os.path.isdir(chdir or '.'):
+                            die('bad arg (path does not exist):', orig_arg)
+                        dropped_missing_args = True
+                        continue
+                    lst = None
                 except OSError:
                     lst = None
                 if lst is not None and not (stat.S_ISREG(lst.st_mode)
