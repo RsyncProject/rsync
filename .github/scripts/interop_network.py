@@ -131,8 +131,8 @@ def download_records(run_id, expected, timeout=600, progress=None):
     deadline = time.monotonic() + timeout
     cached, etag = None, None
     while time.monotonic() < deadline:
-        if progress is not None:
-            progress()
+        if progress is not None and progress() is True:
+            deadline = time.monotonic() + timeout
         try:
             body, headers = fetch(url, os.environ['GH_TOKEN'],
                                   headers={'If-None-Match': etag} if etag else {},

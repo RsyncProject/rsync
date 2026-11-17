@@ -166,7 +166,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('phase', choices=('install', 'recipient', 'connect', 'prepare', 'forward', 'quarantine', 'admit',
                                         'transfer1', 'wait1', 'next', 'transfer2', 'wait2', 'verify',
-                                        'revoked', 'stop', 'result'))
+                                        'revoked', 'stop', 'outcome', 'result'))
     parser.add_argument('platform', choices=(*ROLES, 'all'))
     parser.add_argument('--root', type=Path, required=True)
     args = parser.parse_args()
@@ -177,6 +177,15 @@ def main():
         role, phase = args.platform, args.phase
         if phase == 'stop':
             stop(root, role)
+            return 0
+        if phase == 'outcome':
+            blocked = os.environ.get('INTEROP_BLOCKED', 'false')
+            if blocked not in ('true', 'false'):
+                raise NetworkError('Invalid endpoint outcome')
+            with open(os.environ['GITHUB_OUTPUT'], 'a') as stream:
+                stream.write('blocked=' + blocked + '\n')
+            if blocked == 'true':
+                raise NetworkError('Endpoint did not complete interoperability')
             return 0
         if phase == 'forward':
             forward(root, role)
