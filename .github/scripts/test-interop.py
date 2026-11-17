@@ -435,11 +435,32 @@ class Network(unittest.TestCase):
         self.assertEqual(output.read_text(), 'enabled=false\n')
         self.assertFalse((self.root / 'context.json').exists())
 
+    def test_startup_wait_precedes_network_authority(self):
+        authority = Mock(side_effect=AssertionError('Startup wait obtained network authority'))
+        recipients = Mock(side_effect=network.NetworkError('Readiness timed out'))
+        with patch.object(sys, 'argv', ['interop-broker.py', 'broker', '--root', str(self.root)]), \
+                patch.dict(broker['main'].__globals__, Tailnet=authority, records=recipients), \
+                patch('sys.stderr', new_callable=io.StringIO):
+            self.assertEqual(broker['main'](), 1)
+        recipients.assert_called_once_with('public', timeout=ci.STARTUP_TIMEOUT)
+        authority.assert_not_called()
+
+    def test_cancelled_startup_never_obtains_network_authority(self):
+        authority = Mock(side_effect=AssertionError('Cancelled startup obtained network authority'))
+        recipients = {role: dict(public_key=role) for role in ROLES}
+        check = Mock(side_effect=[None, ci.NotSelected('CI finished during startup')])
+        with patch.object(sys, 'argv', ['interop-broker.py', 'broker', '--root', str(self.root)]), \
+                patch.dict(broker['main'].__globals__, Tailnet=authority, check_ci=check,
+                           records=Mock(return_value=recipients)), \
+                patch('sys.stderr', new_callable=io.StringIO):
+            self.assertEqual(broker['main'](), 1)
+        authority.assert_not_called()
+
     def test_cancelled_key_issuance_is_cleaned_before_delivery(self):
         api = Mock()
         api.policy.return_value = ({}, {})
         api.create_key.return_value = ('key1', 'tskey-auth-fixture')
-        check = Mock(side_effect=[None, None, ci.NotSelected('CI finished')])
+        check = Mock(side_effect=[None, None, None, ci.NotSelected('CI finished')])
         recipients = {role: {'public_key': role} for role in ROLES}
         with patch.dict(broker['main'].__globals__, Tailnet=lambda: api, check_ci=check,
                         records=lambda *args, **kwargs: recipients, check_policy=lambda policy: None,
@@ -788,6 +809,154 @@ class Network(unittest.TestCase):
         with patch.object(network, 'exchange', return_value='fixture'), patch.object(network, 'fetch', return_value=(b'{}', {})):
             with self.assertRaises(network.NetworkError):
                 network.Tailnet().change(lambda value: value)
+
+
+class Startup(unittest.TestCase):
+    def setUp(self):
+        self.state = dict(run_id='123', run_attempt='2', source_sha='a' * 40)
+        ci.bind(self.state)
+        self.addCleanup(setattr, ci, 'bound', None)
+        self.now = 0
+        self.starts = [0, 0, 0, 1200, 1500, 1900, 2050]
+        self.ready_at = 2200
+        self.current = dict(run_attempt=2, status='in_progress')
+        self.controller = dict(status='in_progress')
+        self.record = self.state
+        self.mutate_jobs = lambda jobs: jobs
+        self.transient = False
+        self.churn = False
+
+    def jobs(self):
+        return self.mutate_jobs([
+            dict(id=index + 1, name='Interoperability / ' + role, run_id=123, run_attempt=2,
+                 status='in_progress' if self.now >= start else 'queued', conclusion=None,
+                 started_at='2026-11-17T00:00:00Z' if self.now >= start else None)
+            for index, (role, start) in enumerate(zip(ROLES, self.starts))])
+
+    def api(self, path):
+        if path == '/actions/runs/123':
+            return self.current
+        if path == '/actions/runs/456':
+            return self.controller
+        if path == '/actions/runs/123/attempts/2/jobs?per_page=100':
+            jobs = self.jobs()
+            return dict(total_count=len(jobs), jobs=jobs)
+        self.fail('Unexpected API request: ' + path)
+
+    def wait(self, kind):
+        roles = (None,) if kind == 'enrolment' else ROLES
+        names = {ci.artifact_name(kind, role): index + 1 for index, role in enumerate(roles)}
+        def fetch(url, *args, **kwargs):
+            if '/artifacts?' in url:
+                if self.transient:
+                    raise network.NetworkError('Connection failed', retryable=True)
+                items = [dict(id=number, name=name, expired=False) for name, number in names.items()]
+                if self.now < self.ready_at:
+                    items = [dict(id=int(self.now) + 100, name='unrelated', expired=False)] if self.churn else []
+                return json.dumps(dict(total_count=len(items), artifacts=items)).encode(), {}
+            buffer = io.BytesIO()
+            with zipfile.ZipFile(buffer, 'w') as archive:
+                archive.writestr('record.json', json.dumps(self.record))
+            return buffer.getvalue(), {}
+        def sleep(seconds):
+            self.now += seconds
+        with patch.object(ci, 'api', side_effect=self.api), \
+                patch.object(network, 'fetch', side_effect=fetch), \
+                patch.dict(os.environ, GH_TOKEN='fixture'), \
+                patch.object(time, 'monotonic', side_effect=lambda: self.now), \
+                patch.object(time, 'sleep', side_effect=sleep):
+            return ci.records(kind, roles, '456' if kind == 'enrolment' else None, ci.STARTUP_TIMEOUT)
+
+    def test_late_job_starts_renew_both_startup_waits(self):
+        for kind in ('public', 'enrolment'):
+            with self.subTest(kind=kind):
+                self.now = 0
+                records = self.wait(kind)
+                self.assertEqual(len(records), 1 if kind == 'enrolment' else len(ROLES))
+                self.assertGreaterEqual(self.now, self.ready_at)
+
+    def test_queued_jobs_cannot_extend_the_startup_wait(self):
+        self.starts = [10000] * len(ROLES)
+        self.mutate_jobs = lambda jobs: [dict(job, started_at='2026-11-17T00:00:00Z') for job in jobs]
+        for kind in ('public', 'enrolment'):
+            with self.subTest(kind=kind):
+                self.now = 0
+                with self.assertRaisesRegex(network.NetworkError, 'Timed out'):
+                    self.wait(kind)
+                self.assertEqual(self.now, ci.STARTUP_TIMEOUT)
+
+    def test_each_job_start_renews_only_once(self):
+        self.starts = [1700] * len(ROLES)
+        self.ready_at = 10000
+        with self.assertRaisesRegex(network.NetworkError, 'Timed out'):
+            self.wait('public')
+        self.assertGreater(self.now, ci.STARTUP_TIMEOUT)
+        self.assertLessEqual(self.now, ci.STARTUP_TIMEOUT * 2)
+
+    def test_retries_and_unrelated_artifacts_cannot_renew_startup(self):
+        self.starts = [0] * len(ROLES)
+        for transient, churn in ((True, False), (False, True)):
+            with self.subTest(transient=transient, churn=churn):
+                self.now, self.transient, self.churn = 0, transient, churn
+                with self.assertRaisesRegex(network.NetworkError, 'Timed out'):
+                    self.wait('public')
+                self.assertEqual(self.now, ci.STARTUP_TIMEOUT)
+
+    def test_transfer_deadlines_do_not_follow_job_starts(self):
+        with self.assertRaisesRegex(network.NetworkError, 'Timed out'):
+            self.wait('ready')
+        self.assertEqual(self.now, ci.STARTUP_TIMEOUT)
+
+    def test_delayed_readiness_still_rejects_stale_records(self):
+        self.record = dict(self.state, run_attempt='1')
+        with self.assertRaisesRegex(network.NetworkError, 'different CI run, attempt or revision'):
+            self.wait('public')
+
+    def test_startup_preserves_liveness_checks(self):
+        variants = [(dict(run_attempt=3), dict(status='in_progress'), None, ci.NotSelected),
+                    (dict(run_attempt=2, status='completed'), dict(status='in_progress'), None, ci.NotSelected),
+                    (dict(run_attempt=2, conclusion='cancelled'), dict(status='in_progress'), None, ci.NotSelected),
+                    (self.current, dict(status='completed'), None, ci.PeerUnavailable),
+                    (self.current, self.controller, 'failure', ci.PeerUnavailable)]
+        for current, controller, conclusion, error in variants:
+            with self.subTest(current=current, controller=controller, conclusion=conclusion):
+                self.now, self.current, self.controller = 0, current, controller
+                self.mutate_jobs = lambda jobs: [dict(job, conclusion=conclusion) for job in jobs]
+                with self.assertRaises(error):
+                    self.wait('enrolment')
+                self.assertEqual(self.now, 0)
+
+    def test_startup_rejects_ambiguous_job_progress(self):
+        variants = [lambda jobs: jobs + [jobs[0]],
+                    lambda jobs: jobs + [dict(jobs[0], id=99, name='Interoperability / extra')],
+                    lambda jobs: [dict(job, run_id=999) for job in jobs],
+                    lambda jobs: [dict(job, run_attempt=1) for job in jobs],
+                    lambda jobs: [dict(job, id=True) for job in jobs],
+                    lambda jobs: [dict(job, id=1) for job in jobs],
+                    lambda jobs: [dict(job, started_at='invalid') for job in jobs]]
+        self.starts = [0] * len(ROLES)
+        for mutate in variants:
+            with self.subTest(mutate=mutate):
+                self.now, self.mutate_jobs = 0, mutate
+                with self.assertRaisesRegex(network.NetworkError, 'endpoint job'):
+                    self.wait('public')
+                self.assertEqual(self.now, 0)
+
+    def test_changed_job_identity_is_not_new_progress(self):
+        self.starts = [0] * len(ROLES)
+        self.mutate_jobs = lambda jobs: [dict(job, id=job['id'] + int(self.now)) for job in jobs]
+        with self.assertRaisesRegex(network.NetworkError, 'endpoint job'):
+            self.wait('public')
+        self.assertEqual(self.now, 30)
+
+    def test_result_and_other_jobs_cannot_renew_startup(self):
+        self.starts = [0] * len(ROLES)
+        self.mutate_jobs = lambda jobs: jobs + [
+            dict(jobs[0], id=100 + int(self.now), name=name)
+            for name in ('Interoperability / Result', 'Other / endpoint')]
+        with self.assertRaisesRegex(network.NetworkError, 'Timed out'):
+            self.wait('public')
+        self.assertEqual(self.now, ci.STARTUP_TIMEOUT)
 
 
 if __name__ == '__main__':

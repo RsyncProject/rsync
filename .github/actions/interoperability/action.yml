@@ -208,9 +208,6 @@ runs:
       id: outcome
       if: always()
       shell: bash
-      run: |
-        python3 -B -S - <<'PY'
-        import os
-        with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
-            output.write('blocked=' + os.environ.get('INTEROP_BLOCKED', 'false') + '\n')
-        PY
+      env:
+        INTEROP_PLATFORM: ${{ inputs.platform }}
+      run: python3 -B -S .github/scripts/interop-host.py outcome "$INTEROP_PLATFORM" --root "$RUNNER_TEMP/interoperability"
