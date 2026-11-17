@@ -323,6 +323,18 @@ class Transfers(unittest.TestCase):
         self.assertFalse(environment.exists())
         self.assertFalse((self.root / 'blocked.json').exists())
 
+    def test_endpoint_outcome_preserves_blocked_failure(self):
+        output = self.root / 'outcome'
+        for blocked, status in (('true', 1), ('false', 0)):
+            with self.subTest(blocked=blocked), \
+                    patch.object(sys, 'argv', ['interop-host.py', 'outcome', 'linux', '--root', str(self.root)]), \
+                    patch.dict(os.environ, INTEROP_BLOCKED=blocked, GITHUB_OUTPUT=str(output)), \
+                    patch.dict(host['main'].__globals__, identity=lambda: self.fail('Outcome required CI identity')), \
+                    patch('sys.stderr', new_callable=io.StringIO):
+                self.assertEqual(host['main'](), status)
+            self.assertEqual(output.read_text(), 'blocked=' + blocked + '\n')
+            output.unlink()
+
     def test_failed_transfer_is_published_before_the_phase_barrier(self):
         ci.bind(self.state)
         with patch.object(sys, 'argv', ['interop-host.py', 'transfer2', 'linux', '--root', str(self.root)]), \

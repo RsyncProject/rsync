@@ -256,12 +256,14 @@ def main():
             if args.phase == 'finish':
                 write(root, 'result', passed=False, cleaned=True, roles=[])
             return 0
-        api = Tailnet()
         if args.phase == 'broker':
-            check_policy(api.policy()[0])
             recipients, keys = records('public', timeout=STARTUP_TIMEOUT), {}
             if len({record.get('public_key') for record in recipients.values()}) != len(ROLES):
                 raise NetworkError('Endpoints share an enrolment recipient')
+            check_ci()
+        api = Tailnet()
+        if args.phase == 'broker':
+            check_policy(api.policy()[0])
             encrypted = {}
             save(root, 'keys', keys=keys, pending=None)
             for role in ROLES:

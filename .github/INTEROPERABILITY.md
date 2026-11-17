@@ -10,13 +10,19 @@ We bind every record to the parent CI run, attempt and tested revision. Endpoint
 
 Artefact names end in `attempt-N`. Context and lease artefacts use the controller attempt; other interoperability artefacts use the parent CI attempt. The suffix prevents a rerun from consuming records from an earlier attempt.
 
+Recipient and enrolment waits allow 30 minutes without a newly observed endpoint job start. Each endpoint can renew that startup window once, using GitHub job identity and start metadata from the same CI attempt. Polling, artefact changes and transient request failures do not renew it. Transfer barriers retain their fixed deadlines. The controller and endpoint jobs retain their 75-minute limits.
+
 We publish each phase result before waiting at the barrier, which keeps a failed endpoint available until its peers finish the current phase. We block later phases but still run local cleanup. A missing, failed or incomplete endpoint result fails the final check.
+
+Blocked endpoint jobs fail after uploading their blocked record and attempting local cleanup. Qualification after a shared startup failure requires a full CI attempt. A failed-job rerun can leave successful endpoints from an earlier attempt, whose records remain ineligible.
 
 ## Authentication
 
 The Network controller runs trusted default-branch code through a `workflow_run` listener and ignores CI runs that did not select the endpoint workflow. We configure the dedicated test tailnet outside this repository. The controller identity needs write access to `auth_keys`, `policy_file`, `devices:core` and `devices:posture_attributes`. We restrict enrolment to `tag:quarantine`.
 
 The controller checks CI and endpoint liveness before obtaining authority, requesting keys and publishing enrolment.
+
+The broker waits for every enrolment recipient before obtaining Tailscale authority. A startup timeout before that point does not create tailnet resources.
 
 We give endpoint jobs read-only GitHub permissions and no OIDC permission. Each endpoint generates a temporary RSA recipient and receives one encrypted, single-use enrolment key. RSA-OAEP uses 3072-bit keys and SHA-256. We remove the enrolment files immediately and remove SSH private keys when fixture services stop. We never include plaintext credentials in artefacts or job output.
 

@@ -201,20 +201,54 @@ def check_ci():
                   'failure', 'cancelled', 'timed_out', 'action_required')]
     if failed:
         raise PeerUnavailable('Unavailable endpoints: ' + ', '.join(failed))
+    return [job for job in listing if job.get('name', '').startswith('Interoperability / ')
+            and job['name'] != 'Interoperability / Result']
+
+
+def started_endpoints(jobs):
+    state = identity()
+    started, names, job_ids = {}, set(), set()
+    if len(jobs) > len(ROLES):
+        raise NetworkError('Unexpected endpoint job count')
+    for job in jobs:
+        name, job_id = job['name'], job.get('id')
+        if (name in names or type(job_id) is not int or job_id < 1 or job_id in job_ids
+                or job.get('run_id') != int(state['run_id'])
+                or job.get('run_attempt') != int(state['run_attempt'])):
+            raise NetworkError('Invalid endpoint job identity')
+        names.add(name)
+        job_ids.add(job_id)
+        if job.get('status') not in ('in_progress', 'completed'):
+            continue
+        if not isinstance(job.get('started_at'), str) or not re.fullmatch(TIMESTAMP, job['started_at']):
+            raise NetworkError('Invalid endpoint job start')
+        started[name] = job_id, job['started_at']
+    return started
 
 
 def records(kind, roles=ROLES, run_id=None, timeout=600):
     state = identity()
     expected = {artifact_name(kind, role): role for role in roles}
     checked = [None]
+    started = {}
     def active():
         now = time.monotonic()
         if checked[0] is not None and now - checked[0] < 30:
             return
         checked[0] = now
-        check_ci()
+        jobs = check_ci()
         if run_id is not None and kind != 'result' and api('/actions/runs/' + run_id).get('status') == 'completed':
             raise PeerUnavailable('Network controller has stopped')
+        if kind in ('public', 'enrolment'):
+            current = started_endpoints(jobs)
+            if (any(name in started and started[name] != value for name, value in current.items())
+                    or len(set(started) | set(current)) > len(ROLES)):
+                raise NetworkError('Changed endpoint job identity during startup')
+            # Runner scheduling is progress only once per endpoint. Artefact
+            # churn and retries cannot renew this startup stall window.
+            advanced = bool(set(current) - set(started))
+            started.update(current)
+            return advanced
     return {role: validate(record, state) for role, (record, _) in
             download_records(run_id or state['run_id'], expected, timeout, progress=active).items()}
 
