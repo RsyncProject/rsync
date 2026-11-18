@@ -810,13 +810,18 @@ int set_file_attrs(const char *fname, struct file_struct *file, stat_x *sxp,
 			: op_refuse ? (errno = ELOOP, -1)
 			: dfd >= 0 && !S_ISLNK(new_mode) ? do_chmod_atfd(dfd, leaf, new_mode)
 			: do_chmod_at(fname, new_mode);
+		/* An inherited mode is best-effort on filesystems that refuse chmod.
+		 * Do not hide path-resolution or race errors from the safe wrappers. */
+		if (ret < 0 && !preserve_perms && !preserve_executability
+		 && (errno == EACCES || errno == EPERM))
+			ret = 1;
 		if (ret < 0) {
 			rsyserr(FERROR_XFER, errno,
 				"failed to set permissions on %s",
 				full_fname(fname));
 			goto cleanup;
 		}
-		if (ret == 0) /* ret == 1 if symlink could not be set */
+		if (ret == 0) /* ret == 1 if a best-effort mode could not be set */
 			updated |= UPDATED_MODE;
 	}
 #endif
