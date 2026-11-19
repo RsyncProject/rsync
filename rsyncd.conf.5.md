@@ -442,6 +442,10 @@ in the values of parameters.  See that section for details.
     set on a per-module basis instead of globally, the global log will still
     contain any authorization failures or config-file error messages.
 
+    File logging uses the daemon's locale and follows the same byte escaping
+    and line termination rules as [`--log-file`](rsync.1#opt--log-file).
+    These rules do not change what the daemon sends to syslog.
+
     If the daemon fails to open the specified file, it will fall back to using
     syslog and output an error about the failure.  (Note that the failure to
     open the specified log file used to be a fatal error.)

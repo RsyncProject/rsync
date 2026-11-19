@@ -68,26 +68,26 @@ extern char *iconv_opt;
 #define UPDATED_MODE  (1<<5)
 #define UPDATED_CRTIME (1<<6)
 
+const char *get_locale_charset(void)
+{
+#if defined HAVE_LIBCHARSET_H && defined HAVE_LOCALE_CHARSET
+	return locale_charset();
+#elif defined HAVE_LANGINFO_H && defined HAVE_NL_LANGINFO
+	return nl_langinfo(CODESET);
+#else
+	return ""; /* Works with (at the very least) gnu iconv... */
+#endif
+}
+
 #ifdef ICONV_CONST
 iconv_t ic_chck = (iconv_t)-1;
 # ifdef ICONV_OPTION
 iconv_t ic_send = (iconv_t)-1, ic_recv = (iconv_t)-1;
 # endif
 
-static const char *default_charset(void)
-{
-# if defined HAVE_LIBCHARSET_H && defined HAVE_LOCALE_CHARSET
-	return locale_charset();
-# elif defined HAVE_LANGINFO_H && defined HAVE_NL_LANGINFO
-	return nl_langinfo(CODESET);
-# else
-	return ""; /* Works with (at the very least) gnu iconv... */
-# endif
-}
-
 void setup_iconv(void)
 {
-	const char *defset = default_charset();
+	const char *defset = get_locale_charset();
 # ifdef ICONV_OPTION
 	const char *charset;
 	char *cp;

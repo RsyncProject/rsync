@@ -3508,6 +3508,19 @@ sign) if you want the local shell to expand it.
     of "%i %n%L".  See the [`--log-file-format`](#opt) option if you wish to
     override this.
 
+    The file uses the character encoding of the writing process's
+    `LC_CTYPE` locale. Rsync preserves valid characters and escapes
+    undecodable bytes using the byte notation described under
+    [`--8-bit-output`](#opt). In the `C` and `POSIX` locales or when the
+    codeset or its decoder is unavailable, all non-ASCII bytes are escaped.
+    Control characters other than tabs are escaped within each message.
+    Each message ends with a newline. The `--8-bit-output` option itself
+    does not affect log files.
+
+    Rsync appends each complete message to a regular log file in one write.
+    Sharing such a log file between processes requires a filesystem that
+    supports atomic append. This does not apply to pipes or other devices.
+
     Here's an example command that requests the remote side to log what is
     happening:
 
