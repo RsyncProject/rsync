@@ -8,11 +8,13 @@ We test compatible POSIX ACLs and xattrs separately. We return fake-super backup
 
 We bind every record to the parent CI run, attempt and tested revision. Endpoint records include the operating system, effective UID, effective GID and executable SHA-256. We accept the final result only after all seven endpoints complete every assigned case and we confirm network cleanup.
 
-Artefact names end in `attempt-N`. Context and lease artefacts use the controller attempt; other interoperability artefacts use the parent CI attempt. The suffix prevents a rerun from consuming records from an earlier attempt. Controller discovery lists only runs created since the current CI attempt started. A matching timestamp does not replace validation of the controller context.
+Artefact names end in `attempt-N`. Context and lease artefacts use the controller attempt; other interoperability artefacts use the parent CI attempt. The suffix prevents a rerun from consuming records from an earlier attempt. Controller discovery lists only runs created since the current CI attempt started and reuses each candidate's artefact listing for its first context download. A matching timestamp does not replace validation of the controller context.
+
+A rendezvous can reuse an archive it already downloaded if the current listing still selects the same unexpired artefact ID. This reuse ends when the rendezvous returns.
 
 Recipient and enrolment waits allow 30 minutes without a newly observed endpoint job start. Each endpoint can renew that startup window once, using GitHub job identity and start metadata from the same CI attempt. Polling, artefact changes and transient request failures do not renew it. Transfer barriers retain their fixed deadlines. The controller and endpoint jobs retain their 75-minute limits.
 
-We publish each phase result before waiting at the barrier, which keeps a failed endpoint available until its peers finish the current phase. We block later phases but still run local cleanup. A missing, failed or incomplete endpoint result fails the final check.
+We publish each phase result before waiting at the barrier, which keeps a failed endpoint available until its peers finish the current phase. Each verification step requires its barrier to have succeeded. It checks CI liveness again without downloading the same completion artefacts. We block later phases but still run local cleanup. A missing, failed or incomplete endpoint result fails the final check.
 
 Blocked endpoint jobs fail after uploading their blocked record and attempting local cleanup. Qualification after a shared startup failure requires a full CI attempt. A failed-job rerun can leave successful endpoints from an earlier attempt, whose records remain ineligible.
 
@@ -22,9 +24,7 @@ GitHub API errors report explicit rate-limit signals without logging response bo
 
 The Network controller runs trusted default-branch code through a `workflow_run` listener and ignores CI runs that did not select the endpoint workflow. We configure the dedicated test tailnet outside this repository. The controller identity needs write access to `auth_keys`, `policy_file`, `devices:core` and `devices:posture_attributes`. We restrict enrolment to `tag:quarantine`.
 
-The controller checks CI and endpoint liveness before obtaining authority, requesting keys and publishing enrolment.
-
-The broker waits for every enrolment recipient before obtaining Tailscale authority. A startup timeout before that point does not create tailnet resources.
+The broker waits for every enrolment recipient and checks CI and endpoint liveness before obtaining Tailscale authority. It rechecks liveness before requesting keys and publishing enrolment. A startup timeout before that point does not create tailnet resources. Transfer receipt verification checks the trusted workflow and live CI state without requesting a Tailnet credential.
 
 We give endpoint jobs read-only GitHub permissions and no OIDC permission. Each endpoint generates a temporary RSA recipient and receives one encrypted, single-use enrolment key. RSA-OAEP uses 3072-bit keys and SHA-256. We remove the enrolment files immediately and remove SSH private keys when fixture services stop. We never include plaintext credentials in artefacts or job output.
 
@@ -46,7 +46,9 @@ event_name | workflow_run
 workflow_ref | RsyncProject/rsync/.github/workflows/interoperability*.yml@refs/heads/master
 runner_environment | github-hosted
 
-We give endpoint jobs no federated identity. We find the controller from the parent CI run and attempt. We then verify its default-branch revision. We do not need a per-PR identity, branch or repository variable.
+We give endpoint jobs no federated identity. The controller independently checks PR change selection before requesting authority. Endpoint jobs check the current CI attempt and selected workflow revision without rereading the PR diff.
+
+Each endpoint job saves its verified controller identity and the topology checked during quarantine. Subsequent phases use that topology and still read the live CI and controller state before accepting admission or revocation. A changed controller attempt or revision is refused. The saved records do not contain enrolment keys.
 
 ## Recovery
 

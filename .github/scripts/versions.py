@@ -6,6 +6,7 @@ import subprocess
 import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'testsuite'))
+from harness.check_recipe import check_command
 from harness.profile import load_binaries
 
 
@@ -47,17 +48,11 @@ def main():
                                   else (current, peer.resolve()))
             for transport in ('pipe', 'tcp'):
                 label = f'{peer.name} ({args.role}, {transport})'
-                profiles = ['non-asan', 'nonroot', 'linux', profile]
-                if transport == 'pipe':
-                    profiles.insert(0, 'pipe')
+                profiles = f'non-asan,nonroot,linux,{profile}'
                 print(f'::group::{label}', flush=True)
                 try:
-                    command = [sys.executable, '-S', 'testsuite/tools/check.py', '.', str(primary),
-                               ','.join(profiles),
-                               str(output / f'{peer.name}-{args.role}-{transport}'),
-                               f'--rsync-bin2={secondary}', f'--archived-role={args.role}', '-j8']
-                    if transport == 'tcp':
-                        command += ['--use-tcp', '--daemon-tests-only']
+                    command = check_command('.', primary, profiles, output / f'{peer.name}-{args.role}-{transport}',
+                                            transport, f'--rsync-bin2={secondary}', f'--archived-role={args.role}', '-j8')
                     active = subprocess.Popen(command, env={**os.environ, 'PYTHONDONTWRITEBYTECODE': '1'})
                     if active.wait():
                         print(f'::error::Version mix failed: {label}', file=sys.stderr)

@@ -65,19 +65,7 @@ jobs:
               compile(path.read_bytes(), str(path), 'exec')
           PY
       - name: Check helpers
-        run: |
-          python3 -B -S .github/scripts/test-android.py
-          python3 -B -S .github/scripts/test-termux.py
-          python3 -B -S .github/scripts/test-storage.py
-          python3 -B -S .github/scripts/test-interop-metadata.py
-          python3 -B -S .github/scripts/test-changes.py
-          python3 -B -S .github/scripts/test-results.py
-          python3 -B -S .github/scripts/test-guest.py
-          python3 -B -S .github/scripts/test-diagnostics.py
-          python3 -B -S .github/scripts/test-archive.py
-          python3 -B -S .github/scripts/test-interop-policy.py
-          python3 -B -S .github/scripts/test-interop.py
-          python3 -B -S .github/scripts/test-transfers.py
+        run: python3 -B -S .github/scripts/diagnostics.py check-helpers
       - name: Tests
         id: test
         run: python3 -B -S testsuite/tools/check.py . ./rsync pipe,root,self-peer,linux,non-asan,no-userns test-results/python37 metadata profile process mutation cli-transfers runner check-recipe -j2
@@ -105,21 +93,8 @@ jobs:
         run: actionlint -version
       - name: Check workflows
         run: actionlint -color -ignore '^label "ubuntu-26\.04(-arm)?" is unknown\.'
-      - name: Check result gate
-        run: python3 -S .github/scripts/test-results.py
       - name: Check helpers
-        run: |
-          python3 -S .github/scripts/test-changes.py
-          python3 -S .github/scripts/test-guest.py
-          python3 -S .github/scripts/test-diagnostics.py
-          python3 -S .github/scripts/test-android.py
-          python3 -S .github/scripts/test-termux.py
-          python3 -S .github/scripts/test-storage.py
-          python3 -S .github/scripts/test-interop-metadata.py
-          python3 -S .github/scripts/test-archive.py
-          python3 -S .github/scripts/test-interop-policy.py
-          python3 -S .github/scripts/test-interop.py
-          python3 -S .github/scripts/test-transfers.py
+        run: python3 -B -S .github/scripts/diagnostics.py check-helpers
       - name: Check Python runtime
         run: python3 -S testsuite/runtests.py --describe-tests > /dev/null
 

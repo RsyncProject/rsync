@@ -21,6 +21,11 @@ from interop_policy import PORTS, QUARANTINE, ROLES, update_policy
 broker = runpy.run_path(str(Path(__file__).with_name('interop-broker.py')))
 
 
+def controller_run():
+    return dict(id=456, run_attempt=1, path='.github/workflows/interoperability.yml', head_branch='master',
+                event='workflow_run', head_sha='c' * 40, status='in_progress', repository=dict(id=266877886))
+
+
 class Network(unittest.TestCase):
     def setUp(self):
         self.directory = tempfile.TemporaryDirectory()
@@ -235,7 +240,7 @@ class Network(unittest.TestCase):
                     patch.object(ci, 'api', side_effect=[dict(total_count=1, workflow_runs=[run]),
                         dict(total_count=1, artifacts=[dict(name='interoperability-context-1', expired=False)])]), \
                     patch.object(ci, 'download_records', return_value={None: (metadata, b'{}')}):
-                self.assertEqual(ci.controller(), '456')
+                self.assertEqual(ci.controller(), dict(control_run_id='456', control_attempt='1', control_sha='c' * 40))
         for field, value in dict(head_branch='untrusted', event='pull_request', repository=dict(id=1)).items():
             with self.subTest(field=field), patch.object(ci, 'source', return_value=origin), \
                     patch.object(ci, 'api', return_value=dict(
@@ -256,7 +261,45 @@ class Network(unittest.TestCase):
                 dict(total_count=2, workflow_runs=[duplicate, run]),
                 dict(total_count=1, artifacts=[dict(name='interoperability-context-1', expired=False)])]), \
                 patch.object(ci, 'download_records', return_value={None: (metadata, b'{}')}):
-            self.assertEqual(ci.controller(), '456')
+            self.assertEqual(ci.controller()['control_run_id'], '456')
+
+    def test_controller_context_reuses_artefact_listing(self):
+        origin = dict(self.state, attempt_started_at='2026-11-14T00:00:00Z')
+        controller = dict(id=456, run_attempt=1, path='.github/workflows/interoperability.yml', head_branch='master',
+                          event='workflow_run', display_title='Network controller', repository=dict(id=266877886),
+                          head_sha='c' * 40, status='in_progress', created_at='2026-11-14T00:00:01Z')
+        runs = dict(total_count=1, workflow_runs=[controller])
+        listing = dict(total_count=1, artifacts=[dict(id=900, name='interoperability-context-attempt-1', expired=False)])
+        context = dict(self.state, control_run_id='456', control_attempt='1', control_sha='c' * 40)
+        buffer = io.BytesIO()
+        with zipfile.ZipFile(buffer, 'w') as archive:
+            archive.writestr('context.json', json.dumps(context))
+
+        discovery = ci.API + '/actions/workflows/interoperability.yml/runs?'
+        artefacts = ci.API + '/actions/runs/456/artifacts?per_page=100'
+        download = ci.API + '/actions/artifacts/900/zip'
+        for delayed in (False, True):
+            requests = []
+
+            def fetch(url, *args, **kwargs):
+                requests.append(url)
+                if url.startswith(discovery):
+                    return json.dumps(runs).encode(), {}
+                if url == artefacts:
+                    return json.dumps(listing).encode(), {}
+                if url == download:
+                    if delayed and requests.count(download) == 1:
+                        raise network.NetworkError('Archive not ready', 404)
+                    return buffer.getvalue(), {}
+                self.fail('Unexpected API request: ' + url)
+
+            with self.subTest(delayed=delayed), patch.dict(ci.api_cache, clear=True), \
+                    patch.object(ci, 'source', return_value=origin), patch.object(ci, 'fetch', side_effect=fetch), \
+                    patch.object(network, 'fetch', side_effect=fetch), patch.object(time, 'sleep'):
+                self.assertEqual(ci.controller()['control_run_id'], '456')
+                expected = [artefacts, download, artefacts, download] if delayed else [artefacts, download]
+                self.assertTrue(requests[0].startswith(discovery))
+                self.assertEqual(requests[1:], expected)
 
     def test_controller_listing_is_scoped_to_the_ci_attempt(self):
         origin = dict(self.state, head_sha='b' * 40, display_title='current',
@@ -274,7 +317,7 @@ class Network(unittest.TestCase):
                 dict(total_count=22, workflow_runs=unrelated),
                 dict(total_count=22, workflow_runs=[current, older]), artifact]) as api, \
                 patch.object(ci, 'download_records', return_value={None: (metadata, b'{}')}):
-            self.assertEqual(ci.controller(), '456')
+            self.assertEqual(ci.controller()['control_run_id'], '456')
         self.assertIn('per_page=20&page=1', api.call_args_list[0][0][0])
         self.assertIn('per_page=20&page=2', api.call_args_list[1][0][0])
         for request in api.call_args_list[:2]:
@@ -300,7 +343,7 @@ class Network(unittest.TestCase):
                     patch.object(ci, 'download_records', side_effect=[
                         {None: (stale_metadata, b'{}')}, {None: (current_metadata, b'{}')}]) as download, \
                     patch.object(time, 'sleep'):
-                self.assertEqual(ci.controller(), '456')
+                self.assertEqual(ci.controller()['control_run_id'], '456')
             self.assertEqual(download.call_args[0][:2], ('456', {name: None}))
 
     def test_controller_listing_rejects_invalid_or_truncated_results(self):
@@ -401,28 +444,30 @@ class Network(unittest.TestCase):
         api = API()
         broker['cleanup'](api, dict(grant=own, devices=[dict(node_id='old', device_id='old')], keys={'linux': 'key1'}))
         self.assertEqual(api.policy['grants'], [foreign])
-        self.assertNotIn('new', api.deleted)
-        self.assertIn('key1', api.deleted)
+        self.assertEqual(api.deleted, ['key1'])
 
     def test_cleanup_never_deletes_a_reassigned_device_id(self):
         class API:
             def devices(api):
-                return [dict(id='old', nodeId='foreign')]
+                return [dict(id='old', nodeId=actual)]
             def change(api, transform):
                 transform(dict(acls=[], grants=[]))
             def delete(api, key):
                 self.fail('Foreign device was deleted')
             def delete_key(api, key):
                 pass
-        with self.assertRaisesRegex(network.NetworkError, 'identity changed'):
-            broker['cleanup'](API(), dict(grant=dict(src=['100.64.0.1'], dst=['100.64.0.1'], ip=list(PORTS)),
-                                         devices=[dict(node_id='own', device_id='old')], keys={}))
+        lease = dict(grant=dict(src=['100.64.0.1'], dst=['100.64.0.1'], ip=list(PORTS)),
+                     devices=[dict(node_id='own', device_id='old')], keys={})
+        for actual in ('foreign', None):
+            with self.subTest(actual=actual), self.assertRaisesRegex(network.NetworkError, 'identity changed'):
+                broker['cleanup'](API(), lease)
 
     def test_cleanup_attempts_all_owned_resources_after_policy_failure(self):
         calls = []
+        inventories = iter(([dict(id='1', nodeId='n1'), dict(id='2', nodeId='n2')], []))
         class API:
             def devices(api):
-                return []
+                return next(inventories)
             def change(api, transform):
                 raise network.NetworkError('Policy update failed')
             def delete(api, key):
@@ -491,17 +536,19 @@ class Network(unittest.TestCase):
     def test_startup_wait_precedes_network_authority(self):
         authority = Mock(side_effect=AssertionError('Startup wait obtained network authority'))
         recipients = Mock(side_effect=network.NetworkError('Readiness timed out'))
+        check = Mock()
         with patch.object(sys, 'argv', ['interop-broker.py', 'broker', '--root', str(self.root)]), \
-                patch.dict(broker['main'].__globals__, Tailnet=authority, records=recipients), \
+                patch.dict(broker['main'].__globals__, Tailnet=authority, records=recipients, check_ci=check), \
                 patch('sys.stderr', new_callable=io.StringIO):
             self.assertEqual(broker['main'](), 1)
         recipients.assert_called_once_with('public', timeout=ci.STARTUP_TIMEOUT)
+        check.assert_not_called()
         authority.assert_not_called()
 
     def test_cancelled_startup_never_obtains_network_authority(self):
         authority = Mock(side_effect=AssertionError('Cancelled startup obtained network authority'))
         recipients = {role: dict(public_key=role) for role in ROLES}
-        check = Mock(side_effect=[None, ci.NotSelected('CI finished during startup')])
+        check = Mock(side_effect=ci.NotSelected('CI finished during startup'))
         with patch.object(sys, 'argv', ['interop-broker.py', 'broker', '--root', str(self.root)]), \
                 patch.dict(broker['main'].__globals__, Tailnet=authority, check_ci=check,
                            records=Mock(return_value=recipients)), \
@@ -513,7 +560,7 @@ class Network(unittest.TestCase):
         api = Mock()
         api.policy.return_value = ({}, {})
         api.create_key.return_value = ('key1', 'tskey-auth-fixture')
-        check = Mock(side_effect=[None, None, None, ci.NotSelected('CI finished')])
+        check = Mock(side_effect=[None, None, ci.NotSelected('CI finished')])
         recipients = {role: {'public_key': role} for role in ROLES}
         with patch.dict(broker['main'].__globals__, Tailnet=lambda: api, check_ci=check,
                         records=lambda *args, **kwargs: recipients, check_policy=lambda policy: None,
@@ -598,6 +645,33 @@ class Network(unittest.TestCase):
         self.assertEqual(api.delete_key.call_count, 2)
         self.assertFalse((self.root / 'result.json').exists())
 
+    def test_verify_without_tailnet(self):
+        broker['save'](self.root, 'lease', nodes=self.nodes)
+        verify = Mock()
+        read = Mock(return_value=self.nodes)
+        check = Mock()
+        authority = Mock(side_effect=AssertionError('Read-only verification requested authority'))
+        with patch.object(sys, 'argv', ['interop-broker.py', 'verify', '--root', str(self.root)]), \
+                patch.dict(broker['main'].__globals__, records=read, verify_cases=verify, check_ci=check, Tailnet=authority):
+            self.assertEqual(broker['main'](), 0)
+        read.assert_called_once_with('result', timeout=1800)
+        verify.assert_called_once_with(self.nodes, self.state['source_sha'])
+        check.assert_not_called()
+        authority.assert_not_called()
+        self.assertTrue(json.loads((self.root / 'verified.json').read_text())['passed'])
+
+    def test_verify_rejects_an_untrusted_workflow(self):
+        broker['save'](self.root, 'lease', nodes=self.nodes)
+        read = Mock(side_effect=AssertionError('Untrusted workflow read transfer receipts'))
+        with patch.object(sys, 'argv', ['interop-broker.py', 'verify', '--root', str(self.root)]), \
+                patch.dict(os.environ, GITHUB_REF='refs/heads/other'), \
+                patch.dict(broker['main'].__globals__, records=read,
+                           Tailnet=lambda: self.fail('Untrusted workflow requested authority')), \
+                patch('sys.stderr', new_callable=io.StringIO) as errors:
+            self.assertEqual(broker['main'](), 1)
+        self.assertIn('Unexpected CI context', errors.getvalue())
+        self.assertFalse((self.root / 'verified.json').exists())
+
     def test_first_liveness_check_does_not_assume_runner_uptime(self):
         def downloading(*args, **kwargs):
             kwargs['progress']()
@@ -613,15 +687,30 @@ class Network(unittest.TestCase):
         def downloading(*args, **kwargs):
             kwargs['progress']()
             return {None: (self.state, b'{}')}
+        control = dict(control_run_id='456', control_attempt='1', control_sha='c' * 40)
         responses = [dict(run_attempt=2, status='in_progress'), dict(total_count=0, jobs=[]),
-                     dict(status='completed')]
+                     dict(controller_run(), status='completed')]
         with patch.object(ci, 'api', side_effect=responses), patch.object(time, 'monotonic', return_value=1), \
                 patch.object(ci, 'download_records', side_effect=downloading), \
                 self.assertRaisesRegex(ci.PeerUnavailable, 'controller has stopped'):
-            ci.records('enrolment', (None,), '456')
+            ci.records('enrolment', (None,), control)
         with patch.object(ci, 'api', side_effect=responses[:2]), patch.object(time, 'monotonic', return_value=1), \
                 patch.object(ci, 'download_records', side_effect=downloading):
-            self.assertEqual(ci.records('result', (None,), '456'), {None: self.state})
+            self.assertEqual(ci.records('result', (None,), control), {None: self.state})
+
+    def test_controller_pin_requires_live_attempt_and_revision(self):
+        def downloading(*args, **kwargs):
+            kwargs['progress']()
+            self.fail('Different controller reached artifact download')
+
+        control = dict(control_run_id='456', control_attempt='1', control_sha='c' * 40)
+        current = [dict(run_attempt=2, status='in_progress'), dict(total_count=0, jobs=[])]
+        for change in (dict(run_attempt=2), dict(head_sha='d' * 40), dict(head_branch='untrusted')):
+            with self.subTest(change=change), \
+                    patch.object(ci, 'api', side_effect=current + [dict(controller_run(), **change)]), \
+                    patch.object(ci, 'download_records', side_effect=downloading), \
+                    self.assertRaisesRegex(network.NetworkError, 'Controller'):
+                ci.records('topology', (None,), control)
 
     def test_recovery_handles_completed_and_unstarted_controllers(self):
         run = dict(id=456, run_attempt=1, path='.github/workflows/interoperability.yml', head_branch='master',
@@ -681,11 +770,12 @@ class Network(unittest.TestCase):
             self.assertNotIn('ACTIONS_ID_TOKEN_REQUEST_TOKEN', kwargs['env'])
             return subprocess.CompletedProcess(argv, 1)
         for name in ('interoperability-lease-attempt-1', 'interoperability-lease-1'):
+            artifacts = [dict(name=name, expired=False)]
             responses = [(json.dumps(run).encode(), {}),
                          (json.dumps({'total_count': 1, 'jobs': [dict(
                              name='Admission and cleanup', run_id=456, run_attempt=1,
                              status='completed', steps=[])]}).encode(), {}),
-                         (json.dumps(dict(total_count=1, artifacts=[dict(name=name, expired=False)])).encode(), {})]
+                         (json.dumps(dict(total_count=1, artifacts=artifacts)).encode(), {})]
             download = Mock(return_value={None: (lease, raw)})
             with self.subTest(name=name), patch.dict(os.environ, env), \
                     patch.object(network, 'fetch', side_effect=responses), \
@@ -694,7 +784,7 @@ class Network(unittest.TestCase):
                     patch.object(subprocess, 'run', side_effect=verified):
                 with self.assertRaisesRegex(network.NetworkError, 'attested'):
                     broker['recover'](self.root)
-            download.assert_called_once_with('456', {name: None}, timeout=60)
+            download.assert_called_once_with('456', {name: None}, timeout=60, initial_listing=artifacts)
 
     def test_cancelled_or_superseded_ci_aborts_rendezvous(self):
         for current in (dict(run_attempt=3), dict(run_attempt=2, conclusion='cancelled'),
@@ -784,6 +874,36 @@ class Network(unittest.TestCase):
             value = network.download_records('123', {'ready': 'linux'})
         self.assertEqual(value['linux'][0], record)
         sleep.assert_called_once_with(5)
+
+    def test_archive_retry_keeps_successful_downloads(self):
+        def archive(artifact_id):
+            buffer = io.BytesIO()
+            with zipfile.ZipFile(buffer, 'w') as archive:
+                archive.writestr('record.json', json.dumps(dict(artifact_id=artifact_id)))
+            return buffer.getvalue(), {}
+
+        for replacement in (False, True):
+            listings, downloads = [], []
+
+            def fetch(url, *args, **kwargs):
+                if '/runs/123/artifacts?' in url:
+                    first = 3 if listings and replacement else 1
+                    listings.append(first)
+                    entries = [dict(id=first, name='one', expired=False), dict(id=2, name='two', expired=False)]
+                    return json.dumps(dict(artifacts=entries, total_count=2)).encode(), {}
+                artifact_id = int(url.split('/')[-2])
+                downloads.append(artifact_id)
+                if artifact_id == 2 and downloads.count(2) == 1:
+                    raise network.NetworkError('Archive not ready', 404)
+                return archive(artifact_id)
+
+            with self.subTest(replacement=replacement), patch.object(network, 'fetch', side_effect=fetch), \
+                    patch.object(time, 'sleep'):
+                result = network.download_records('123', {'one': 'linux', 'two': 'freebsd'})
+                self.assertEqual(listings, [1, 3] if replacement else [1, 1])
+                self.assertEqual(downloads, [1, 2, 3, 2] if replacement else [1, 2, 2])
+                self.assertEqual(result['linux'][0]['artifact_id'], 3 if replacement else 1)
+                self.assertEqual(result['freebsd'][0]['artifact_id'], 2)
 
     def test_redacted_http_errors(self):
         class Opener:
@@ -893,7 +1013,8 @@ class Startup(unittest.TestCase):
         self.starts = [0, 0, 0, 1200, 1500, 1900, 2050]
         self.ready_at = 2200
         self.current = dict(run_attempt=2, status='in_progress')
-        self.controller = dict(status='in_progress')
+        self.controller = controller_run()
+        self.control = dict(control_run_id='456', control_attempt='1', control_sha='c' * 40)
         self.record = self.state
         self.mutate_jobs = lambda jobs: jobs
         self.transient = False
@@ -938,7 +1059,7 @@ class Startup(unittest.TestCase):
                 patch.dict(os.environ, GH_TOKEN='fixture'), \
                 patch.object(time, 'monotonic', side_effect=lambda: self.now), \
                 patch.object(time, 'sleep', side_effect=sleep):
-            return ci.records(kind, roles, '456' if kind == 'enrolment' else None, ci.STARTUP_TIMEOUT)
+            return ci.records(kind, roles, self.control if kind == 'enrolment' else None, ci.STARTUP_TIMEOUT)
 
     def test_late_job_starts_renew_both_startup_waits(self):
         for kind in ('public', 'enrolment'):
@@ -986,10 +1107,10 @@ class Startup(unittest.TestCase):
             self.wait('public')
 
     def test_startup_preserves_liveness_checks(self):
-        variants = [(dict(run_attempt=3), dict(status='in_progress'), None, ci.NotSelected),
-                    (dict(run_attempt=2, status='completed'), dict(status='in_progress'), None, ci.NotSelected),
-                    (dict(run_attempt=2, conclusion='cancelled'), dict(status='in_progress'), None, ci.NotSelected),
-                    (self.current, dict(status='completed'), None, ci.PeerUnavailable),
+        variants = [(dict(run_attempt=3), self.controller, None, ci.NotSelected),
+                    (dict(run_attempt=2, status='completed'), self.controller, None, ci.NotSelected),
+                    (dict(run_attempt=2, conclusion='cancelled'), self.controller, None, ci.NotSelected),
+                    (self.current, dict(self.controller, status='completed'), None, ci.PeerUnavailable),
                     (self.current, self.controller, 'failure', ci.PeerUnavailable)]
         for current, controller, conclusion, error in variants:
             with self.subTest(current=current, controller=controller, conclusion=conclusion):
