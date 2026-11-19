@@ -1,5 +1,4 @@
 #define _GNU_SOURCE
-#include <dlfcn.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <limits.h>
@@ -8,6 +7,9 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <unistd.h>
+
+/* Declare the time types before dlsym so 32-bit musl selects the time64 ABI. */
+#include <dlfcn.h>
 
 static int target_fd(int fd, int directory_fd)
 {
