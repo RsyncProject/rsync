@@ -13,6 +13,19 @@ guest = runpy.run_path(str(Path(__file__).with_name('guest.py')))
 
 
 class Guest(unittest.TestCase):
+    def test_shared_check_recipe_selects_transport(self):
+        command = guest['check_command']
+        prefix = [sys.executable, '-S', 'testsuite/tools/check.py', 'build', 'binary']
+        self.assertEqual(command('build', 'binary', 'root,protocol-30', 'results', 'pipe', '--protocol=30'),
+                         prefix + ['pipe,root,protocol-30', 'results', '--protocol=30'])
+        self.assertEqual(command('build', 'binary', 'nonroot', 'results', 'tcp', '-j2'),
+                         prefix + ['nonroot', 'results', '-j2', '--use-tcp', '--daemon-tests-only'])
+        self.assertEqual(command('build', 'binary', 'pipe,root', 'results', 'pipe')[5], 'pipe,root')
+        with self.assertRaisesRegex(ValueError, 'cannot use the pipe profile'):
+            command('build', 'binary', 'pipe,root', 'results', 'tcp')
+        with self.assertRaisesRegex(ValueError, 'Unknown test transport'):
+            command('build', 'binary', 'root', 'results', 'unknown')
+
     def run_guest(self, platform, failure=None):
         with tempfile.TemporaryDirectory(prefix='rsync-guest-') as directory:
             output = Path(directory) / 'results'

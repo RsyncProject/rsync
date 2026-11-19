@@ -11,6 +11,8 @@ import tarfile
 import tempfile
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'packaging'))
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'testsuite'))
+from harness.check_recipe import check_command
 from source_archive import GEN_FILES, make_archive
 
 
@@ -83,7 +85,7 @@ def qualify(archive, output):
             tool.write_text(f'#!{sys.executable}\nraise SystemExit("Unexpected build dependency: {name}")\n')
             tool.chmod(0o755)
         env = {**os.environ, 'PATH': str(blocked) + os.pathsep + os.environ['PATH'],
-               'RSYNC_TEST_TMP': '/dev/shm'}
+               'PYTHONDONTWRITEBYTECODE': '1', 'RSYNC_TEST_TMP': '/dev/shm'}
         build, prefix = root / 'build', root / 'installed'
         build.mkdir()
         with (output / 'build.log').open('w') as log:
@@ -93,15 +95,12 @@ def qualify(archive, output):
         privilege = 'root' if os.geteuid() == 0 else 'nonroot'
         for transport in ('pipe', 'tcp'):
             profiles = f'non-asan,{privilege},self-peer,linux,no-userns,archive'
-            args = [] if transport == 'pipe' else ['--use-tcp', '--daemon-tests-only']
-            if transport == 'pipe':
-                profiles = 'pipe,' + profiles
             results = root / 'results' / transport
+            command = check_command('.', './rsync', profiles, results, transport, '-j4',
+                                    checker=source / 'testsuite/tools/check.py')
             try:
                 with (output / f'{transport}.log').open('w') as log:
-                    run(sys.executable, '-B', '-S', str(source / 'testsuite/tools/check.py'), '.', './rsync',
-                        profiles, str(results), *args, '-j4', cwd=build, env=env,
-                        stdout=log, stderr=subprocess.STDOUT)
+                    run(*command, cwd=build, env=env, stdout=log, stderr=subprocess.STDOUT)
             finally:
                 retained = output / transport
                 retained.mkdir()
