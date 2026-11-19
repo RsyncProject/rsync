@@ -3,6 +3,7 @@ from functools import lru_cache
 import os
 import re
 import time
+from urllib.parse import urlencode
 
 from changes import select as select_changes
 from interop_network import NetworkError, decode, download_records, fetch
@@ -27,13 +28,18 @@ class PeerUnavailable(NetworkError):
 def api(path, array=False):
     key = path, array
     cached = api_cache.get(key)
-    try:
-        body, headers = fetch(API + path, os.environ['GH_TOKEN'],
-                              headers={'If-None-Match': cached[0]} if cached else {}, operation='Read CI identity')
-    except NetworkError as error:
-        if error.code == 304 and cached:
-            return cached[1]
-        raise
+    request_headers = {'If-None-Match': cached[0]} if cached else {}
+    for delay in (1, 2, None):
+        try:
+            body, headers = fetch(API + path, os.environ['GH_TOKEN'], headers=request_headers,
+                                  operation='Read CI identity')
+            break
+        except NetworkError as error:
+            if error.code == 304 and cached:
+                return cached[1]
+            if delay is None or not error.retryable:
+                raise
+            time.sleep(delay)
     if array:
         try:
             value = json.loads(body)
@@ -150,8 +156,11 @@ def source():
         raise NetworkError('CI has an invalid interoperability workflow selection')
     if run.get('status') == 'completed':
         raise NotSelected('CI has already completed')
+    started = run.get('run_started_at')
+    if not isinstance(started, str) or not re.fullmatch(TIMESTAMP, started):
+        raise NetworkError('CI attempt has no valid start time')
     return dict(run_id=str(run_id), run_attempt=str(attempt), source_sha=references[0]['sha'],
-                head_sha=run['head_sha'], display_title=run['display_title'], created_at=run['created_at'])
+                head_sha=run['head_sha'], display_title=run['display_title'], attempt_started_at=started)
 
 
 def identity():
@@ -256,18 +265,19 @@ def records(kind, roles=ROLES, run_id=None, timeout=600):
 def find_controller(exclude=None):
     state = source()
     titles = {'Network controller', f"Network CI {state['run_id']} attempt {state['run_attempt']}"}
+    started = state['attempt_started_at']
+    query = dict(branch='master', event='workflow_run', created='>=' + started, per_page=20)
     runs = []
     for page in range(1, 6):
-        listing = api('/actions/workflows/interoperability.yml/runs?branch=master&event=workflow_run'
-                      + '&per_page=20&page=' + str(page))
+        listing = api('/actions/workflows/interoperability.yml/runs?' + urlencode(dict(query, page=page)))
         batch = listing.get('workflow_runs')
         count = listing.get('total_count')
         if (type(count) is not int or count < 0 or not isinstance(batch, list) or len(batch) > 20
                 or any(not isinstance(run, dict)
                        or not re.fullmatch(TIMESTAMP, run.get('created_at', '')) for run in batch)):
             raise NetworkError('Invalid controller run listing')
-        runs.extend(run for run in batch if run['created_at'] >= state['created_at'])
-        if len(batch) < 20 or any(run['created_at'] < state['created_at'] for run in batch):
+        runs.extend(run for run in batch if run['created_at'] >= started)
+        if len(batch) < 20 or any(run['created_at'] < started for run in batch):
             break
     else:
         raise NetworkError('Controller run listing exceeds limit')
