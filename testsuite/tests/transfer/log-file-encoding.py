@@ -5,6 +5,7 @@ import errno
 import locale
 import os
 import subprocess
+import sys
 
 from harness import metadata
 from harness.environment import SCRATCHDIR, TOOLDIR
@@ -81,6 +82,7 @@ def check_log_encoding(label, active_locale, names, *options):
     dest.mkdir()
 
     source_bytes = os.fsencode(source)
+    created = set()
     for name in names:
         try:
             with open(os.path.join(source_bytes, name), 'wb') as entry:
@@ -89,13 +91,15 @@ def check_log_encoding(label, active_locale, names, *options):
             if error.errno not in UNSUPPORTED_NAMES:
                 raise
             print(f'{label}: filesystem refuses {name!r}')
+        else:
+            created.add(name)
 
-    # Some filesystems normalise names or cannot represent arbitrary bytes.
-    created = set(os.listdir(source_bytes))
-    for changed in created - names.keys():
-        os.unlink(os.path.join(source_bytes, changed))
-        print(f'{label}: filesystem changed filename bytes to {changed!r}')
-    created.intersection_update(names)
+    # A rewritten directory entry may not be usable for lookup or removal.
+    listed = set(os.listdir(source_bytes))
+    for name in sorted(created - listed):
+        os.unlink(os.path.join(source_bytes, name))
+        print(f'{label}: filesystem did not preserve {name!r}')
+    created.intersection_update(listed)
     if not created:
         return
     expected = sorted(b'\\#134#123|' + names[name] for name in created)
@@ -103,13 +107,11 @@ def check_log_encoding(label, active_locale, names, *options):
     if fallback:
         expected = sorted(escape_nonascii(name) for name in expected)
 
-    env = {**os.environ, 'LC_ALL': active_locale}
-    env.pop('RSYNC_ICONV', None)
     # Exercise a literal escape without using a backslash in a filename.
     proc = subprocess.run(
         rsync_argv('-r', *options, f'--log-file={logfile}',
                    r'--log-file-format=entry:\#123|%f', '--', *sorted(created), f'{dest}/'),
-        cwd=source, env=env, capture_output=True, timeout=30,
+        cwd=source, capture_output=True, timeout=30,
     )
     if proc.returncode != 0:
         test_fail(f'{label}: transfer failed ({proc.returncode}): {proc.stderr!r}')
@@ -129,23 +131,48 @@ def check_log_encoding(label, active_locale, names, *options):
     print(f'{label}: {active_locale}, {len(entries)} logfile entries')
 
 
-check_log_encoding('c', 'C', C_NAMES)
-check_log_encoding('c-8bit', 'C', C_NAMES, '--8-bit-output')
-check_log_encoding('posix', 'POSIX', C_NAMES)
-for label, encoding, candidates, names in (
-    ('utf8', 'UTF-8', ('C.UTF-8', 'C.utf8', 'en_US.UTF-8', 'en_US.utf8', 'UTF-8'), UTF8_NAMES),
-    ('turkish-utf8', 'UTF-8', ('tr_TR.UTF-8', 'tr_TR.utf8'), UTF8_NAMES),
-    ('turkish-legacy', 'ISO-8859-9', ('tr_TR.ISO-8859-9', 'tr_TR.iso88599'),
-     {b'turkish-I-\xfd': b'turkish-I-\xfd'}),
-    ('latin1', 'ISO-8859-1', ('en_US.ISO-8859-1', 'en_US.iso88591'),
-     {b'legacy-\xc3\x85': b'legacy-\xc3\\#205'}),
-    ('latin3', 'ISO-8859-3', ('mt_MT.ISO-8859-3', 'mt_MT.iso88593'),
-     {b'legacy-\xd0\xb1': b'legacy-\\#320\xb1'}),
-    ('euc-jp', 'EUC-JP', ('ja_JP.eucJP', 'ja_JP.ujis', 'japanese.euc'),
-     {b'legacy-\x8e\xb1': b'legacy-\x8e\xb1'}),
-):
-    active_locale = available_locale(candidates, encoding)
-    if active_locale is None:
-        print(f'{label}: no active {encoding} locale')
-        continue
-    check_log_encoding(label, active_locale, names)
+# Cygwin decodes this ISO-8859-3 byte where glibc rejects it.
+LATIN3_D0 = b'\xd0' if sys.platform == 'cygwin' else b'\\#320'
+
+CASES = {
+    'c': (None, ('C',), C_NAMES, ()),
+    'c-8bit': (None, ('C',), C_NAMES, ('--8-bit-output',)),
+    'posix': (None, ('POSIX',), C_NAMES, ()),
+    'utf8': ('UTF-8', ('C.UTF-8', 'C.utf8', 'en_US.UTF-8', 'en_US.utf8', 'UTF-8'), UTF8_NAMES, ()),
+    'turkish-utf8': ('UTF-8', ('tr_TR.UTF-8', 'tr_TR.utf8'), UTF8_NAMES, ()),
+    'turkish-legacy': ('ISO-8859-9', ('tr_TR.ISO-8859-9', 'tr_TR.iso88599'),
+                       {b'turkish-I-\xfd': b'turkish-I-\xfd'}, ()),
+    'latin1': ('ISO-8859-1', ('en_US.ISO-8859-1', 'en_US.iso88591'),
+               {b'legacy-\xc3\x85': b'legacy-\xc3\\#205'}, ()),
+    'latin3': ('ISO-8859-3', ('mt_MT.ISO-8859-3', 'mt_MT.iso88593'),
+               {b'legacy-\xd0\xb1': b'legacy-' + LATIN3_D0 + b'\xb1'}, ()),
+    'euc-jp': ('EUC-JP', ('ja_JP.eucJP', 'ja_JP.ujis', 'japanese.euc'),
+               {b'legacy-\x8e\xb1': b'legacy-\x8e\xb1'}, ()),
+}
+
+
+def main():
+    if len(sys.argv) == 2:
+        label = sys.argv[1]
+        _, _, names, options = CASES[label]
+        check_log_encoding(label, os.environ['LC_ALL'], names, *options)
+        return
+
+    for label, (encoding, candidates, _, _) in CASES.items():
+        active_locale = available_locale(candidates, encoding) if encoding else candidates[0]
+        if active_locale is None:
+            print(f'{label}: no active {encoding} locale', flush=True)
+            continue
+        # Cygwin chooses its filename encoding when the process starts.
+        env = {**os.environ, 'LC_ALL': active_locale}
+        env.pop('RSYNC_ICONV', None)
+        proc = subprocess.run(
+            [sys.executable, '-B', '-S', '-m', 'harness.execute', __file__, label],
+            env=env, timeout=35,
+        )
+        if proc.returncode:
+            raise SystemExit(proc.returncode)
+
+
+if __name__ == '__main__':
+    main()
