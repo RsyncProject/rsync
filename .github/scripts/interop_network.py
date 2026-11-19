@@ -37,6 +37,17 @@ def decode(body):
     return result
 
 
+def github_rate_limit_hint(url, code, headers):
+    if code not in (403, 429) or not url.startswith('https://api.github.com/'):
+        return ''
+    headers = headers or {}
+    if headers.get('X-RateLimit-Remaining') == '0':
+        return ' (GitHub API rate limit exhausted)'
+    if code == 429 or headers.get('Retry-After', '').isdigit():
+        return ' (GitHub API throttled the request)'
+    return ''
+
+
 def fetch(url, token=None, data=None, headers=None, allowed_redirect=False, method=None, operation='Network request'):
     options = {'Accept': 'application/json', **(headers or {})}
     if token:
@@ -57,7 +68,8 @@ def fetch(url, token=None, data=None, headers=None, allowed_redirect=False, meth
                     or parts.username or parts.password or parts.port not in (None, 443)):
                 raise NetworkError('Unexpected artifact download host') from None
             return fetch(target, operation=operation)
-        raise NetworkError(operation + ': HTTP ' + str(error.code), error.code,
+        hint = github_rate_limit_hint(url, error.code, error.headers)
+        raise NetworkError(operation + ': HTTP ' + str(error.code) + hint, error.code,
                            retryable=error.code in RETRYABLE_HTTP) from None
     except (OSError, urllib.error.URLError):
         raise NetworkError(operation + ': connection failed', retryable=True) from None
