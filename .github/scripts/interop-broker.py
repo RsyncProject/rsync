@@ -6,9 +6,10 @@ import re
 import subprocess
 import sys
 
-from interop_ci import ROLES, STARTUP_TIMEOUT, NotSelected, PeerUnavailable, bind, check_ci, find_controller, identity, records, source, write
+from interop_ci import (ROLES, STARTUP_TIMEOUT, NotSelected, PeerUnavailable, bind, check_ci,
+                        controller_binding, find_controller, identity, records, source, write)
 from interop_enrol import seal
-from interop_network import NetworkError, Tailnet, download_records
+from interop_network import NetworkError, Tailnet, download_records, workflow_event
 from interop_policy import TAILNET, admission, check_policy, update_policy
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'testsuite'))
@@ -127,12 +128,14 @@ def cleanup(api, lease):
         errors.append('Device ownership could not be checked')
     if current is not None:
         for device in lease['devices']:
-            actual = current.get(device['device_id'])
-            if actual is not None and actual != device['node_id']:
+            device_id = device['device_id']
+            if device_id not in current:
+                continue
+            if current[device_id] != device['node_id']:
                 errors.append('Device identity changed')
                 continue
             try:
-                api.delete(device['device_id'])
+                api.delete(device_id)
             except ValueError:
                 errors.append('Device removal failed')
     for key in lease['keys'].values():
@@ -155,13 +158,13 @@ def recover(root):
     body, _ = fetch('https://api.github.com/repos/RsyncProject/rsync/actions/runs/' + run_id + '/attempts/' + attempt,
                     os.environ['GH_TOKEN'], operation='Read recovery run')
     run = decode(body)
-    if (run.get('path') != '.github/workflows/interoperability.yml' or run.get('head_branch') != 'master'
-            or run.get('id') != int(run_id) or run.get('run_attempt') != int(attempt)
-            or run.get('repository', {}).get('id') != 266877886
-            or run.get('event') != 'workflow_run'
+    try:
+        control = controller_binding(run)
+    except NetworkError:
+        raise NetworkError('Recovery run is not a trusted controller') from None
+    if (control['control_run_id'] != run_id or control['control_attempt'] != attempt
             or run.get('status') != 'completed'
-            or run.get('conclusion') not in ('failure', 'cancelled', 'timed_out')
-            or not re.fullmatch(r'[0-9a-f]{40}', run.get('head_sha', ''))):
+            or run.get('conclusion') not in ('failure', 'cancelled', 'timed_out')):
         raise NetworkError('Recovery run is not a trusted controller')
     body, _ = fetch('https://api.github.com/repos/RsyncProject/rsync/actions/runs/' + run_id + '/attempts/' + attempt + '/jobs',
                     os.environ['GH_TOKEN'], operation='Read controller cleanup result')
@@ -200,17 +203,17 @@ def recover(root):
         raise NetworkError('Duplicate recovery lease')
     if matches:
         name = matches[0]['name']
-    lease, raw = download_records(run_id, {name: None}, timeout=60)[None]
+    lease, raw = download_records(run_id, {name: None}, timeout=60,
+                                  initial_listing=listing['artifacts'] if matches else None)[None]
     path = root / 'recovery-lease.json'
     path.write_bytes(raw)
     env = {key: os.environ[key] for key in ('PATH', 'HOME', 'GH_TOKEN') if key in os.environ}
     env['GH_PROMPT_DISABLED'] = '1'
     result = subprocess.run(['gh', 'attestation', 'verify', str(path), '--repo', 'RsyncProject/rsync',
                              '--signer-workflow', 'RsyncProject/rsync/.github/workflows/interoperability.yml',
-                             '--signer-digest', run['head_sha'], '--source-ref', 'refs/heads/master',
+                             '--signer-digest', control['control_sha'], '--source-ref', 'refs/heads/master',
                              '--deny-self-hosted-runners'], capture_output=True, timeout=60, env=env)
-    if (result.returncode or lease.get('control_run_id') != run_id
-            or lease.get('control_attempt') != str(run['run_attempt']) or lease.get('control_sha') != run['head_sha']):
+    if result.returncode or any(lease.get(key) != value for key, value in control.items()):
         raise NetworkError('Recovery lease is not attested by the expected controller')
     cleanup(Tailnet(), lease)
 
@@ -230,7 +233,7 @@ def main():
             bind(load(root, 'context'))
         try:
             state = identity()
-            if args.phase not in ('revoke', 'finish'):
+            if args.phase in ('metadata', 'prepare', 'admit'):
                 check_ci()
         except (NotSelected, PeerUnavailable) as error:
             if args.phase != 'metadata':
@@ -255,6 +258,15 @@ def main():
         if args.phase in ('revoke', 'finish') and not any((root / (name + '.json')).exists() for name in ('lease', 'keys')):
             if args.phase == 'finish':
                 write(root, 'result', passed=False, cleaned=True, roles=[])
+            return 0
+        if args.phase == 'verify':
+            workflow_event()
+            lease = load(root, 'lease')
+            results = records('result', timeout=1800)
+            if any(record.get('node_id') != lease['nodes'][role]['node_id'] for role, record in results.items()):
+                raise NetworkError('Transfer result has a different node identity')
+            verify_cases(results, state['source_sha'])
+            write(root, 'verified', passed=True)
             return 0
         if args.phase == 'broker':
             recipients, keys = records('public', timeout=STARTUP_TIMEOUT), {}
@@ -286,13 +298,6 @@ def main():
             check_ci()
             policy = api.change(lambda current: update_policy(current, lease['grant']))
             write(root, 'admission', nodes=lease['nodes'], policy=policy)
-        elif args.phase == 'verify':
-            lease = load(root, 'lease')
-            results = records('result', timeout=1800)
-            if any(record.get('node_id') != lease['nodes'][role]['node_id'] for role, record in results.items()):
-                raise NetworkError('Transfer result has a different node identity')
-            verify_cases(results, state['source_sha'])
-            write(root, 'verified', passed=True)
         elif args.phase == 'revoke':
             if (root / 'lease.json').exists():
                 revoke(api, load(root, 'lease'))

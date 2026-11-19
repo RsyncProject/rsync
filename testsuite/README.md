@@ -56,6 +56,11 @@ With profiles active, an unsupported result is accepted only when the test decla
 
 [ci.yml](../.github/workflows/ci.yml) defines the platform groups and required checks. Native jobs exercise root and non-root transfers where available. Historical peers run applicable tests in both executable roles over pipe and TCP. Diagnostics cover the minimum Python version, static analysis, sanitisers, coverage and Valgrind. Coverage reports omit daemon work after chroot because its counter files are outside the chroot.
 
+The minimum Python and workflow lint jobs use the same helper test roster. Run those checks from the repository root with:
+```sh
+python3 -B -S .github/scripts/diagnostics.py check-helpers
+```
+
 Linux jobs cover both xattr syscall paths, nested user namespaces, older libc and OpenSSL versions, musl and 32-bit behaviour. We pin one BSD and macOS release unless another release exercises distinct rsync behaviour. Check the workflow files for exact versions.
 
 The Ubuntu 24.04 X86-64 non-root pipe run generates Turkish UTF-8 and ISO-8859-9 locale data alongside other legacy encodings. The test process uses `LOCPATH` to find that data without changing the host's default locale.

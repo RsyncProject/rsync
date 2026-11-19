@@ -13,6 +13,21 @@ import time
 import urllib.error
 import urllib.request
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'testsuite'))
+from harness.check_recipe import check_command
+
+
+def check_helpers(directory):
+    suites = sorted(directory.glob('test-*.py'))
+    if not suites:
+        raise ValueError('No CI helper tests found')
+    for suite in suites:
+        print(f'Checking {suite.name}', flush=True)
+        status = subprocess.call([sys.executable, '-B', '-S', str(suite)])
+        if status:
+            return status if status > 0 else 128 - status
+    return 0
+
 
 def logged(command, path):
     with path.open('w') as log, subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
@@ -80,6 +95,7 @@ def main():
     parser = argparse.ArgumentParser()
     sub = parser.add_subparsers(dest='task', required=True)
     sub.add_parser('install-actionlint')
+    sub.add_parser('check-helpers')
     coverage = sub.add_parser('coverage')
     coverage.add_argument('transport', choices=['pipe', 'tcp'])
     sub.add_parser('coverage-summary')
@@ -95,6 +111,8 @@ def main():
     if args.task == 'install-actionlint':
         install_actionlint()
         return 0
+    if args.task == 'check-helpers':
+        return check_helpers(Path(__file__).resolve().parent)
     if args.task == 'coverage':
         target = 'coverage' if args.transport == 'pipe' else 'coverage-tcp'
         return logged(['make', target], Path(f'cov-{args.transport}.log'))
@@ -114,10 +132,9 @@ def main():
     if args.task == 'valgrind':
         if not args.profiles:
             parser.error('--profiles is required for Valgrind tests')
-        options = ['--use-tcp', '--daemon-tests-only'] if args.transport == 'tcp' else []
-        command = [sys.executable, '-S', 'testsuite/tools/check.py', '.', './rsync', args.profiles, str(output),
-                   '--valgrind', '--valgrind-opts=--leak-check=no --error-exitcode=0',
-                   *options, '-j2', '--timeout=600', '--preserve-scratch']
+        command = check_command('.', './rsync', args.profiles, output, args.transport,
+                                '--valgrind', '--valgrind-opts=--leak-check=no --error-exitcode=0',
+                                '-j2', '--timeout=600', '--preserve-scratch')
         result = logged(command, evidence / f'valgrind-{args.privilege}-{args.transport}.log')
         if (output / 'receipt.json').is_file():
             shutil.copyfile(output / 'receipt.json', evidence / f'valgrind-{args.privilege}-{args.transport}.json')

@@ -135,31 +135,37 @@ def require_no_oidc():
         raise NetworkError('Worker has OIDC request variables')
 
 
-def download_records(run_id, expected, timeout=600, progress=None):
+def list_artifacts(url, etag):
+    body, headers = fetch(url, os.environ['GH_TOKEN'], headers={'If-None-Match': etag} if etag else {},
+                          operation='List GitHub artifacts')
+    listing = decode(body)
+    artifacts = listing['artifacts']
+    count = listing['total_count']
+    if type(count) is not int or count < 0 or count > 1000:
+        raise NetworkError('Artifact listing exceeds rendezvous limit')
+    for page in range(2, (count + 99) // 100 + 1):
+        body, _ = fetch(url + '&page=' + str(page), os.environ['GH_TOKEN'], operation='List GitHub artifacts')
+        artifacts += decode(body)['artifacts']
+    return list({item['id']: item for item in artifacts}.values()), headers.get('ETag')
+
+
+def download_records(run_id, expected, timeout=600, progress=None, *, initial_listing=None):
     if not isinstance(run_id, str) or not re.fullmatch(r'[1-9][0-9]*', run_id):
         raise NetworkError('Invalid artifact source run')
     url = ('https://api.github.com/repos/RsyncProject/rsync/actions/runs/'
            + run_id + '/artifacts?per_page=100')
     deadline = time.monotonic() + timeout
     cached, etag = None, None
+    downloaded = {}
     while time.monotonic() < deadline:
         if progress is not None and progress() is True:
             deadline = time.monotonic() + timeout
         try:
-            body, headers = fetch(url, os.environ['GH_TOKEN'],
-                                  headers={'If-None-Match': etag} if etag else {},
-                                  operation='List GitHub artifacts')
-            listing = decode(body)
-            records = listing['artifacts']
-            count = listing['total_count']
-            if type(count) is not int or count < 0 or count > 1000:
-                raise NetworkError('Artifact listing exceeds rendezvous limit')
-            for page in range(2, (count + 99) // 100 + 1):
-                body, _ = fetch(url + '&page=' + str(page), os.environ['GH_TOKEN'],
-                                operation='List GitHub artifacts')
-                records += decode(body)['artifacts']
-            records = list({item['id']: item for item in records}.values())
-            cached, etag = records, headers.get('ETag')
+            if initial_listing is None:
+                cached, etag = list_artifacts(url, etag)
+                records = cached
+            else:
+                records, initial_listing = initial_listing, None
         except NetworkError as error:
             if error.retryable:
                 time.sleep(5)
@@ -177,6 +183,10 @@ def download_records(run_id, expected, timeout=600, progress=None):
                 artifact_id = items[0]['id']
                 if type(artifact_id) is not int or artifact_id <= 0:
                     raise NetworkError('Invalid artifact identity')
+                saved = downloaded.get(name)
+                if saved is not None and saved[0] == artifact_id:
+                    result[expected[name]] = saved[1]
+                    continue
                 download = 'https://api.github.com/repos/RsyncProject/rsync/actions/artifacts/' + str(artifact_id) + '/zip'
                 try:
                     data, _ = fetch(download, os.environ['GH_TOKEN'], allowed_redirect=True, operation='Download GitHub artifact')
@@ -193,6 +203,7 @@ def download_records(run_id, expected, timeout=600, progress=None):
                         raise NetworkError('Invalid rendezvous artifact')
                     raw = archive.read(files[0])
                 result[expected[name]] = decode(raw), raw
+                downloaded[name] = artifact_id, result[expected[name]]
             if result is not None:
                 return result
         time.sleep(5)

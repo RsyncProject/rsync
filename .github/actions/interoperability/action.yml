@@ -109,6 +109,7 @@ runs:
         if-no-files-found: error
         retention-days: 7
     - name: Complete initial transfer phase
+      id: wait1
       if: ${{ always() && !cancelled() && steps.transfer1_upload.outcome == 'success' }}
       shell: bash
       env:
@@ -116,7 +117,7 @@ runs:
         INTEROP_PLATFORM: ${{ inputs.platform }}
       run: python3 -B -S .github/scripts/interop-host.py wait1 "$INTEROP_PLATFORM" --root "$RUNNER_TEMP/interoperability"
     - name: Verify initial data and update sources
-      if: env.INTEROP_BLOCKED != 'true'
+      if: env.INTEROP_BLOCKED != 'true' && steps.wait1.outcome == 'success'
       shell: bash
       env:
         GH_TOKEN: ${{ github.token }}
@@ -150,6 +151,7 @@ runs:
         if-no-files-found: error
         retention-days: 7
     - name: Complete updated transfer phase
+      id: wait2
       if: ${{ always() && !cancelled() && steps.transfer2_upload.outcome == 'success' }}
       shell: bash
       env:
@@ -157,7 +159,7 @@ runs:
         INTEROP_PLATFORM: ${{ inputs.platform }}
       run: python3 -B -S .github/scripts/interop-host.py wait2 "$INTEROP_PLATFORM" --root "$RUNNER_TEMP/interoperability"
     - name: Verify updated native data
-      if: env.INTEROP_BLOCKED != 'true'
+      if: env.INTEROP_BLOCKED != 'true' && steps.wait2.outcome == 'success'
       shell: bash
       env:
         GH_TOKEN: ${{ github.token }}
