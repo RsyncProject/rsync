@@ -975,10 +975,40 @@ AC_CHECK_FUNCS(waitpid wait4 getcwd chown chmod lchmod mknod mkfifo fdopendir \
     memmove lchown vsnprintf snprintf vasprintf asprintf setsid strpbrk \
     strlcat strlcpy stpcpy strtol mallinfo mallinfo2 getgroups setgroups geteuid getegid \
     setlocale setmode open64 lseek64 mkstemp64 mtrace va_copy __va_copy \
-    seteuid strerror putenv iconv_open locale_charset nl_langinfo getxattr \
+    seteuid strerror putenv iconv_open getxattr \
     extattr_get_link sigaction sigprocmask setattrlist getgrouplist \
     initgroups utimensat futimens posix_fallocate attropen setvbuf nanosleep usleep \
     setenv unsetenv mbrtowc setpriority)
+
+dnl A link-only probe can find a symbol hidden by the target SDK headers.
+dnl Verify that each codeset query is declared and can actually be called.
+AC_CACHE_CHECK([for usable locale_charset()], [rsync_cv_HAVE_LOCALE_CHARSET], [
+    AC_LINK_IFELSE([AC_LANG_PROGRAM([[#include <libcharset.h>]], [[
+        const char *volatile charset;
+#ifndef locale_charset
+        (void) &locale_charset;
+#endif
+        charset = locale_charset();
+        return charset == 0;
+    ]])], [rsync_cv_HAVE_LOCALE_CHARSET=yes], [rsync_cv_HAVE_LOCALE_CHARSET=no])
+])
+if test x"$rsync_cv_HAVE_LOCALE_CHARSET" = xyes; then
+    AC_DEFINE([HAVE_LOCALE_CHARSET], 1, [Define to 1 if locale_charset() is usable.])
+fi
+
+AC_CACHE_CHECK([for usable nl_langinfo(CODESET)], [rsync_cv_HAVE_NL_LANGINFO_CODESET], [
+    AC_LINK_IFELSE([AC_LANG_PROGRAM([[#include <langinfo.h>]], [[
+        const char *volatile charset;
+#ifndef nl_langinfo
+        (void) &nl_langinfo;
+#endif
+        charset = nl_langinfo(CODESET);
+        return charset == 0;
+    ]])], [rsync_cv_HAVE_NL_LANGINFO_CODESET=yes], [rsync_cv_HAVE_NL_LANGINFO_CODESET=no])
+])
+if test x"$rsync_cv_HAVE_NL_LANGINFO_CODESET" = xyes; then
+    AC_DEFINE([HAVE_NL_LANGINFO], 1, [Define to 1 if nl_langinfo(CODESET) is usable.])
+fi
 
 dnl dirfd() is a macro or static inline on several systems (the BSDs), so the
 dnl default AC_CHECK_FUNCS link probe -- which declares `char dirfd(void);` and
