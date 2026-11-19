@@ -9,7 +9,7 @@ import sys
 import tempfile
 import time
 import unittest
-from unittest.mock import Mock, patch
+from unittest.mock import Mock, call, patch
 import urllib.error
 import zipfile
 
@@ -94,6 +94,7 @@ class Network(unittest.TestCase):
         run = dict(id=123, run_attempt=2, path='.github/workflows/ci.yml', name='CI', event='pull_request',
                    repository=dict(id=266877886), head_repository=dict(id=999), head_sha='b' * 40,
                    display_title='testsuite, ci: rework tests', created_at='2026-11-14T00:00:00Z',
+                   run_started_at='2026-11-14T00:05:00Z',
                    pull_requests=[dict(number=1, base=dict(sha='c' * 40, repo=dict(id=266877886)),
                                        head=dict(sha='d' * 40, repo=dict(id=999)))],
                    referenced_workflows=[dict(path=ci.WORKFLOW + 'a' * 40, sha='a' * 40)])
@@ -110,6 +111,7 @@ class Network(unittest.TestCase):
             self.fail('Unexpected API request: ' + path)
         with patch.object(ci, 'api', side_effect=production):
             self.assertEqual(ci.identity(), self.state)
+            self.assertEqual(ci.source().get('attempt_started_at'), '2026-11-14T00:05:00Z')
         ci.source.cache_clear()
         docs = dict(run, referenced_workflows=[])
         def documentation(path, array=False):
@@ -132,6 +134,11 @@ class Network(unittest.TestCase):
         ci.source.cache_clear()
         with patch.object(ci, 'api', return_value=dict(without_reference, display_title='')), self.assertRaises(network.NetworkError):
             ci.source()
+        for started in (None, 'invalid'):
+            response = dict(run, event='push', run_started_at=started)
+            with self.subTest(started=started), patch.object(ci, 'api', return_value=response), \
+                    self.assertRaisesRegex(network.NetworkError, 'CI attempt has no valid start time'):
+                ci.source()
 
     def test_controller_uses_trusted_change_selection(self):
         run = dict(event='pull_request', pull_requests=[dict(
@@ -172,9 +179,52 @@ class Network(unittest.TestCase):
                 network.NetworkError, 'JSON object'):
             ci.api('/actions/runs/1')
 
+    def test_api_retries_transient_reads(self):
+        responses = [network.NetworkError('Read CI identity: connection failed', retryable=True),
+                     network.NetworkError('Read CI identity: HTTP 502', 502, retryable=True),
+                     (b'{"id": 123}', {})]
+        with patch.dict(ci.api_cache, clear=True), patch.object(ci, 'fetch', side_effect=responses) as fetch, \
+                patch.object(time, 'sleep') as sleep:
+            self.assertEqual(ci.api('/actions/runs/123'), {'id': 123})
+        self.assertEqual(fetch.call_count, 3)
+        self.assertEqual(sleep.call_args_list, [call(1), call(2)])
+
+    def test_api_exhausted_retries_do_not_use_cache(self):
+        path = '/actions/runs/123'
+        cached = {(path, False): ('v1', {'id': 123})}
+        unavailable = network.NetworkError('Read CI identity: HTTP 503', 503, retryable=True)
+        with patch.dict(ci.api_cache, cached, clear=True), \
+                patch.object(ci, 'fetch', side_effect=unavailable) as fetch, patch.object(time, 'sleep') as sleep:
+            with self.assertRaisesRegex(network.NetworkError, 'Read CI identity: HTTP 503'):
+                ci.api(path)
+            self.assertEqual(ci.api_cache, cached)
+        self.assertEqual(fetch.call_count, 3)
+        self.assertEqual(sleep.call_args_list, [call(1), call(2)])
+
+    def test_api_does_not_retry_permanent_errors(self):
+        for code in (401, 403, 404):
+            with self.subTest(code=code), patch.dict(ci.api_cache, clear=True), \
+                    patch.object(ci, 'fetch', side_effect=network.NetworkError('Denied', code)) as fetch, \
+                    patch.object(time, 'sleep') as sleep, self.assertRaises(network.NetworkError):
+                ci.api('/actions/runs/123')
+            fetch.assert_called_once()
+            sleep.assert_not_called()
+
+    def test_api_revalidates_cache_after_retry(self):
+        path = '/actions/runs/123'
+        record = {'id': 123}
+        responses = [network.NetworkError('Read CI identity: HTTP 502', 502, retryable=True),
+                     network.NetworkError('Not modified', 304)]
+        with patch.dict(ci.api_cache, {(path, False): ('v1', record)}, clear=True), \
+                patch.object(ci, 'fetch', side_effect=responses) as fetch, patch.object(time, 'sleep') as sleep:
+            self.assertEqual(ci.api(path), record)
+        sent = call(ci.API + path, 'fixture', headers={'If-None-Match': 'v1'}, operation='Read CI identity')
+        self.assertEqual(fetch.call_args_list, [sent, sent])
+        sleep.assert_called_once_with(1)
+
     def test_controller_discovery_requires_trusted_code_and_exact_attempt(self):
         origin = dict(self.state, head_sha='b' * 40, display_title='testsuite, ci: rework tests',
-                      created_at='2026-11-14T00:00:00Z')
+                      attempt_started_at='2026-11-14T00:00:00Z')
         metadata = dict(self.state, control_run_id='456', control_attempt='1', control_sha='c' * 40)
         titles = ('Network controller', 'Network CI 123 attempt 2')
         for title in titles:
@@ -194,7 +244,7 @@ class Network(unittest.TestCase):
 
     def test_first_controller_context_survives_a_later_duplicate(self):
         origin = dict(self.state, head_sha='b' * 40, display_title='testsuite, ci: rework tests',
-                      created_at='2026-11-14T00:00:00Z')
+                      attempt_started_at='2026-11-14T00:00:00Z')
         run = dict(id=456, run_attempt=1, path='.github/workflows/interoperability.yml', head_branch='master',
                    event='workflow_run', display_title='Network controller',
                    repository=dict(id=266877886),
@@ -208,9 +258,9 @@ class Network(unittest.TestCase):
                 patch.object(ci, 'download_records', return_value={None: (metadata, b'{}')}):
             self.assertEqual(ci.controller(), '456')
 
-    def test_controller_listing_is_paged_and_bounded_to_the_ci_run(self):
+    def test_controller_listing_is_scoped_to_the_ci_attempt(self):
         origin = dict(self.state, head_sha='b' * 40, display_title='current',
-                      created_at='2026-11-14T00:00:20Z')
+                      created_at='2026-11-14T00:00:00Z', attempt_started_at='2026-11-14T00:00:20Z')
         unrelated = [dict(id=500 + index, created_at='2026-11-14T00:00:30Z',
                           display_title='other') for index in range(20)]
         current = dict(id=456, run_attempt=1, path='.github/workflows/interoperability.yml',
@@ -227,10 +277,13 @@ class Network(unittest.TestCase):
             self.assertEqual(ci.controller(), '456')
         self.assertIn('per_page=20&page=1', api.call_args_list[0][0][0])
         self.assertIn('per_page=20&page=2', api.call_args_list[1][0][0])
+        for request in api.call_args_list[:2]:
+            self.assertIn('created=%3E%3D2026-11-14T00%3A00%3A20Z', request[0][0])
+        self.assertEqual(api.call_args_list[2][0][0], '/actions/runs/456/artifacts?per_page=100')
 
     def test_controller_title_collision_uses_the_context_identity(self):
         origin = dict(self.state, head_sha='b' * 40, display_title='same title',
-                      created_at='2026-11-14T00:00:00Z')
+                      attempt_started_at='2026-11-14T00:00:00Z')
         run = dict(run_attempt=1, path='.github/workflows/interoperability.yml', head_branch='master',
                    event='workflow_run', display_title='Network controller',
                    repository=dict(id=266877886), head_sha='c' * 40, status='in_progress',
@@ -251,7 +304,7 @@ class Network(unittest.TestCase):
             self.assertEqual(download.call_args[0][:2], ('456', {name: None}))
 
     def test_controller_listing_rejects_invalid_or_truncated_results(self):
-        origin = dict(self.state, head_sha='b' * 40, created_at='2026-11-14T00:00:00Z')
+        origin = dict(self.state, head_sha='b' * 40, attempt_started_at='2026-11-14T00:00:00Z')
         recent = dict(id=500, created_at='2026-11-14T00:00:30Z', display_title='other')
         invalid = [dict(workflow_runs=[]), dict(total_count=1, workflow_runs=None),
                    dict(total_count=21, workflow_runs=[recent] * 21),
@@ -745,6 +798,26 @@ class Network(unittest.TestCase):
         with patch.object(network.urllib.request, 'build_opener', return_value=Opener()):
             with self.assertRaisesRegex(network.NetworkError, 'Worker acl access probe: HTTP 403'):
                 network.fetch('https://example.test', 'fixture-bearer', operation='Worker acl access probe')
+
+    def test_github_rate_limit_diagnostics(self):
+        github = 'https://api.github.com/example'
+        cases = (
+            (github, 403, {}, ''),
+            (github, 403, {'X-RateLimit-Remaining': '0'}, ' (GitHub API rate limit exhausted)'),
+            (github, 403, {'Retry-After': '60'}, ' (GitHub API throttled the request)'),
+            (github, 429, {}, ' (GitHub API throttled the request)'),
+            ('https://example.test', 403, {'X-RateLimit-Remaining': '0'}, ''),
+        )
+        for url, code, headers, hint in cases:
+            error = urllib.error.HTTPError(url, code, 'private detail', headers, io.BytesIO(b'private body'))
+            opener = Mock()
+            opener.open.side_effect = error
+            with self.subTest(url=url, code=code, headers=headers), \
+                    patch.object(network.urllib.request, 'build_opener', return_value=opener):
+                with self.assertRaises(network.NetworkError) as caught:
+                    network.fetch(url, 'fixture-bearer', operation='Read CI identity')
+                self.assertEqual(str(caught.exception), f'Read CI identity: HTTP {code}' + hint)
+                self.assertFalse(caught.exception.retryable)
 
     def test_connection_errors_are_retryable(self):
         class Opener:
