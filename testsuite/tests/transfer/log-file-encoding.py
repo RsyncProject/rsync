@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import codecs
 import errno
 import locale
 import os
@@ -18,7 +19,6 @@ C_NAMES = {
     b'sharp-\xc3\x9f\xc3\x9f': b'sharp-\\#303\\#237\\#303\\#237',
     b'turkish-I-\xc4\xb1': b'turkish-I-\\#304\\#261',
     b'legacy-\xe9': b'legacy-\\#351',
-    b'literal-\\#123': b'literal-\\#134#123',
     b'line-\rline-\t\n': b'line-\\#015line-\t\\#012',
 }
 UTF8_NAMES = {
@@ -34,15 +34,20 @@ UTF8_NAMES = {
 }
 
 
-def available_locale(names):
+def available_locale(names, encoding):
+    if not hasattr(locale, 'nl_langinfo') or not hasattr(locale, 'CODESET'):
+        return None
+    expected = codecs.lookup(encoding).name
     saved = locale.setlocale(locale.LC_CTYPE)
     try:
         for name in names:
             try:
                 locale.setlocale(locale.LC_CTYPE, name)
-            except locale.Error:
+                actual = codecs.lookup(locale.nl_langinfo(locale.CODESET)).name
+            except (locale.Error, LookupError):
                 continue
-            return name
+            if actual == expected:
+                return name
     finally:
         locale.setlocale(locale.LC_CTYPE, saved)
     return None
@@ -93,16 +98,17 @@ def check_log_encoding(label, active_locale, names, *options):
     created.intersection_update(names)
     if not created:
         return
-    expected = sorted(names[name] for name in created)
+    expected = sorted(b'\\#134#123|' + names[name] for name in created)
     fallback = ascii_fallback(label)
     if fallback:
         expected = sorted(escape_nonascii(name) for name in expected)
 
     env = {**os.environ, 'LC_ALL': active_locale}
     env.pop('RSYNC_ICONV', None)
+    # Exercise a literal escape without using a backslash in a filename.
     proc = subprocess.run(
         rsync_argv('-r', *options, f'--log-file={logfile}',
-                   '--log-file-format=entry:%f', '--', *sorted(created), f'{dest}/'),
+                   r'--log-file-format=entry:\#123|%f', '--', *sorted(created), f'{dest}/'),
         cwd=source, env=env, capture_output=True, timeout=30,
     )
     if proc.returncode != 0:
@@ -126,20 +132,20 @@ def check_log_encoding(label, active_locale, names, *options):
 check_log_encoding('c', 'C', C_NAMES)
 check_log_encoding('c-8bit', 'C', C_NAMES, '--8-bit-output')
 check_log_encoding('posix', 'POSIX', C_NAMES)
-for label, candidates, names in (
-    ('utf8', ('C.UTF-8', 'C.utf8', 'en_US.UTF-8', 'en_US.utf8', 'UTF-8'), UTF8_NAMES),
-    ('turkish-utf8', ('tr_TR.UTF-8', 'tr_TR.utf8'), UTF8_NAMES),
-    ('turkish-legacy', ('tr_TR.ISO-8859-9', 'tr_TR.iso88599'),
+for label, encoding, candidates, names in (
+    ('utf8', 'UTF-8', ('C.UTF-8', 'C.utf8', 'en_US.UTF-8', 'en_US.utf8', 'UTF-8'), UTF8_NAMES),
+    ('turkish-utf8', 'UTF-8', ('tr_TR.UTF-8', 'tr_TR.utf8'), UTF8_NAMES),
+    ('turkish-legacy', 'ISO-8859-9', ('tr_TR.ISO-8859-9', 'tr_TR.iso88599'),
      {b'turkish-I-\xfd': b'turkish-I-\xfd'}),
-    ('latin1', ('en_US.ISO-8859-1', 'en_US.iso88591'),
+    ('latin1', 'ISO-8859-1', ('en_US.ISO-8859-1', 'en_US.iso88591'),
      {b'legacy-\xc3\x85': b'legacy-\xc3\\#205'}),
-    ('latin3', ('mt_MT.ISO-8859-3', 'mt_MT.iso88593'),
+    ('latin3', 'ISO-8859-3', ('mt_MT.ISO-8859-3', 'mt_MT.iso88593'),
      {b'legacy-\xd0\xb1': b'legacy-\\#320\xb1'}),
-    ('euc-jp', ('ja_JP.eucJP', 'ja_JP.ujis', 'japanese.euc'),
+    ('euc-jp', 'EUC-JP', ('ja_JP.eucJP', 'ja_JP.ujis', 'japanese.euc'),
      {b'legacy-\x8e\xb1': b'legacy-\x8e\xb1'}),
 ):
-    active_locale = available_locale(candidates)
+    active_locale = available_locale(candidates, encoding)
     if active_locale is None:
-        print(f'{label}: locale unavailable')
+        print(f'{label}: no active {encoding} locale')
         continue
     check_log_encoding(label, active_locale, names)
