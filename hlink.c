@@ -604,8 +604,21 @@ int skip_hard_link(struct file_struct *file, struct file_list **flist_p)
 	int prev_ndx;
 
 	file->flags |= FLAG_SKIP_HLINK;
-	if (!(file->flags & FLAG_HLINK_LAST))
-		return -1;
+	if (!(file->flags & FLAG_HLINK_LAST)) {
+		/* A failed transfer leader may already have later members waiting
+		 * on it.  Promote the newest waiter and retain its chain so the
+		 * remaining members finish when the replacement transfer does. */
+		if (!inc_recurse || !(file->flags & FLAG_FILE_SENT)
+		 || (prev_ndx = F_HL_PREV(file)) < 0
+		 || (flist = flist_for_ndx(prev_ndx, NULL)) == NULL)
+			return -1;
+		file = flist->files[prev_ndx - flist->ndx_start];
+		if (!(file->flags & FLAG_HLINK_WAIT))
+			return -1;
+		file->flags = (file->flags | FLAG_HLINK_FIRST) & ~FLAG_FILE_SENT;
+		*flist_p = flist;
+		return prev_ndx;
+	}
 
 	check_prior(file, F_HL_GNUM(file), &prev_ndx, &flist);
 	if (prev_ndx >= 0) {
