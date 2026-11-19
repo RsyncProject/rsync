@@ -231,7 +231,7 @@ struct name_num_item *get_nni_by_name(struct name_num_obj *nno, const char *name
 	for (nni = nno->list; nni->name; nni++) {
 		if (nni->num == CSUM_gone)
 			continue;
-		if (strncasecmp(name, nni->name, len) == 0 && nni->name[len] == '\0')
+		if (ascii_strncasecmp(name, nni->name, len) == 0 && nni->name[len] == '\0')
 			return nni;
 	}
 

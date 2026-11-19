@@ -5,6 +5,11 @@
 Release notes for compatible fixes and incremental improvements are maintained
 in the [stable/3.5 NEWS](https://github.com/RsyncProject/rsync/blob/stable/3.5/NEWS.md).
 
+### Pending 3.5.3 backports
+
+- Fix locale-dependent option and daemon keyword matching and parse fractional
+  sizes exactly.
+
 # NEWS for rsync 3.5.2 (4 Nov 2026)
 
 ## Changes in this version:

@@ -131,7 +131,7 @@ static int EatWhitespace( FILE *InFile )
   {
   int c;
 
-  for( c = get_char( InFile ); isspace( c ) && ('\n' != c); c = get_char( InFile ) )
+  for( c = get_char( InFile ); ascii_is_space(c) && ('\n' != c); c = get_char( InFile ) )
     ;
   return( c );
   } /* EatWhitespace */
@@ -253,7 +253,7 @@ static BOOL Section( FILE *InFile, BOOL (*sfunc)(char *) )
         break;
 
       default:                        /* All else are a valid name chars.   */
-        if( isspace( c ) )              /* One space per whitespace region. */
+        if( ascii_is_space(c) )        /* One space per whitespace region. */
           {
           bufr[end] = ' ';
           i = end + 1;
@@ -364,7 +364,7 @@ static BOOL Parameter( FILE *InFile, BOOL (*pfunc)(char *, char *), int c )
         /* FALL THROUGH */
 
       default:
-        if( isspace( c ) )     /* One ' ' per whitespace region.       */
+        if( ascii_is_space(c) ) /* One ' ' per whitespace region.     */
           {
           bufr[end] = ' ';
           i = end + 1;
@@ -409,7 +409,7 @@ static BOOL Parameter( FILE *InFile, BOOL (*pfunc)(char *, char *), int c )
 
       default:               /* All others verbatim.  Note that spaces do */
         bufr[i++] = c;       /* not advance <end>.  This allows trimming  */
-        if( !isspace( c ) )  /* of whitespace at the end of the line.     */
+        if( !ascii_is_space(c) ) /* of whitespace at the end of the line. */
           end = i;
         c = get_char( InFile );
         break;
@@ -495,9 +495,9 @@ static int include_config(char *include, int manage_globals)
 
 static int parse_directives(char *name, char *val)
 {
-    if (strcasecmp(name, "&include") == 0)
+    if (ascii_strcasecmp(name, "&include") == 0)
         return include_config(val, 1);
-    if (strcasecmp(name, "&merge") == 0)
+    if (ascii_strcasecmp(name, "&merge") == 0)
         return include_config(val, 0);
     rprintf(FLOG, "Unknown directive: %s.\n", name);
     return 0;

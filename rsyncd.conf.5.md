@@ -19,6 +19,9 @@ modules.
 
 ## FILE FORMAT
 
+Configuration keywords use ASCII letters and are matched without regard to
+ASCII letter case. Locale settings do not change the meaning of a keyword.
+
 The file consists of modules and parameters. A module begins with the name of
 the module in square brackets and continues until the next module begins.
 Modules contain parameters of the form `name = value`.

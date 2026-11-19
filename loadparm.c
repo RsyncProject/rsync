@@ -47,7 +47,6 @@
 
 extern item_list dparam_list;
 
-#define strequal(a, b) (strcasecmp(a, b)==0)
 
 #ifndef LOG_DAEMON
 #define LOG_DAEMON 0
@@ -397,29 +396,39 @@ static void init_section(local_vars *psection)
 	copy_section(psection, &Vars.l);
 }
 
-/* Do a case-insensitive, whitespace-ignoring string equality check. */
-static int strwiEQ(char *psz1, char *psz2)
+enum config_comparison { COMPARE_CONFIG_SYNTAX, COMPARE_MODULE_NAME };
+
+static int config_name_equal(const char *left, const char *right, enum config_comparison comparison)
 {
-	/* If one or both strings are NULL, we return equality right away. */
-	if (psz1 == psz2)
+	if (left == right)
 		return 1;
-	if (psz1 == NULL || psz2 == NULL)
+	if (!left || !right)
 		return 0;
 
-	/* sync the strings on first non-whitespace */
-	while (1) {
-		while (isSpace(psz1))
-			psz1++;
-		while (isSpace(psz2))
-			psz2++;
-		if (*psz1 == '\0' || *psz2 == '\0')
-			break;
-		if (toUpper(psz1) != toUpper(psz2))
-			break;
-		psz1++;
-		psz2++;
+	for (;;) {
+		int a, b;
+
+		if (comparison == COMPARE_MODULE_NAME) {
+			/* Module names are user data and retain their existing matching rules. */
+			while (isSpace(left))
+				left++;
+			while (isSpace(right))
+				right++;
+			a = toUpper(left);
+			b = toUpper(right);
+		} else {
+			while (ascii_is_space((uchar)*left))
+				left++;
+			while (ascii_is_space((uchar)*right))
+				right++;
+			a = ascii_lower((uchar)*left);
+			b = ascii_lower((uchar)*right);
+		}
+		if (a != b || !a)
+			return a == b;
+		left++;
+		right++;
 	}
-	return *psz1 == *psz2;
 }
 
 /* Find a section by name. Otherwise works like get_section. */
@@ -428,7 +437,7 @@ static int getsectionbyname(char *name)
 	int i;
 
 	for (i = section_list.count - 1; i >= 0; i--) {
-		if (strwiEQ(iSECTION(i).name, name))
+		if (config_name_equal(iSECTION(i).name, name, COMPARE_MODULE_NAME))
 			break;
 	}
 
@@ -468,7 +477,7 @@ static int map_parameter(char *parmname)
 		return -1;
 
 	for (iIndex = 0; parm_table[iIndex].label; iIndex++) {
-		if (strwiEQ(parm_table[iIndex].label, parmname))
+		if (config_name_equal(parm_table[iIndex].label, parmname, COMPARE_CONFIG_SYNTAX))
 			return iIndex;
 	}
 
@@ -481,11 +490,16 @@ static int map_parameter(char *parmname)
  * represent a boolean. */
 static BOOL set_boolean(BOOL *pb, char *parmvalue, int allow_unset)
 {
-	if (strwiEQ(parmvalue, "yes") || strwiEQ(parmvalue, "true") || strwiEQ(parmvalue, "1"))
+	if (config_name_equal(parmvalue, "yes", COMPARE_CONFIG_SYNTAX)
+	 || config_name_equal(parmvalue, "true", COMPARE_CONFIG_SYNTAX)
+	 || config_name_equal(parmvalue, "1", COMPARE_CONFIG_SYNTAX))
 		*pb = True;
-	else if (strwiEQ(parmvalue, "no") || strwiEQ(parmvalue, "false") || strwiEQ(parmvalue, "0"))
+	else if (config_name_equal(parmvalue, "no", COMPARE_CONFIG_SYNTAX)
+	      || config_name_equal(parmvalue, "false", COMPARE_CONFIG_SYNTAX)
+	      || config_name_equal(parmvalue, "0", COMPARE_CONFIG_SYNTAX))
 		*pb = False;
-	else if (allow_unset && (strwiEQ(parmvalue, "unset") || strwiEQ(parmvalue, "-1")))
+	else if (allow_unset && (config_name_equal(parmvalue, "unset", COMPARE_CONFIG_SYNTAX)
+			     || config_name_equal(parmvalue, "-1", COMPARE_CONFIG_SYNTAX)))
 		*pb = Unset;
 	else {
 		rprintf(FLOG, "Badly formed boolean in configuration file: \"%s\".\n", parmvalue);
@@ -574,7 +588,7 @@ static BOOL do_parameter(char *parmname, char *parmvalue)
 
 	case P_ENUM:
 		for (i=0; parm_table[parmnum].enum_list[i].name; i++) {
-			if (strequal(parmvalue, parm_table[parmnum].enum_list[i].name)) {
+			if (ascii_strcasecmp(parmvalue, parm_table[parmnum].enum_list[i].name) == 0) {
 				*(int *)parm_ptr = parm_table[parmnum].enum_list[i].value;
 				break;
 			}
@@ -613,7 +627,7 @@ static BOOL do_section(char *sectionname)
 		return True;
 	}
 
-	isglobal = strwiEQ(sectionname, GLOBAL_NAME);
+	isglobal = config_name_equal(sectionname, GLOBAL_NAME, COMPARE_CONFIG_SYNTAX);
 
 	/* At the end of the global section, add any --dparam items. */
 	if (bInGlobalSection && !isglobal) {
