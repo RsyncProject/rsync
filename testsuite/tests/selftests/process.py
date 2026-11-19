@@ -88,6 +88,9 @@ def test(context: TestContext):
     if rsync_argv_for(wrapped, replacement, '-a') != [
             'valgrind', '--tool=memcheck', str(replacement), '-a']:
         test_fail('the wrapped rsync executable was not replaced')
+    repeated = quote_command(['wrapper', str(binary), str(binary)])
+    if rsync_argv_for(repeated, replacement) != ['wrapper', str(binary), str(replacement)]:
+        test_fail('replacement changed a wrapper argument instead of the rsync executable')
 
     lookup = bindir / 'lookup-command'
     lookup.write_text(f'#!{sys.executable}\nraise SystemExit(0)\n')

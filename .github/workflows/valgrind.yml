@@ -25,7 +25,7 @@ jobs:
           - name: Root pipe
             privilege: root
             transport: pipe
-            profiles: pipe,non-asan,root,self-peer,linux,valgrind,no-userns
+            profiles: non-asan,root,self-peer,linux,valgrind,no-userns
           - name: Root TCP
             privilege: root
             transport: tcp
@@ -33,7 +33,7 @@ jobs:
           - name: Non-root pipe
             privilege: non-root
             transport: pipe
-            profiles: pipe,non-asan,nonroot,self-peer,linux,valgrind,no-userns
+            profiles: non-asan,nonroot,self-peer,linux,valgrind,no-userns
           - name: Non-root TCP
             privilege: non-root
             transport: tcp

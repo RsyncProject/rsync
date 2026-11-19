@@ -26,11 +26,15 @@ def split_rsync_cmd(command: str) -> list:
             return [executable] + shlex.split(command[match.start():])
     return shlex.split(command)
 
-def rsync_command_binary(command: str) -> str:
-    for argument in reversed(split_rsync_cmd(command)):
-        if os.path.isfile(argument):
-            return argument
+def rsync_binary_index(argv):
+    for index in range(len(argv) - 1, -1, -1):
+        if os.path.isfile(argv[index]):
+            return index
     raise ValueError('rsync command contains no executable file')
+
+def rsync_command_binary(command: str) -> str:
+    argv = split_rsync_cmd(command)
+    return argv[rsync_binary_index(argv)]
 
 def under_valgrind(*commands: str) -> bool:
     return any(os.path.basename(split_rsync_cmd(command)[0]) == 'valgrind' for command in commands)
@@ -46,7 +50,7 @@ def rsync_argv(command: str, *args: str) -> list:
 
 def rsync_argv_for(command: str, binary, *args: str) -> list:
     argv = split_rsync_cmd(command)
-    argv[argv.index(rsync_command_binary(command))] = os.fspath(binary)
+    argv[rsync_binary_index(argv)] = os.fspath(binary)
     return argv + list(args)
 
 def run_rsync(command: str, *args: str, check: bool = True,

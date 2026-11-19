@@ -11,6 +11,9 @@ import subprocess
 import sys
 import tempfile
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'testsuite'))
+from harness.check_recipe import check_command
+
 
 def main():
     parser = argparse.ArgumentParser()
@@ -161,18 +164,16 @@ def main():
         if account:
             passes += [('nonroot', 'pipe', None), ('nonroot', 'tcp', None)]
         for role, transport, protocol in passes:
-            selected = f'{role},{profiles}' + ('' if transport == 'tcp' else ',pipe')
+            selected = f'{role},{profiles}'
             options = []
-            if transport == 'tcp':
-                options += ['--use-tcp', '--daemon-tests-only']
             if protocol:
                 selected += f',protocol-{protocol}'
                 options += [f'--protocol={protocol}']
             parallel = 4 if args.platform == 'alpine' else 2 if args.platform == 'openbsd' and transport == 'tcp' else 8
             label = f'protocol {protocol}' if protocol else 'TCP' if transport == 'tcp' else 'pipe'
             status |= bool(command(f'Tests ({"non-root" if role == "nonroot" else role} {label})',
-                                   [sys.executable, '-S', 'testsuite/tools/check.py', str(source), str(source / 'rsync'),
-                                    selected, str(output / role / transport), *options, f'-j{parallel}'],
+                                   check_command(source, source / 'rsync', selected, output / role / transport,
+                                                 'pipe' if protocol else transport, *options, f'-j{parallel}'),
                                    required=False, account=account if role == 'nonroot' else None))
     except (KeyError, OSError, ValueError, subprocess.SubprocessError, SystemExit) as error:
         print(f'::error::Guest checks failed: {error}', file=sys.stderr)

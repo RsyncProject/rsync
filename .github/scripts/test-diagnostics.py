@@ -6,13 +6,28 @@ import runpy
 import sys
 import tempfile
 import unittest
-from unittest.mock import patch
+from unittest.mock import call, patch
 
 
 diagnostics = runpy.run_path(str(Path(__file__).with_name('diagnostics.py')))
 
 
 class Diagnostics(unittest.TestCase):
+    def test_helper_runner_covers_the_roster(self):
+        with tempfile.TemporaryDirectory(prefix='rsync-helpers-') as directory:
+            root = Path(directory)
+            for name in ('test-z.py', 'test-a.py', 'support.py'):
+                (root / name).touch()
+            with patch.object(diagnostics['subprocess'], 'call', side_effect=[0, 17]) as run, redirect_stdout(StringIO()):
+                self.assertEqual(diagnostics['check_helpers'](root), 17)
+            self.assertEqual(run.call_args_list, [call([sys.executable, '-B', '-S', str(root / name)])
+                                                  for name in ('test-a.py', 'test-z.py')])
+
+    def test_helper_runner_rejects_an_empty_roster(self):
+        with tempfile.TemporaryDirectory(prefix='rsync-helpers-') as directory:
+            with self.assertRaisesRegex(ValueError, 'No CI helper tests'):
+                diagnostics['check_helpers'](Path(directory))
+
     def test_logged_failure(self):
         with tempfile.TemporaryDirectory(prefix='rsync-diagnostics-') as directory:
             log = Path(directory) / 'run.log'
