@@ -11,6 +11,7 @@ from interop_policy import ROLES
 
 API = 'https://api.github.com/repos/RsyncProject/rsync'
 WORKFLOW = 'RsyncProject/rsync/.github/workflows/interoperability-tests.yml@'
+CONTROLLER_FIELDS = ('control_run_id', 'control_attempt', 'control_sha')
 STARTUP_TIMEOUT = 1800
 TIMESTAMP = r'\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z'
 bound = None
@@ -140,7 +141,8 @@ def source():
             or not re.fullmatch(TIMESTAMP, run.get('created_at', ''))
             or not isinstance(run.get('display_title'), str) or not run['display_title']):
         raise NetworkError('CI run does not match its event')
-    if not selected(run):
+    # The controller makes its own selection before it can obtain authority.
+    if event_name == 'workflow_run' and not selected(run):
         raise NotSelected('CI has not selected interoperability')
     references = [item for item in run.get('referenced_workflows', []) if item.get('path', '').startswith(WORKFLOW)]
     deadline = time.monotonic() + 180
@@ -235,8 +237,21 @@ def started_endpoints(jobs):
     return started
 
 
-def records(kind, roles=ROLES, run_id=None, timeout=600):
+def controller_binding(run):
+    run_id, attempt, sha = run.get('id'), run.get('run_attempt'), run.get('head_sha')
+    repository = run.get('repository')
+    if (run.get('path') != '.github/workflows/interoperability.yml'
+            or run.get('head_branch') != 'master' or run.get('event') != 'workflow_run'
+            or not isinstance(repository, dict) or repository.get('id') != 266877886
+            or type(run_id) is not int or run_id < 1 or type(attempt) is not int or attempt < 1
+            or not isinstance(sha, str) or not re.fullmatch(r'[0-9a-f]{40}', sha)):
+        raise NetworkError('Controller does not match the trusted workflow revision')
+    return dict(control_run_id=str(run_id), control_attempt=str(attempt), control_sha=sha)
+
+
+def records(kind, roles=ROLES, control=None, timeout=600):
     state = identity()
+    run_id = state['run_id'] if control is None else control['control_run_id']
     expected = {artifact_name(kind, role): role for role in roles}
     checked = [None]
     started = {}
@@ -246,8 +261,12 @@ def records(kind, roles=ROLES, run_id=None, timeout=600):
             return
         checked[0] = now
         jobs = check_ci()
-        if run_id is not None and kind != 'result' and api('/actions/runs/' + run_id).get('status') == 'completed':
-            raise PeerUnavailable('Network controller has stopped')
+        if control is not None and kind != 'result':
+            current = api('/actions/runs/' + run_id)
+            if controller_binding(current) != control:
+                raise NetworkError('Controller attempt or revision changed')
+            if current.get('status') == 'completed':
+                raise PeerUnavailable('Network controller has stopped')
         if kind in ('public', 'enrolment'):
             current = started_endpoints(jobs)
             if (any(name in started and started[name] != value for name, value in current.items())
@@ -259,7 +278,7 @@ def records(kind, roles=ROLES, run_id=None, timeout=600):
             started.update(current)
             return advanced
     return {role: validate(record, state) for role, (record, _) in
-            download_records(run_id or state['run_id'], expected, timeout, progress=active).items()}
+            download_records(run_id, expected, timeout, progress=active).items()}
 
 
 def find_controller(exclude=None):
@@ -284,10 +303,7 @@ def find_controller(exclude=None):
     for run in sorted(runs, key=lambda value: value['id']):
         if run.get('display_title') not in titles or str(run['id']) == exclude:
             continue
-        if (run.get('path') != '.github/workflows/interoperability.yml'
-                or run.get('head_branch') != 'master' or run.get('event') != 'workflow_run'
-                or run.get('repository', {}).get('id') != 266877886):
-            raise NetworkError('Controller does not match the trusted workflow revision')
+        control = controller_binding(run)
         names = {'interoperability-context-attempt-' + str(run['run_attempt']),
                  'interoperability-context-' + str(run['run_attempt'])}
         listing = api('/actions/runs/' + str(run['id']) + '/artifacts?per_page=100')
@@ -305,9 +321,7 @@ def find_controller(exclude=None):
             validate(metadata, {key: state[key] for key in ('run_id', 'run_attempt', 'source_sha')})
         except NetworkError:
             continue
-        if (metadata.get('control_run_id') != str(run['id'])
-                or metadata.get('control_attempt') != str(run['run_attempt'])
-                or metadata.get('control_sha') != run['head_sha']):
+        if any(metadata.get(key) != value for key, value in control.items()):
             raise NetworkError('Controller context has a different signing revision')
         return run
     return None
@@ -320,13 +334,13 @@ def controller():
         if run is not None:
             if run.get('conclusion') in ('failure', 'cancelled', 'timed_out'):
                 raise PeerUnavailable('Network controller failed')
-            return str(run['id'])
+            return controller_binding(run)
         time.sleep(5)
     raise NetworkError('Trusted controller did not start')
 
 
-def published(kind, timeout=600):
-    return records(kind, (None,), controller(), timeout)[None]
+def published(kind, timeout=600, *, control=None):
+    return records(kind, (None,), controller() if control is None else control, timeout)[None]
 
 
 def write(root, kind, **data):

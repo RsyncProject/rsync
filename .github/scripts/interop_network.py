@@ -156,6 +156,7 @@ def download_records(run_id, expected, timeout=600, progress=None, *, initial_li
            + run_id + '/artifacts?per_page=100')
     deadline = time.monotonic() + timeout
     cached, etag = None, None
+    downloaded = {}
     while time.monotonic() < deadline:
         if progress is not None and progress() is True:
             deadline = time.monotonic() + timeout
@@ -182,6 +183,10 @@ def download_records(run_id, expected, timeout=600, progress=None, *, initial_li
                 artifact_id = items[0]['id']
                 if type(artifact_id) is not int or artifact_id <= 0:
                     raise NetworkError('Invalid artifact identity')
+                saved = downloaded.get(name)
+                if saved is not None and saved[0] == artifact_id:
+                    result[expected[name]] = saved[1]
+                    continue
                 download = 'https://api.github.com/repos/RsyncProject/rsync/actions/artifacts/' + str(artifact_id) + '/zip'
                 try:
                     data, _ = fetch(download, os.environ['GH_TOKEN'], allowed_redirect=True, operation='Download GitHub artifact')
@@ -198,6 +203,7 @@ def download_records(run_id, expected, timeout=600, progress=None, *, initial_li
                         raise NetworkError('Invalid rendezvous artifact')
                     raw = archive.read(files[0])
                 result[expected[name]] = decode(raw), raw
+                downloaded[name] = artifact_id, result[expected[name]]
             if result is not None:
                 return result
         time.sleep(5)

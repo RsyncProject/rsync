@@ -28,6 +28,7 @@ class Transfers(unittest.TestCase):
         self.addCleanup(self.directory.cleanup)
         self.root = Path(self.directory.name)
         self.state = dict(run_id='123', run_attempt='2', source_sha='a' * 40)
+        self.control = dict(control_run_id='456', control_attempt='1', control_sha='c' * 40)
         self.nodes = {role: dict(self.state, role=role, node_id='n' + str(index), address='100.64.0.' + str(index))
                       for index, role in enumerate(ci.ROLES, 1)}
         self.run = dict(id=123, run_attempt=2, path='.github/workflows/ci.yml', name='CI',
@@ -61,6 +62,18 @@ class Transfers(unittest.TestCase):
                           metadata_initial_verified=[list(case) for case in cases if case[1] == role],
                           metadata_restored=[list(case) for case in cases if case[0] == role and case[-1] == 'backup'])
         return result
+
+    def test_endpoint_identity_uses_workflow_selection(self):
+        request = dict(number=7, base=dict(sha='b' * 40, repo=dict(id=266877886)), head=dict(sha='c' * 40))
+        run = dict(self.run, pull_requests=[request])
+
+        def response(path):
+            self.assertEqual(path, '/actions/runs/123')
+            return run
+
+        with patch.object(ci, 'api', side_effect=response) as api:
+            self.assertEqual(ci.identity(), self.state)
+        api.assert_called_once_with('/actions/runs/123')
 
     def test_complete_native_case_set(self):
         self.assertEqual(set(ci.ROLES), set(PLATFORMS))
@@ -184,15 +197,17 @@ class Transfers(unittest.TestCase):
             enrol.seal(self.root, 'linux', recipient, 'key1', 'tskey-auth-fixture', dict(self.state, run_attempt='3'))
 
     def test_enrolment_wait_matches_the_controller_startup_window(self):
+        ci.bind(self.state)
         published = unittest.mock.Mock(return_value={'recipients': {'linux': {'key_id': 'key1'}}})
         node = {'ID': 'n1', 'TailscaleIPs': ['100.64.0.1']}
         with patch.object(sys, 'argv', ['interop-host.py', 'connect', 'linux', '--root', str(self.root)]), \
                 patch.dict(host['main'].__globals__, identity=lambda: self.state, published=published,
-                           decrypt=unittest.mock.Mock(), forget=unittest.mock.Mock()), \
+                           controller=lambda: self.control, decrypt=unittest.mock.Mock(), forget=unittest.mock.Mock()), \
                 patch.dict(host['client'], connect=unittest.mock.Mock(return_value=node)), \
                 patch.object(host['socket'], 'socket'):
             self.assertEqual(host['main'](), 0)
-        published.assert_called_once_with('enrolment', timeout=ci.STARTUP_TIMEOUT)
+        published.assert_called_once_with('enrolment', timeout=ci.STARTUP_TIMEOUT, control=self.control)
+        self.assertEqual(json.loads((self.root / 'controller.json').read_text()), dict(self.state, **self.control))
 
     def test_bad_public_keys_are_refused(self):
         for value in ('', 'ssh-rsa AAAA', 'ssh-ed25519 AAAA', 'ssh-ed25519 AAAA\ncommand=evil'):
@@ -414,12 +429,13 @@ class Transfers(unittest.TestCase):
 
     def test_denial_has_healthy_controls_before_and_after(self):
         ci.bind(self.state)
+        ci.write(self.root, 'controller', **self.control)
         (self.root / 'ready.json').write_text(json.dumps(self.nodes['linux']))
         calls = []
         def connected(address, port):
             calls.append((address, port))
             return address == self.nodes['linux']['address']
-        shared = dict(published=lambda *args: dict(nodes=self.nodes), connect=connected)
+        shared = dict(published=lambda *args, **kwargs: dict(nodes=self.nodes), connect=connected)
         with patch.dict(host['network'].__globals__, shared):
             host['network'](self.root, 'linux', 'quarantine')
         for port in (18731, 18732, 18733):
@@ -430,11 +446,58 @@ class Transfers(unittest.TestCase):
         self.assertTrue(json.loads((self.root / 'quarantine.json').read_text())['passed'])
 
     def test_a_dead_service_cannot_prove_network_denial(self):
+        ci.bind(self.state)
+        ci.write(self.root, 'controller', **self.control)
         (self.root / 'ready.json').write_text(json.dumps(self.nodes['linux']))
-        with patch.dict(host['network'].__globals__, published=lambda *args: dict(nodes=self.nodes), connect=lambda *args: False):
+        with patch.dict(host['network'].__globals__, published=lambda *args, **kwargs: dict(nodes=self.nodes),
+                       connect=lambda *args: False):
             with self.assertRaisesRegex(NetworkError, 'not listening'):
                 host['network'](self.root, 'linux', 'quarantine')
         self.assertFalse((self.root / 'quarantine.json').exists())
+        self.assertFalse((self.root / 'topology.json').exists())
+
+    def test_network_phases_reuse_one_checked_topology(self):
+        ci.bind(self.state)
+        ci.write(self.root, 'controller', **self.control)
+        (self.root / 'ready.json').write_text(json.dumps(self.nodes['linux']))
+        publications = dict(topology=dict(nodes=self.nodes), admission=dict(nodes=self.nodes), revocation=dict(revoked=True))
+        published = unittest.mock.Mock(side_effect=lambda kind, **kwargs: publications[kind])
+        configure = unittest.mock.Mock()
+        own = self.nodes['linux']['address']
+        with patch.dict(host['network'].__globals__, published=published, call=configure):
+            for phase in ('quarantine', 'admit', 'revoked'):
+                def connected(address, port):
+                    return address == own or (phase == 'admit' and port != 18732)
+
+                with patch.dict(host['network'].__globals__, connect=connected):
+                    host['network'](self.root, 'linux', phase)
+        self.assertEqual(published.call_args_list, [unittest.mock.call(kind, control=self.control)
+                                                  for kind in ('topology', 'admission', 'revocation')])
+        configure.assert_called_once_with(self.root, 'linux', 'configure', self.nodes)
+
+    def test_network_rejects_stale_topology_and_changed_membership(self):
+        ci.bind(self.state)
+        ci.write(self.root, 'controller', **self.control)
+        (self.root / 'ready.json').write_text(json.dumps(self.nodes['linux']))
+        with patch.dict(host['network'].__globals__, published=lambda *args, **kwargs: self.fail('Missing topology used')), \
+                self.assertRaisesRegex(NetworkError, 'Endpoint has no saved topology'):
+            host['network'](self.root, 'linux', 'admit')
+        for field, value in (('run_attempt', '1'), ('control_attempt', '2'), ('source_sha', 'b' * 40)):
+            record = dict(self.state, nodes=self.nodes, **self.control)
+            record[field] = value
+            (self.root / 'topology.json').write_text(json.dumps(record))
+            with self.subTest(field=field), \
+                    patch.dict(host['network'].__globals__, published=lambda *args, **kwargs: self.fail('Stale topology used')), \
+                    self.assertRaisesRegex(NetworkError, 'Record belongs|Saved topology belongs'):
+                host['network'](self.root, 'linux', 'admit')
+
+        ci.write(self.root, 'topology', nodes=self.nodes, **self.control)
+        changed = dict(self.nodes, freebsd=dict(self.nodes['freebsd'], node_id='unexpected'))
+        with patch.dict(host['network'].__globals__, healthy=lambda *args: None,
+                        published=lambda *args, **kwargs: dict(nodes=changed),
+                        connect=lambda *args: self.fail('A changed endpoint set reached network probes')), \
+                self.assertRaisesRegex(NetworkError, 'Admission replaced the endpoint set'):
+            host['network'](self.root, 'linux', 'admit')
 
     def test_client_checks_active_preferences_without_retaining_private_data(self):
         (self.root / 'client.json').write_text(json.dumps(dict(command=['tailscale'], windows=False)))

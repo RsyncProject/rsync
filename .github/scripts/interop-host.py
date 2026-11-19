@@ -10,11 +10,13 @@ import subprocess
 import sys
 import time
 
-from interop_ci import ROLES, STARTUP_TIMEOUT, PeerUnavailable, check_ci, identity, published, records, write
+from interop_ci import (CONTROLLER_FIELDS, ROLES, STARTUP_TIMEOUT, PeerUnavailable, check_ci, controller,
+                        identity, published, records, validate, write)
 from interop_enrol import decrypt, forget, generate
 from interop_network import NetworkError, require_no_oidc
 
 client = runpy.run_path(str(Path(__file__).with_name('interop-client.py')))
+ENDPOINT_RECORD_LIMIT = 128 * 1024
 
 
 def path(value):
@@ -97,17 +99,39 @@ def healthy(node):
         raise NetworkError('Local fixture services are not listening')
 
 
+def load_endpoint_record(root, kind):
+    path = root / (kind + '.json')
+    if path.is_symlink():
+        raise NetworkError('Unexpected link for saved endpoint ' + kind)
+    try:
+        with path.open('rb') as stream:
+            raw = stream.read(ENDPOINT_RECORD_LIMIT + 1)
+    except FileNotFoundError:
+        raise NetworkError('Endpoint has no saved ' + kind) from None
+    if len(raw) > ENDPOINT_RECORD_LIMIT:
+        raise NetworkError('Saved endpoint record exceeds limit')
+    return validate(json.loads(raw))
+
+
 def network(root, role, phase):
     own = json.loads((root / 'ready.json').read_text())
-    topology = published('topology')['nodes']
-    if set(topology) != set(ROLES) or topology[role] != own:
+    binding = load_endpoint_record(root, 'controller')
+    control = {key: binding[key] for key in CONTROLLER_FIELDS}
+    if phase == 'quarantine':
+        topology = published('topology', control=control)['nodes']
+    else:
+        saved = load_endpoint_record(root, 'topology')
+        if any(saved.get(key) != value for key, value in control.items()):
+            raise NetworkError('Saved topology belongs to another controller')
+        topology = saved['nodes']
+    if not isinstance(topology, dict) or set(topology) != set(ROLES) or topology[role] != own:
         raise NetworkError('Network topology changed the local endpoint')
     healthy(own)
     if phase == 'quarantine':
         if any(connect(peer['address'], 18731) for name, peer in topology.items() if name != role):
             raise NetworkError('A quarantined peer is reachable')
     elif phase == 'admit':
-        admission = published('admission')
+        admission = published('admission', control=control)
         if admission['nodes'] != topology:
             raise NetworkError('Admission replaced the endpoint set')
         deadline = time.monotonic() + 60
@@ -122,7 +146,7 @@ def network(root, role, phase):
                 raise NetworkError('A forbidden fixture port is reachable')
         call(root, role, 'configure', topology)
     else:
-        if published('revocation').get('revoked') is not True:
+        if published('revocation', control=control).get('revoked') is not True:
             raise NetworkError('Network revocation was not recorded')
         deadline = time.monotonic() + 60
         for name, peer in topology.items():
@@ -133,6 +157,8 @@ def network(root, role, phase):
                     raise NetworkError('A revoked endpoint remains reachable')
                 time.sleep(1)
     healthy(own)
+    if phase == 'quarantine':
+        write(root, 'topology', nodes=topology, **control)
     if phase != 'admit':
         write(root, phase, role=role, node_id=own['node_id'], passed=True)
     else:
@@ -197,7 +223,8 @@ def main():
         if phase == 'recipient':
             generate(root, role, state)
         elif phase == 'connect':
-            enrolment = published('enrolment', timeout=STARTUP_TIMEOUT)['recipients'][role]
+            control = controller()
+            enrolment = published('enrolment', timeout=STARTUP_TIMEOUT, control=control)['recipients'][role]
             decrypt(root, role, enrolment, state)
             try:
                 node = client['connect'](root, root / 'enrol-key', f'ci-{state["run_id"]}-{state["run_attempt"]}-{role}')
@@ -217,6 +244,7 @@ def main():
                         raise NetworkError('The allocated overlay address is not available locally') from None
                     time.sleep(0.1)
             (root / 'node.json').write_text(json.dumps(dict(node_id=node['ID'], address=addresses[0], key_id=enrolment['key_id'])))
+            write(root, 'controller', **control)
         elif phase == 'prepare':
             endpoint = call(root, role, 'prepare')
             if endpoint.get('identity', {}).get('platform') != role:
