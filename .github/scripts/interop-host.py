@@ -10,7 +10,7 @@ import subprocess
 import sys
 import time
 
-from interop_ci import ROLES, STARTUP_TIMEOUT, PeerUnavailable, identity, published, records, write
+from interop_ci import ROLES, STARTUP_TIMEOUT, PeerUnavailable, check_ci, identity, published, records, write
 from interop_enrol import decrypt, forget, generate
 from interop_network import NetworkError, require_no_oidc
 
@@ -253,7 +253,7 @@ def main():
             if failed:
                 raise PeerUnavailable('Failed transfer endpoints: ' + ', '.join(failed))
         elif phase in ('next', 'verify'):
-            records('transfer1' if phase == 'next' else 'transfer2', timeout=1800)
+            check_ci()
             result = call(root, role, phase)
             write(root, phase, **result)
             if phase == 'verify':

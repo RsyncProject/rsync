@@ -267,10 +267,11 @@ class Transfers(unittest.TestCase):
         def barrier(kind, **kwargs):
             calls.append(kind)
             return {}
-        shared = dict(identity=lambda: self.state, call=native, records=barrier, write=lambda *args, **kwargs: None)
+        shared = dict(identity=lambda: self.state, call=native, records=barrier,
+                      check_ci=lambda: calls.append('check-ci'), write=lambda *args, **kwargs: None)
         for phase, expected in (('transfer1', ['admitted', 'transfer1']), ('wait1', ['transfer1']),
                                 ('transfer2', ['next', 'transfer2']), ('wait2', ['transfer2']),
-                                ('next', ['transfer1', 'next'])):
+                                ('next', ['check-ci', 'next'])):
             calls.clear()
             with self.subTest(phase=phase), patch.object(sys, 'argv', ['interop-host.py', phase, 'linux', '--root', str(self.root)]), \
                     patch.dict(host['main'].__globals__, shared):
@@ -286,16 +287,32 @@ class Transfers(unittest.TestCase):
         (self.root / 'transfer2.json').write_text(json.dumps(dict(commands=record['commands'],
             metadata_commands=record['metadata_updates'], metadata_restored=record['metadata_restored'])))
         publish = unittest.mock.Mock()
+        check_ci = unittest.mock.Mock()
         final = dict(verified=record['verified'], metadata_verified=record['metadata_verified'])
         with patch.object(sys, 'argv', ['interop-host.py', 'verify', 'linux', '--root', str(self.root)]), \
-                patch.dict(host['main'].__globals__, identity=lambda: self.state, records=lambda *args, **kwargs: {},
+                patch.dict(host['main'].__globals__, identity=lambda: self.state, check_ci=check_ci,
+                           records=lambda *args, **kwargs: self.fail('Verification downloaded completed transfers again'),
                            call=lambda *args: final, write=publish):
             self.assertEqual(host['main'](), 0)
+        check_ci.assert_called_once_with()
         self.assertEqual(publish.call_args[0][1], 'result')
         self.assertEqual(publish.call_args[1]['metadata_initial_verified'], initial)
         self.assertEqual(publish.call_args[1]['metadata_verified'], record['metadata_verified'])
         self.assertEqual(publish.call_args[1]['metadata_commands'], record['metadata_commands'])
         self.assertEqual(publish.call_args[1]['metadata_updates'], record['metadata_updates'])
+
+    def test_completed_barrier_does_not_override_peer_failure(self):
+        ci.bind(self.state)
+        for phase in ('next', 'verify'):
+            environment = self.root / (phase + '-env')
+            with self.subTest(phase=phase), patch.dict(os.environ, GITHUB_ENV=str(environment)), \
+                    patch.object(sys, 'argv', ['interop-host.py', phase, 'linux', '--root', str(self.root)]), \
+                    patch.dict(host['main'].__globals__, identity=lambda: self.state,
+                               check_ci=unittest.mock.Mock(side_effect=ci.PeerUnavailable('Unavailable endpoint')),
+                               records=lambda *args, **kwargs: self.fail('Liveness reloaded the transfer barrier'),
+                               call=lambda *args: self.fail('Verification ran with a failed endpoint')):
+                self.assertEqual(host['main'](), 0)
+                self.assertEqual(environment.read_text(), 'INTEROP_BLOCKED=true\n')
 
     def test_peer_failure_records_a_blocked_phase(self):
         environment = self.root / 'github-env'

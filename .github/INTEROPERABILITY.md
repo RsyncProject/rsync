@@ -8,11 +8,11 @@ We test compatible POSIX ACLs and xattrs separately. We return fake-super backup
 
 We bind every record to the parent CI run, attempt and tested revision. Endpoint records include the operating system, effective UID, effective GID and executable SHA-256. We accept the final result only after all seven endpoints complete every assigned case and we confirm network cleanup.
 
-Artefact names end in `attempt-N`. Context and lease artefacts use the controller attempt; other interoperability artefacts use the parent CI attempt. The suffix prevents a rerun from consuming records from an earlier attempt. Controller discovery lists only runs created since the current CI attempt started. A matching timestamp does not replace validation of the controller context.
+Artefact names end in `attempt-N`. Context and lease artefacts use the controller attempt; other interoperability artefacts use the parent CI attempt. The suffix prevents a rerun from consuming records from an earlier attempt. Controller discovery lists only runs created since the current CI attempt started and reuses each candidate's artefact listing for its first context download. A matching timestamp does not replace validation of the controller context.
 
 Recipient and enrolment waits allow 30 minutes without a newly observed endpoint job start. Each endpoint can renew that startup window once, using GitHub job identity and start metadata from the same CI attempt. Polling, artefact changes and transient request failures do not renew it. Transfer barriers retain their fixed deadlines. The controller and endpoint jobs retain their 75-minute limits.
 
-We publish each phase result before waiting at the barrier, which keeps a failed endpoint available until its peers finish the current phase. We block later phases but still run local cleanup. A missing, failed or incomplete endpoint result fails the final check.
+We publish each phase result before waiting at the barrier, which keeps a failed endpoint available until its peers finish the current phase. Each verification step requires its barrier to have succeeded. It checks CI liveness again without downloading the same completion artefacts. We block later phases but still run local cleanup. A missing, failed or incomplete endpoint result fails the final check.
 
 Blocked endpoint jobs fail after uploading their blocked record and attempting local cleanup. Qualification after a shared startup failure requires a full CI attempt. A failed-job rerun can leave successful endpoints from an earlier attempt, whose records remain ineligible.
 

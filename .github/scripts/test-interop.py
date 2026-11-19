@@ -258,6 +258,44 @@ class Network(unittest.TestCase):
                 patch.object(ci, 'download_records', return_value={None: (metadata, b'{}')}):
             self.assertEqual(ci.controller(), '456')
 
+    def test_controller_context_reuses_artefact_listing(self):
+        origin = dict(self.state, attempt_started_at='2026-11-14T00:00:00Z')
+        controller = dict(id=456, run_attempt=1, path='.github/workflows/interoperability.yml', head_branch='master',
+                          event='workflow_run', display_title='Network controller', repository=dict(id=266877886),
+                          head_sha='c' * 40, status='in_progress', created_at='2026-11-14T00:00:01Z')
+        runs = dict(total_count=1, workflow_runs=[controller])
+        listing = dict(total_count=1, artifacts=[dict(id=900, name='interoperability-context-attempt-1', expired=False)])
+        context = dict(self.state, control_run_id='456', control_attempt='1', control_sha='c' * 40)
+        buffer = io.BytesIO()
+        with zipfile.ZipFile(buffer, 'w') as archive:
+            archive.writestr('context.json', json.dumps(context))
+
+        discovery = ci.API + '/actions/workflows/interoperability.yml/runs?'
+        artefacts = ci.API + '/actions/runs/456/artifacts?per_page=100'
+        download = ci.API + '/actions/artifacts/900/zip'
+        for delayed in (False, True):
+            requests = []
+
+            def fetch(url, *args, **kwargs):
+                requests.append(url)
+                if url.startswith(discovery):
+                    return json.dumps(runs).encode(), {}
+                if url == artefacts:
+                    return json.dumps(listing).encode(), {}
+                if url == download:
+                    if delayed and requests.count(download) == 1:
+                        raise network.NetworkError('Archive not ready', 404)
+                    return buffer.getvalue(), {}
+                self.fail('Unexpected API request: ' + url)
+
+            with self.subTest(delayed=delayed), patch.dict(ci.api_cache, clear=True), \
+                    patch.object(ci, 'source', return_value=origin), patch.object(ci, 'fetch', side_effect=fetch), \
+                    patch.object(network, 'fetch', side_effect=fetch), patch.object(time, 'sleep'):
+                self.assertEqual(ci.controller(), '456')
+                expected = [artefacts, download, artefacts, download] if delayed else [artefacts, download]
+                self.assertTrue(requests[0].startswith(discovery))
+                self.assertEqual(requests[1:], expected)
+
     def test_controller_listing_is_scoped_to_the_ci_attempt(self):
         origin = dict(self.state, head_sha='b' * 40, display_title='current',
                       created_at='2026-11-14T00:00:00Z', attempt_started_at='2026-11-14T00:00:20Z')

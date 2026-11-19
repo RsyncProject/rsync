@@ -299,7 +299,8 @@ def find_controller(exclude=None):
         if len(matches) != 1:
             raise NetworkError('Duplicate controller context')
         name = matches[0]['name']
-        metadata = download_records(str(run['id']), {name: None}, timeout=60)[None][0]
+        metadata = download_records(str(run['id']), {name: None}, timeout=60,
+                                    initial_listing=listing['artifacts'])[None][0]
         try:
             validate(metadata, {key: state[key] for key in ('run_id', 'run_attempt', 'source_sha')})
         except NetworkError:
