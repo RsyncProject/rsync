@@ -1823,7 +1823,13 @@ int do_open_at(const char *pathname, int flags, mode_t mode)
 }
 
 #ifdef HAVE_CHMOD
-int do_chmod(const char *path, mode_t mode)
+enum chmod_policy {
+	CHMOD_LEGACY,
+	CHMOD_REQUIRED,
+	CHMOD_INHERITED
+};
+
+static int chmod_path(const char *path, mode_t mode, enum chmod_policy policy)
 {
 	static int switch_step = 0;
 	int code;
@@ -1867,9 +1873,24 @@ int do_chmod(const char *path, mode_t mode)
 			code = chmod(path, mode & CHMOD_BITS); /* DISCOURAGED FUNCTION */
 		break;
 	}
-	if (code != 0 && (preserve_perms || preserve_executability))
-		return code;
-	return 0;
+	if (policy == CHMOD_LEGACY && !preserve_perms && !preserve_executability)
+		return 0;
+	return code;
+}
+
+int do_chmod(const char *path, mode_t mode)
+{
+	return chmod_path(path, mode, CHMOD_LEGACY);
+}
+
+/* A pinned inode separates a mode refusal from a failed pathname lookup. */
+static int chmod_inode(int fd, mode_t mode, enum chmod_policy policy)
+{
+	int ret = fchmod(fd, mode);
+
+	if (ret < 0 && policy == CHMOD_INHERITED && (errno == EACCES || errno == EPERM))
+		return 1;
+	return ret;
 }
 
 /* chmod `name` relative to dfd without following a final-component symlink.
@@ -1893,8 +1914,9 @@ int do_chmod(const char *path, mode_t mode)
  * dir that becomes a FIFO is still opened.  O_NOFOLLOW rejects symlinks, not
  * type changes.  Constraining the open to the observed type would close that;
  * it is not done here. */
-static int do_fchmodat_nofollow(int dfd, const char *name, mode_t mode)
+static int do_fchmodat_nofollow(int dfd, const char *name, mode_t mode, enum chmod_policy policy)
 {
+	(void)policy;
 #if defined AT_FDCWD && defined AT_SYMLINK_NOFOLLOW
 	mode &= CHMOD_BITS;
 # ifdef O_NOFOLLOW
@@ -1951,7 +1973,7 @@ static int do_fchmodat_nofollow(int dfd, const char *name, mode_t mode)
 #  endif
 			fd = openat(dfd, name, oflags);
 			if (fd >= 0) {
-				int r = fchmod(fd, mode), e = errno;
+				int r = chmod_inode(fd, mode, policy), e = errno;
 				close(fd);
 				errno = e;
 				return r;
@@ -1986,7 +2008,8 @@ static int do_fchmodat_nofollow(int dfd, const char *name, mode_t mode)
 		int r = syscall(SYS_fchmodat2, dfd, name, (unsigned int)mode, AT_SYMLINK_NOFOLLOW);
 		if (r == 0)
 			return 0;
-		if (errno != ENOSYS && errno != EPERM && errno != EOPNOTSUPP)
+		if (errno != ENOSYS && errno != EOPNOTSUPP
+		 && (errno != EPERM || policy != CHMOD_LEGACY))
 			return r;
 	}
 #  endif
@@ -2020,18 +2043,11 @@ static int do_fchmodat_nofollow(int dfd, const char *name, mode_t mode)
   components is then either followed within the tree (legitimate dir-symlinks
   still work) or rejected (escape attempts fail).
 
-  Final-component handling matches do_chmod(): fchmodat() with flag 0
-  follows a symlink at the final component, which is the same behaviour as
-  chmod() and matches every current call site (the file being chmod'd is
-  one the receiver itself just created or transferred). For the rare case
-  where the caller wants to chmod a symlink-as-an-object (S_ISLNK in the
-  mode bits), we fall through to do_chmod() which has portability code for
-  that case.
-
-  Falls back to do_chmod() for absolute paths and for paths with no parent
-  component, where there is nothing to protect against.
+  With a held parent, change the leaf's mode without following a symlink.
+  Use the platform's link-mode handling when changing a symlink itself.
+  The pathname fallback retains the caller's mode-update policy.
 */
-int do_chmod_at(const char *fname, mode_t mode)
+static int chmod_at_path(const char *fname, mode_t mode, enum chmod_policy policy)
 {
 #ifdef AT_FDCWD
 	extern int am_daemon, am_chrooted;
@@ -2052,11 +2068,11 @@ int do_chmod_at(const char *fname, mode_t mode)
 	 * S_ISLNK(mode) still needs do_chmod()'s lchmod()/setattrlist() handling. */
 	if (operator_path_resolve && fname && *fname && !S_ISLNK(mode)) {
 		if (symlink_optout_allowed())
-			return do_chmod(fname, mode);
+			return chmod_path(fname, mode, policy);
 		dfd = owner_walk_parent(fname, &bname);
 		if (dfd < 0)
 			return -1;
-		ret = do_fchmodat_nofollow(dfd, bname, mode);
+		ret = do_fchmodat_nofollow(dfd, bname, mode, policy);
 		e = errno;
 		close(dfd);
 		errno = e;
@@ -2064,21 +2080,15 @@ int do_chmod_at(const char *fname, mode_t mode)
 	}
 #endif
 
-	/* Only the daemon-without-chroot case is exposed to the symlink-
-	 * race attack: a chroot already confines the receiver, and a
-	 * non-daemon rsync runs with the user's own authority so a
-	 * symlink they planted can only redirect to files they could
-	 * already access.  Everywhere else, fall through to plain
-	 * do_chmod() to avoid the dirfd-open overhead on every call. */
 	if (!secure_relpath_active())
-		return do_chmod(fname, mode);
+		return chmod_path(fname, mode, policy);
 
 	if (!fname || !*fname || *fname == '/' || S_ISLNK(mode))
-		return do_chmod(fname, mode);
+		return chmod_path(fname, mode, policy);
 
 	slash = strrchr(fname, '/');
 	if (!slash)
-		return do_chmod(fname, mode);
+		return chmod_path(fname, mode, policy);
 
 	dlen = slash - fname;
 	if (dlen >= sizeof dirpath) {
@@ -2093,14 +2103,19 @@ int do_chmod_at(const char *fname, mode_t mode)
 	if (dfd < 0)
 		return -1;
 
-	ret = do_fchmodat_nofollow(dfd, bname, mode);
+	ret = do_fchmodat_nofollow(dfd, bname, mode, policy);
 	e = errno;
 	close(dfd);
 	errno = e;
 	return ret;
 #else
-	return do_chmod(fname, mode);
+	return chmod_path(fname, mode, policy);
 #endif
+}
+
+int do_chmod_at(const char *fname, mode_t mode)
+{
+	return chmod_at_path(fname, mode, CHMOD_LEGACY);
 }
 #endif
 
@@ -4019,21 +4034,41 @@ int do_mkdir_atfd(int dfd, const char *name, mode_t mode)
 }
 
 #ifdef HAVE_CHMOD
-int do_chmod_atfd(int dfd, const char *name, mode_t mode)
+static int chmod_at_dirfd(int dfd, const char *name, mode_t mode, enum chmod_policy policy)
 {
 #ifdef AT_FDCWD
 	if (dry_run) return 0;
 	RETURN_ERROR_IF_RO_OR_LO;
-	/* Do not follow a final-component symlink (closes the leaf race; the
-	 * held parent dfd already confines the ancestors).  A symlink-as-object
-	 * (S_ISLNK(mode)) is still handled by the caller via the full-path
-	 * do_chmod() lchmod/setattrlist code, exactly as do_chmod_at() does. */
-	return do_fchmodat_nofollow(dfd, name, mode);
+	/* The held directory confines the parent. Do not follow the leaf. */
+	return do_fchmodat_nofollow(dfd, name, mode, policy);
 #else
 	(void)dfd; (void)name; (void)mode;
+	(void)policy;
 	errno = ENOSYS;
 	return -1;
 #endif
+}
+
+int do_chmod_atfd(int dfd, const char *name, mode_t mode)
+{
+	return chmod_at_dirfd(dfd, name, mode, CHMOD_LEGACY);
+}
+
+/* Final mode updates report applied (0), skipped (1) or failed (-1).
+ * Pathname errors cannot be classified as refusals on a pinned inode. */
+int do_chmod_attrs(const char *fname, mode_t mode, int fd, int dfd,
+		   const char *leaf, BOOL best_effort)
+{
+	enum chmod_policy policy = best_effort ? CHMOD_INHERITED : CHMOD_REQUIRED;
+
+	if (fd >= 0) {
+		if (dry_run) return 0;
+		RETURN_ERROR_IF_RO_OR_LO;
+		return chmod_inode(fd, mode, policy);
+	}
+	if (dfd >= 0 && !S_ISLNK(mode))
+		return chmod_at_dirfd(dfd, leaf, mode, policy);
+	return chmod_at_path(fname, mode, policy);
 }
 #endif
 
@@ -4050,24 +4085,13 @@ int do_lchown_atfd(int dfd, const char *name, uid_t owner, gid_t group)
 #endif
 }
 
-/* Mode/owner on an already-open fd (no path, no symlink to follow): the
- * race-free way to set metadata on a cross-tree operator-path leaf that was
- * pinned with O_NOFOLLOW.  See set_file_attrs(). */
+/* Set ownership on an already-open fd without resolving a pathname again. */
 int do_fchown(int fd, uid_t owner, gid_t group)
 {
 	if (dry_run) return 0;
 	RETURN_ERROR_IF_RO_OR_LO;
 	return fchown(fd, owner, group);
 }
-
-#ifdef HAVE_CHMOD
-int do_fchmod(int fd, mode_t mode)
-{
-	if (dry_run) return 0;
-	RETURN_ERROR_IF_RO_OR_LO;
-	return fchmod(fd, mode);
-}
-#endif
 
 #ifdef HAVE_FUTIMENS
 /* Set times on an already-open fd (the race-free counterpart for a pinned

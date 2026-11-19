@@ -805,23 +805,18 @@ int set_file_attrs(const char *fname, struct file_struct *file, stat_x *sxp,
 
 #ifdef HAVE_CHMOD
 	if (!BITS_EQUAL(sxp->st.st_mode, new_mode, CHMOD_BITS)) {
+		BOOL best_effort = !preserve_perms && !preserve_executability
+			       && !preserve_acls && !daemon_chmod_modes;
 		int ret = am_root < 0 ? 0
-			: op_leaf_fd >= 0 ? do_fchmod(op_leaf_fd, new_mode)
 			: op_refuse ? (errno = ELOOP, -1)
-			: dfd >= 0 && !S_ISLNK(new_mode) ? do_chmod_atfd(dfd, leaf, new_mode)
-			: do_chmod_at(fname, new_mode);
-		/* An inherited mode is best-effort on filesystems that refuse chmod.
-		 * Do not hide path-resolution or race errors from the safe wrappers. */
-		if (ret < 0 && !preserve_perms && !preserve_executability
-		 && (errno == EACCES || errno == EPERM))
-			ret = 1;
+			: do_chmod_attrs(fname, new_mode, op_leaf_fd, dfd, leaf, best_effort);
 		if (ret < 0) {
 			rsyserr(FERROR_XFER, errno,
 				"failed to set permissions on %s",
 				full_fname(fname));
 			goto cleanup;
 		}
-		if (ret == 0) /* ret == 1 if a best-effort mode could not be set */
+		if (ret == 0)
 			updated |= UPDATED_MODE;
 	}
 #endif
