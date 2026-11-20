@@ -23,6 +23,9 @@
 #include "itypes.h"
 #include "ifuncs.h"
 #include <popt.h>
+#if defined CONFIG_LOCALE && defined HAVE_LOCALE_H
+#include <locale.h>
+#endif
 
 extern int module_id;
 extern int local_server;
@@ -453,27 +456,27 @@ static void parse_output_words(struct output_struct *words, short *levels, const
 			len = strlen(str);
 		if (!len)
 			continue;
-		if (!isDigit(str)) {
-			while (len && isDigit(str+len-1))
+		if (!ascii_is_digit((uchar)*str)) {
+			while (len && ascii_is_digit((uchar)str[len-1]))
 				len--;
 		}
-		lev = isDigit(str+len) ? atoi(str+len) : 1;
+		lev = ascii_is_digit((uchar)str[len]) ? atoi(str+len) : 1;
 		/* atoi() of an overflowing positive digit string can return a
 		 * negative int (LONG_MAX truncated on LP64); a negative lev
 		 * here later indexes counts[lev] in make_output_option(). */
 		if (lev > MAX_OUT_LEVEL || lev < 0)
 			lev = MAX_OUT_LEVEL;
-		if (len == 4 && strncasecmp(str, "help", 4) == 0) {
+		if (len == 4 && ascii_strncasecmp(str, "help", 4) == 0) {
 			output_item_help(words);
 			exit_cleanup(0);
 		}
-		if (len == 4 && strncasecmp(str, "none", 4) == 0)
+		if (len == 4 && ascii_strncasecmp(str, "none", 4) == 0)
 			len = lev = 0;
-		else if (len == 3 && strncasecmp(str, "all", 3) == 0)
+		else if (len == 3 && ascii_strncasecmp(str, "all", 3) == 0)
 			len = 0;
 		for (j = 0; words[j].name; j++) {
 			if (!len
-			 || (len == words[j].namelen && strncasecmp(str, words[j].name, len) == 0)) {
+			 || (len == words[j].namelen && ascii_strncasecmp(str, words[j].name, len) == 0)) {
 				if (priority >= words[j].priority) {
 					words[j].priority = priority;
 					levels[j] = lev;
@@ -1181,21 +1184,56 @@ static int count_args(const char **argv)
  * so this keeps every accepted size representable as a positive ssize_t. */
 #define SIZE_ARG_MAX ((ssize_t)(SIZE_MAX / 2))
 
+static const char *size_fraction_start(const char *point)
+{
+	if (*point == '.')
+		return point + 1;
+#if defined CONFIG_LOCALE && defined HAVE_LOCALE_H
+	const char *decimal = localeconv()->decimal_point;
+	size_t len = strlen(decimal);
+
+	if (len && strncmp(point, decimal, len) == 0)
+		return point + len;
+#endif
+	if (*point == ',' && get_decimal_point() == ',')
+		return point + 1;
+	return point;
+}
+
+static size_t scale_size_fraction(const char *start, const char *end, size_t unit)
+{
+	size_t fraction = 0;
+	size_t tens = unit / 10, ones = unit % 10;
+
+	/* Fold right to left and round down to bytes. Split the multiplier
+	 * before multiplying so even the largest unit cannot overflow. */
+	while (end > start) {
+		unsigned int digit = *--end - '0';
+		fraction = tens * digit + fraction / 10 + (ones * digit + fraction % 10) / 10;
+	}
+	return fraction;
+}
+
 /* If the size_arg is an invalid string or the value is < min_value, an error
  * is put into err_buf & the return is -1.  Note that this parser does NOT
  * support negative numbers, so a min_value < 0 doesn't make any sense. */
 static ssize_t parse_size_arg(const char *size_arg, char def_suf, const char *opt_name,
 			      ssize_t min_value, ssize_t max_value, BOOL unlimited_0)
 {
-	int reps, mult, len;
+	int reps, mult, len, adjustment = 0;
 	const char *arg, *err = "invalid", *min_max = NULL;
-	ssize_t limit = -1, size = 1;
+	const char *whole_end, *fraction, *number_end;
+	ssize_t limit = -1;
 	ssize_t size_max = max_value >= 0 ? max_value : SIZE_ARG_MAX;
-	double dsize;
+	size_t unit = 1, whole = 0, size, fraction_bytes, allowed, whole_limit;
 
-	for (arg = size_arg; isDigit(arg); arg++) {}
-	if (*arg == '.' || *arg == get_decimal_point()) /* backward compatibility: always allow '.' */
-		for (arg++; isDigit(arg); arg++) {}
+	for (whole_end = size_arg; ascii_is_digit((uchar)*whole_end); whole_end++) {}
+	fraction = size_fraction_start(whole_end);
+	for (number_end = fraction; ascii_is_digit((uchar)*number_end); number_end++) {}
+	if (whole_end == size_arg && number_end == fraction)
+		goto failure;
+
+	arg = number_end;
 	switch (*arg && *arg != '+' && *arg != '-' ? *arg++ : def_suf) {
 	case 'b': case 'B':
 		reps = 0;
@@ -1222,58 +1260,57 @@ static ssize_t parse_size_arg(const char *size_arg, char def_suf, const char *op
 		mult = 1000, arg++;
 	else if (!*arg || *arg == '+' || *arg == '-')
 		mult = 1024;
-	else if (strncasecmp(arg, "ib", 2) == 0)
+	else if (ascii_strncasecmp(arg, "ib", 2) == 0)
 		mult = 1024, arg += 2;
 	else
 		goto failure;
 	while (reps--) {
-		if (size > size_max / mult) {
-			err = "too large";
-			min_max = "max";
-			limit = max_value;
-			goto failure;
-		}
-		size *= mult;
+		if (unit > SIZE_MAX / (size_t)mult)
+			goto too_large;
+		unit *= mult;
 	}
-	errno = 0;
-	dsize = strtod(size_arg, NULL);
-	if (errno == ERANGE || dsize < 0 || dsize > (double)size_max / size
-	 || (max_value < 0 && dsize >= (double)size_max / size)) {
-		err = "too large";
-		min_max = "max";
-		limit = max_value;
-		goto failure;
-	}
-	size = (ssize_t)(dsize * size);
-	if ((*arg == '+' || *arg == '-') && arg[1] == '1' && arg != size_arg) {
-		if (*arg == '+') {
-			if (size == size_max) {
-				err = "too large";
-				min_max = "max";
-				limit = max_value;
-				goto failure;
-			}
-			size++;
-		} else
-			size--;
+	if ((*arg == '+' || *arg == '-') && arg[1] == '1') {
+		adjustment = *arg == '+' ? 1 : -1;
 		arg += 2;
 	}
 	if (*arg)
 		goto failure;
-	if (size < 0 || (max_value >= 0 && size > max_value)) {
-		err = "too large";
-		min_max = "max";
-		limit = max_value;
-		goto failure;
+
+	allowed = (size_t)size_max + (adjustment < 0);
+	whole_limit = allowed / unit;
+	for (arg = size_arg; arg < whole_end; arg++) {
+		unsigned int digit = *arg - '0';
+		if (whole > whole_limit / 10
+		 || (whole == whole_limit / 10 && digit > whole_limit % 10))
+			goto too_large;
+		whole = whole * 10 + digit;
 	}
-	if (size < min_value && (!unlimited_0 || size != 0)) {
+	size = whole * unit;
+	fraction_bytes = scale_size_fraction(fraction, number_end, unit);
+	if (fraction_bytes > allowed - size)
+		goto too_large;
+	size += fraction_bytes;
+	if (adjustment < 0) {
+		if (!size)
+			goto too_large;
+		size--;
+	} else if (adjustment > 0) {
+		if (size == (size_t)size_max)
+			goto too_large;
+		size++;
+	}
+	if (size < (size_t)min_value && (!unlimited_0 || size != 0)) {
 		err = "too small";
 		min_max = "min";
 		limit = min_value;
 		goto failure;
 	}
-	return size;
+	return (ssize_t)size;
 
+too_large:
+	err = "too large";
+	min_max = "max";
+	limit = max_value;
 failure:
 	len = snprintf(err_buf, sizeof err_buf - 1, "--%s=%s is %s", opt_name, size_arg, err);
 	if (min_max && limit >= 0 && len < (int)sizeof err_buf - 10) {
@@ -1860,11 +1897,17 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 			break;
 
 		case OPT_BWLIMIT: {
-			ssize_t size = parse_size_arg(bwlimit_arg, 'K', "bwlimit", 512, -1, True);
+			size_t rate_max = INT_MAX;
+			ssize_t bytes_max = SIZE_ARG_MAX;
+			ssize_t size;
+
+			if (rate_max <= (size_t)(bytes_max - 511) / 1024)
+				bytes_max = (ssize_t)(rate_max * 1024 + 511);
+			size = parse_size_arg(bwlimit_arg, 'K', "bwlimit", 512, bytes_max, True);
 			if (size < 0)
 				goto cleanup;
 			bwlimit_arg = strdup(do_big_num(size, 0, NULL));
-			bwlimit = (size + 512) / 1024;
+			bwlimit = (int)(size / 1024 + (size % 1024 >= 512));
 			break;
 		}
 
@@ -2109,17 +2152,10 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 		ssize_t size = parse_size_arg(max_alloc_arg, 'B', "max-alloc", 1024*1024, -1, True);
 		if (size < 0)
 			goto cleanup;
-		max_alloc = size;
+		/* Pass zero through to the peer so each build applies its own ceiling. */
+		max_alloc_arg = strdup(do_big_num(size, 0, NULL));
+		max_alloc = size ? (size_t)size : (size_t)SIZE_ARG_MAX;
 	}
-	/* A 0 value means "as large as this build allows".  We resolve it to the
-	 * same ceiling parse_size_arg() enforces, so that --max-alloc=0 is exactly
-	 * the largest value a user could also have typed, and never a limit that
-	 * only the 0 spelling can reach.  Note that max_alloc_arg is forwarded to
-	 * the peer un-normalized (see server_options()), which is what lets each
-	 * side resolve 0 against its own SIZE_MAX -- a 64-bit client and a 32-bit
-	 * daemon each get their own ceiling from the one portable spelling. */
-	if (!max_alloc)
-		max_alloc = SIZE_ARG_MAX;
 
 	if (old_style_args < 0) {
 		if (!am_server && protect_args <= 0 && (arg = getenv("RSYNC_OLD_ARGS")) != NULL && *arg) {
@@ -2150,7 +2186,8 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 		}
 	}
 
-	if (checksum_choice && strcasecmp(checksum_choice, "auto") != 0 && strcasecmp(checksum_choice, "auto,auto") != 0) {
+	if (checksum_choice && ascii_strcasecmp(checksum_choice, "auto") != 0
+	 && ascii_strcasecmp(checksum_choice, "auto,auto") != 0) {
 		/* Call this early to verify the args and figure out if we need to force
 		 * --whole-file. Note that the parse function will get called again later,
 		 * just in case an "auto" choice needs to know the protocol_version. */
@@ -2166,7 +2203,7 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 
 	if (!compress_choice && do_compression > 1)
 		compress_choice = "zlibx";
-	if (compress_choice && strcasecmp(compress_choice, "auto") != 0)
+	if (compress_choice && ascii_strcasecmp(compress_choice, "auto") != 0)
 		parse_compress_choice(0); /* Twiddles do_compression and can possibly NULL-out compress_choice. */
 	else
 		compress_choice = NULL;
@@ -2190,20 +2227,18 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 
 #ifdef HAVE_SETVBUF
 	if (outbuf_mode && !am_server) {
-		int mode = *(uchar *)outbuf_mode;
-		if (islower(mode))
-			mode = toupper(mode);
+		int mode = ascii_lower(*(uchar *)outbuf_mode);
 		fflush(stdout); /* Just in case... */
 		switch (mode) {
-		case 'N': /* None */
-		case 'U': /* Unbuffered */
+		case 'n': /* None */
+		case 'u': /* Unbuffered */
 			mode = _IONBF;
 			break;
-		case 'L': /* Line */
+		case 'l': /* Line */
 			mode = _IOLBF;
 			break;
-		case 'B': /* Block */
-		case 'F': /* Full */
+		case 'b': /* Block */
+		case 'f': /* Full */
 			mode = _IOFBF;
 			break;
 		default:
@@ -3380,7 +3415,7 @@ char *check_for_hostspec(char *s, char **host_ptr, int *port_ptr)
 {
 	char *path;
 
-	if (port_ptr && strncasecmp(URL_PREFIX, s, strlen(URL_PREFIX)) == 0) {
+	if (port_ptr && ascii_strncasecmp(URL_PREFIX, s, strlen(URL_PREFIX)) == 0) {
 		*host_ptr = parse_hostspec(s + strlen(URL_PREFIX), &path, port_ptr);
 		if (*host_ptr) {
 			if (!*port_ptr)

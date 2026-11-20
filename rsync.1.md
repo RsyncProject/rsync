@@ -2315,6 +2315,10 @@ sign) if you want the local shell to expand it.
     the numeric units or left unqualified to specify bytes, and the numeric
     value can have a fractional part, such as `--max-size=1.5m`.
 
+    A period always denotes the decimal point. The locale's decimal separator
+    is also accepted. Rsync scales the number to bytes and rounds down before
+    applying a final `+1` or `-1`.
+
     This option is a [TRANSFER RULE](#TRANSFER_RULES), so don't expect any
     exclude side effects.
 
