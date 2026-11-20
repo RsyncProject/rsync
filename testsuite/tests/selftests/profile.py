@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 
 import json
+from unittest.mock import patch
 
 from harness import TestContext, requires, run
 from harness.metadata import discover_tests, read_requirements, test_name
-from harness.profile import load_profile, merge_profiles, parse_peer_banner
+from harness.profile import archived_peer_supported_here, load_profile, merge_profiles, parse_peer_banner
 from harness.results import test_fail
 from harness.process import file_digest
 from harness.profile import load_binaries
@@ -107,6 +108,18 @@ def test(context: TestContext):
     manifest.write_text(json.dumps({binary.name: record}))
     if load_binaries(archive) != {binary.name: record}:
         test_fail('a valid binary manifest changed while loading')
+
+    record['target'] = 'x86_64-linux-gnu'
+    manifest.write_text(json.dumps({binary.name: record}))
+    for system, machine, expected in (
+            ('Linux', 'x86_64', True),
+            ('Linux', 'aarch64', False),
+            ('SunOS', 'x86_64', False),
+            ('Darwin', 'x86_64', False)):
+        with patch('harness.profile.platform.system', return_value=system), \
+                patch('harness.profile.platform.machine', return_value=machine):
+            if archived_peer_supported_here(binary) != expected:
+                test_fail(f'archived Linux peer eligibility was wrong on {system}/{machine}')
 
     def reject_binary(data):
         manifest.write_text(json.dumps(data))

@@ -9,7 +9,7 @@ import sys
 from pathlib import Path
 from .metadata import applies_to_peer, discover_tests, read_requirements, test_name
 from .process import file_digest
-from .profile import load_binaries, load_profile, merge_profiles, parse_peer_banner
+from .profile import archive_host_supported, archived_peer_supported_here, load_binaries, load_profile, merge_profiles, parse_peer_banner
 from .results import Exit
 
 _SUITE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -300,6 +300,8 @@ def validate_run_paths(tooldir, srcdir, rsync_bin, rsync_bin2):
             raise ValueError(f'cannot verify source of archived peer {version}') from error
         if source != record['source']:
             raise ValueError(f'archived peer {version} differs from its release tag')
+        if not archived_peer_supported_here(path, record):
+            raise ValueError(f'archived peer {version} targets another OS or architecture')
         actual_version, protocol = binary_identity(binary)
         if actual_version != version or protocol != record['protocol']:
             raise ValueError(f'archived peer {version} differs from its declared identity')
