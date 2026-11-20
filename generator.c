@@ -35,6 +35,7 @@ extern int am_daemon;
 extern int inc_recurse;
 extern int relative_paths;
 extern int implied_dirs;
+extern int copy_links;
 extern int keep_dirlinks;
 extern int write_devices;
 extern int preserve_acls;
@@ -100,6 +101,7 @@ extern dev_t filesystem_dev;
 extern mode_t orig_umask;
 extern uid_t our_uid;
 extern char *tmpdir;
+extern char *confine_root;
 extern char *basis_dir[MAX_BASIS_DIRS+1];
 extern struct file_list *cur_flist, *first_flist, *dir_flist;
 extern filter_rule_list filter_list, daemon_filter_list;
@@ -995,8 +997,87 @@ static int copy_altdest_file(const char *src, const char *dest, struct file_stru
  * chroot confines only the outer path).  secure_relative_open() refuses a parent
  * that escapes beneath the module root.  Plain link_stat() everywhere else --
  * the non-chroot daemon sanitizes basis paths already, and a local receiver must
- * still follow an operator's --link-dest=../backup. */
-static int basis_link_stat(const char *path, STRUCT_STAT *stp)
+ * still follow an operator's --link-dest=../backup.  A non-null parent_fd takes
+ * ownership of the non-daemon parent descriptor after a successful stat. */
+#if defined AT_FDCWD && defined O_NOFOLLOW && defined O_DIRECTORY
+struct basis_parent_entry {
+	int fd;
+	size_t len;
+	char path[MAXPATHLEN];
+};
+/* A directory entry uses the basis root while its files use the child parent.
+ * Keep both checked inodes across adjacent entries without an unbounded cache. */
+static struct basis_parent_entry basis_parent_cache[2] = {{-1, 0, {0}}, {-1, 0, {0}}};
+static int basis_parent_victim;
+
+static void reset_basis_parent_cache(void)
+{
+	int i;
+	for (i = 0; i < 2; i++) {
+		if (basis_parent_cache[i].fd >= 0)
+			close(basis_parent_cache[i].fd);
+		basis_parent_cache[i].fd = -1;
+	}
+	basis_parent_victim = 0;
+}
+
+static int reusable_basis_parent_fd(const char *path, const char **leaf)
+{
+	const char *slash = strrchr(path, '/');
+	size_t parent_len = slash ? (size_t)(slash - path) : 0;
+	struct basis_parent_entry *entry;
+	int fd, flags, slot;
+
+	*leaf = slash ? slash + 1 : path;
+	/* Relative paths depend on cwd, and multiple bases would replace both
+	 * cached parents for every candidate of each file. */
+	if (*path != '/' || basis_dir[1] != NULL)
+		return owner_walk_parent(path, leaf);
+	for (slot = 0; slot < 2; slot++) {
+		entry = &basis_parent_cache[slot];
+		if (entry->fd >= 0 && entry->len == parent_len
+		 && memcmp(entry->path, path, parent_len) == 0) {
+			fd = dup(entry->fd);
+			if (fd >= 0) {
+				basis_parent_victim = 1 - slot;
+				return fd;
+			}
+			close(entry->fd);
+			entry->fd = -1;
+			break;
+		}
+	}
+	if (slot == 2)
+		slot = basis_parent_victim;
+	entry = &basis_parent_cache[slot];
+	if (entry->fd >= 0)
+		close(entry->fd);
+	entry->fd = -1;
+	fd = owner_walk_parent(path, leaf);
+	if (fd < 0)
+		return -1;
+	flags = fcntl(fd, F_GETFD);
+	if (flags < 0 || fcntl(fd, F_SETFD, flags | FD_CLOEXEC) < 0)
+		return fd; /* Keep the ordinary one-file lifetime if it cannot be cached. */
+	entry->fd = fd;
+	entry->len = parent_len;
+	memcpy(entry->path, path, parent_len);
+	entry->path[parent_len] = '\0';
+	basis_parent_victim = 1 - slot;
+	fd = dup(entry->fd);
+	if (fd < 0) {
+		fd = entry->fd;
+		entry->fd = -1;
+	}
+	return fd;
+}
+#else
+static void reset_basis_parent_cache(void)
+{
+}
+#endif
+
+static int basis_link_stat(const char *path, STRUCT_STAT *stp, int *parent_fd)
 {
 	extern int am_chrooted;
 	extern unsigned int module_dirlen;
@@ -1015,11 +1096,16 @@ static int basis_link_stat(const char *path, STRUCT_STAT *stp)
 	 * the plain path (a lower-severity, non-root basis lookup). */
 	if (!am_daemon && am_root >= 0 && !symlink_optout_allowed()) {
 		const char *leaf;
-		int dfd = owner_walk_parent(path, &leaf);
+		int dfd = parent_fd ? reusable_basis_parent_fd(path, &leaf)
+		                    : owner_walk_parent(path, &leaf);
 		int r, e;
 		if (dfd < 0)
 			return -1;
 		r = link_stat_at(dfd, leaf, stp, 0);
+		if (r == 0 && parent_fd) {
+			*parent_fd = dfd;
+			return 0;
+		}
 		e = errno;
 		close(dfd);
 		errno = e;
@@ -1079,6 +1165,8 @@ static int basis_link_stat(const char *path, STRUCT_STAT *stp)
 		}
 #endif
 	}
+#else
+	(void)parent_fd;
 #endif
 	if (am_daemon && am_chrooted && module_dirlen && path[0] != '/' && !symlink_optout_allowed()) {
 		const char *slash = strrchr(path, '/');
@@ -1101,6 +1189,31 @@ static int basis_link_stat(const char *path, STRUCT_STAT *stp)
 	return link_stat(path, stp, 0);
 }
 
+static int can_reuse_basis_parent(void)
+{
+#if defined SUPPORT_HARD_LINKS && defined HAVE_LINKAT && defined AT_FDCWD \
+ && defined O_NOFOLLOW && defined O_DIRECTORY
+	/* Only reuse a parent when stat and link use the same policy, and
+	 * neither the quick check nor the attribute check reopens the name. */
+	return alt_dest_type == LINK_DEST && !am_daemon && am_root >= 0
+	    && !confine_root && !dry_run && !copy_links && always_checksum <= 0
+	    && !preserve_acls && !preserve_xattrs && !crtimes_ndx
+	    && secure_relpath_active();
+#else
+	return 0;
+#endif
+}
+
+static int basis_dir_stat(const char *path, STRUCT_STAT *stp)
+{
+	int parent_fd = -1;
+	int *retain_parent = can_reuse_basis_parent() ? &parent_fd : NULL;
+	int result = basis_link_stat(path, stp, retain_parent);
+	if (parent_fd >= 0)
+		close(parent_fd);
+	return result;
+}
+
 /* This is only called for regular files.  We return -2 if we've finished
  * handling the file, -1 if no dest-linking occurred, or a non-negative
  * value if we found an alternate basis file.  If we're called with the
@@ -1115,17 +1228,19 @@ static int try_dests_reg(struct file_struct *file, char *fname, int ndx,
 	int best_match = -1;
 	int match_level = 0;
 	int j = 0;
+	int basis_parent_fd = -1;
+	int *retain_parent = can_reuse_basis_parent() ? &basis_parent_fd : NULL;
 
 	do {
 		pathjoin(cmpbuf, MAXPATHLEN, basis_dir[j], fname);
-		if (basis_link_stat(cmpbuf, &sxp->st) < 0 || !S_ISREG(sxp->st.st_mode))
-			continue;
+		if (basis_link_stat(cmpbuf, &sxp->st, retain_parent) < 0 || !S_ISREG(sxp->st.st_mode))
+			goto next_basis;
 		if (match_level == 0) {
 			best_match = j;
 			match_level = 1;
 		}
 		if (!quick_check_ok(FT_REG, cmpbuf, file, &sxp->st))
-			continue;
+			goto next_basis;
 		if (match_level == 1) {
 			best_match = j;
 			match_level = 2;
@@ -1136,6 +1251,11 @@ static int try_dests_reg(struct file_struct *file, char *fname, int ndx,
 			break;
 		}
 		free_stat_x(sxp);
+	  next_basis:
+		if (basis_parent_fd >= 0) {
+			close(basis_parent_fd);
+			basis_parent_fd = -1;
+		}
 	} while (basis_dir[++j] != NULL);
 
 	if (!match_level)
@@ -1144,32 +1264,33 @@ static int try_dests_reg(struct file_struct *file, char *fname, int ndx,
 	if (j != best_match) {
 		j = best_match;
 		pathjoin(cmpbuf, MAXPATHLEN, basis_dir[j], fname);
-		if (basis_link_stat(cmpbuf, &sxp->st) < 0)
+		if (basis_link_stat(cmpbuf, &sxp->st, NULL) < 0)
 			goto got_nothing_for_ya;
 	}
 
 	if (match_level == 3 && alt_dest_type != COPY_DEST) {
 		if (find_exact_for_existing) {
-			if (alt_dest_type == LINK_DEST && real_st.st_dev == sxp->st.st_dev && real_st.st_ino == sxp->st.st_ino)
+			if (alt_dest_type == LINK_DEST && real_st.st_dev == sxp->st.st_dev && real_st.st_ino == sxp->st.st_ino) {
+				if (basis_parent_fd >= 0)
+					close(basis_parent_fd);
 				return -1;
+			}
 			if (do_unlink_at(fname) < 0 && errno != ENOENT)
 				goto got_nothing_for_ya;
 		}
 #ifdef SUPPORT_HARD_LINKS
 		if (alt_dest_type == LINK_DEST) {
-			/* For a NON-daemon receiver the basis dir is an operator path:
-			 * resolve the link source via the ownership walk so a foreign-owned
-			 * symlink raced in after the basis_link_stat() check is still
-			 * refused (matching basis_link_stat's !am_daemon gate).  A daemon
-			 * keeps its stronger module-anchored confinement (do_link_at's
-			 * secure_relpath_active path) -- the ownership walk would follow an
-			 * operator-owned symlink out of the module. */
-			int hlok, op = !am_daemon;
-			if (op)
+			/* The non-daemon link still uses operator-path resolution for
+			 * any parent not already held. Daemons keep their own policy. */
+			int hlok, saved_policy = operator_path_resolve;
+			if (!am_daemon)
 				operator_path_resolve = 1;
-			hlok = hard_link_one(file, fname, cmpbuf, 1);
-			if (op)
-				operator_path_resolve = 0;
+			hlok = hard_link_one(file, fname, cmpbuf, basis_parent_fd, 1);
+			operator_path_resolve = saved_policy;
+			if (basis_parent_fd >= 0) {
+				close(basis_parent_fd);
+				basis_parent_fd = -1;
+			}
 			if (!hlok)
 				goto try_a_copy;
 			if (atimes_ndx)
@@ -1230,6 +1351,8 @@ static int try_dests_reg(struct file_struct *file, char *fname, int ndx,
 	return FNAMECMP_BASIS_DIR_LOW + j;
 
 got_nothing_for_ya:
+	if (basis_parent_fd >= 0)
+		close(basis_parent_fd);
 	sxp->st = real_st;
 	return -1;
 }
@@ -1261,7 +1384,8 @@ static int try_dests_non(struct file_struct *file, char *fname, int ndx,
 
 	do {
 		pathjoin(cmpbuf, MAXPATHLEN, basis_dir[j], fname);
-		if (basis_link_stat(cmpbuf, &sxp->st) < 0)
+		if ((ftype == FT_DIR ? basis_dir_stat(cmpbuf, &sxp->st)
+		                     : basis_link_stat(cmpbuf, &sxp->st, NULL)) < 0)
 			continue;
 		if (ftype != get_file_type(sxp->st.st_mode))
 			continue;
@@ -1288,7 +1412,8 @@ static int try_dests_non(struct file_struct *file, char *fname, int ndx,
 	if (j != best_match) {
 		j = best_match;
 		pathjoin(cmpbuf, MAXPATHLEN, basis_dir[j], fname);
-		if (basis_link_stat(cmpbuf, &sxp->st) < 0)
+		if ((ftype == FT_DIR ? basis_dir_stat(cmpbuf, &sxp->st)
+		                     : basis_link_stat(cmpbuf, &sxp->st, NULL)) < 0)
 			return -1;
 	}
 
@@ -2541,7 +2666,7 @@ int atomic_create(struct file_struct *file, char *fname, const char *slnk, const
 #endif
 	} else if (hlnk) {
 #ifdef SUPPORT_HARD_LINKS
-		if (!hard_link_one(file, create_name, hlnk, 0))
+		if (!hard_link_one(file, create_name, hlnk, -1, 0))
 			return 0;
 #else
 		return 0;
@@ -2804,6 +2929,7 @@ void generate_files(int f_out, const char *local_name)
 	enum logcode code;
 	int save_info_flist = info_levels[INFO_FLIST];
 	int save_info_progress = info_levels[INFO_PROGRESS];
+	reset_basis_parent_cache();
 
 	if (protocol_version >= 29) {
 		itemizing = 1;
@@ -3017,4 +3143,5 @@ void generate_files(int f_out, const char *local_name)
 
 	if (DEBUG_GTE(GENR, 1))
 		rprintf(FINFO, "generate_files finished\n");
+	reset_basis_parent_cache();
 }

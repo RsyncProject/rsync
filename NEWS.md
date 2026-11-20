@@ -7,6 +7,8 @@ in the [stable/3.5 NEWS](https://github.com/RsyncProject/rsync/blob/stable/3.5/N
 
 ### Pending 3.5.3 backports
 
+- Reduce repeated basis-directory traversal in non-daemon `--link-dest`
+  transfers (#1180).
 - Fix locale-dependent option and daemon keyword matching and parse fractional
   sizes exactly.
 - Preserve complete logfile records and escape undecodable bytes (#1162).

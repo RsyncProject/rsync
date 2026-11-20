@@ -1194,7 +1194,9 @@ int do_link(const char *old_path, const char *new_path)
   symbolic-link old_path). Only available on systems with linkat();
   pre-AT_FDCWD systems fall through to do_link().
 */
-int do_link_at(const char *old_path, const char *new_path)
+/* A non-negative old_parent_fd borrows a parent checked under the same
+ * operator-path policy as this link. Only the source basename is used. */
+int do_link_at_from(int old_parent_fd, const char *old_path, const char *new_path)
 {
 #if defined AT_FDCWD && defined HAVE_LINKAT
 	extern int am_daemon, am_chrooted;
@@ -1221,23 +1223,29 @@ int do_link_at(const char *old_path, const char *new_path)
 	if (operator_path_resolve) {
 		if (symlink_optout_allowed())
 			return do_link(old_path, new_path);
-		old_dfd = owner_walk_parent(old_path, &old_bname);
-		if (old_dfd < 0)
-			return -1;
+		if (old_parent_fd >= 0) {
+			old_slash = strrchr(old_path, '/');
+			old_bname = old_slash ? old_slash + 1 : old_path;
+			old_dfd = old_parent_fd;
+		} else {
+			old_dfd = owner_walk_parent(old_path, &old_bname);
+			if (old_dfd < 0)
+				return -1;
+			old_owns = True;
+		}
 		new_dfd = owner_walk_parent(new_path, &new_bname);
 		if (new_dfd < 0) {
 			e = errno;
-			close(old_dfd);
+			if (old_owns)
+				close(old_dfd);
 			errno = e;
 			return -1;
 		}
-		ret = linkat(old_dfd, old_bname, new_dfd, new_bname, 0);
-		e = errno;
-		close(new_dfd);
-		close(old_dfd);
-		errno = e;
-		return ret;
+		new_owns = True;
+		goto link_parents;
 	}
+#else
+	(void)old_parent_fd;
 #endif
 
 	old_slash = strrchr(old_path, '/');
@@ -1324,6 +1332,9 @@ int do_link_at(const char *old_path, const char *new_path)
 		new_bname = new_path;
 	}
 
+#if defined O_NOFOLLOW && defined O_DIRECTORY
+  link_parents:
+#endif
 	ret = linkat(old_dfd, old_bname, new_dfd, new_bname, 0);
 	e = errno;
 	if (new_owns)
@@ -1333,8 +1344,14 @@ int do_link_at(const char *old_path, const char *new_path)
 	errno = e;
 	return ret;
 #else
+	(void)old_parent_fd;
 	return do_link(old_path, new_path);
 #endif
+}
+
+int do_link_at(const char *old_path, const char *new_path)
+{
+	return do_link_at_from(-1, old_path, new_path);
 }
 #endif
 
