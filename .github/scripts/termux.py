@@ -19,6 +19,12 @@ PREFIX = '/data/data/com.termux/files/usr'
 HOME = '/data/data/com.termux/files/home'
 
 
+class BootstrapFailure(ValueError):
+    def __init__(self, log):
+        super().__init__('Termux bootstrap failed')
+        self.log = log
+
+
 def download_apk(path):
     url = f'https://github.com/termux/termux-app/releases/download/v{VERSION}/termux-app_v{VERSION}%2Bgithub-debug_x86_64.apk'
     digest, size = hashlib.sha256(), 0
@@ -50,10 +56,12 @@ def wait_for_bootstrap(adb, timeout=180):
         if re.fullmatch(r'\d+', pid):
             log = adb('logcat', '-d', '--pid=' + pid, '-v', 'brief', '-t', '1000',
                       capture_output=True, encoding='utf-8', errors='replace').stdout
-            if 'Bootstrap Error:' in log:
-                raise ValueError('Termux bootstrap failed')
-            if 'Bootstrap packages installed successfully.' in log:
+            failure = log.rfind('Bootstrap Error:')
+            success = log.rfind('Bootstrap packages installed successfully.')
+            if success > failure:
                 return
+            if failure >= 0:
+                raise BootstrapFailure(log)
         time.sleep(1)
     raise TimeoutError('Termux bootstrap did not finish')
 
@@ -142,10 +150,28 @@ def check_transfer(adb, binary, output, device):
             adb('install', str(apk), timeout=120, capture_output=True)
         def run_as(*args, **kwargs):
             return shell('run-as', PACKAGE, *args, **kwargs)
-        run_as('mkdir', '-p', 'files/home/.termux')
-        run_as('sh', '-c', 'cat >files/home/.termux/termux.properties', input='allow-external-apps=true\n', capture_output=True)
-        shell('am', 'start', '-n', PACKAGE + '/.app.TermuxActivity', capture_output=True)
-        wait_for_bootstrap(adb)
+        def launch_app():
+            run_as('mkdir', '-p', 'files/home/.termux')
+            run_as('sh', '-c', 'cat >files/home/.termux/termux.properties',
+                   input='allow-external-apps=true\n', capture_output=True)
+            shell('am', 'start', '-n', PACKAGE + '/.app.TermuxActivity', capture_output=True)
+        launch_app()
+        bootstrap_attempts = 1
+        try:
+            wait_for_bootstrap(adb)
+        except BootstrapFailure as error:
+            # The observed duplicate installers both clear the staging directory.
+            if (error.log.count('Installing Termux bootstrap packages.') < 2
+                    or 'chmod failed: ENOENT' not in error.log):
+                raise
+            (output / 'bootstrap-first-attempt.log').write_text(error.log)
+            shell('am', 'force-stop', PACKAGE, capture_output=True)
+            cleared = shell('pm', 'clear', PACKAGE, capture_output=True)
+            if cleared.stdout.strip() != 'Success':
+                raise ValueError('Termux data reset failed') from error
+            launch_app()
+            wait_for_bootstrap(adb)
+            bootstrap_attempts = 2
         run_as('test', '-x', 'files/usr/bin/am', capture_output=True)
         root = run_as('mktemp', '-d', HOME + '/rsync-ci.XXXXXXXX', capture_output=True).stdout.strip()
         session = Termux(adb, root)
@@ -181,7 +207,8 @@ def check_transfer(adb, binary, output, device):
         shell('test', '-d', '/data/system', capture_output=True)
         session.command('test', '!', '-r', '/data/system')
         receipt = dict(device=device, app=dict(package=PACKAGE, version=VERSION, apk_sha256=APK_SHA256,
-                                              uid=uid, selinux_context=context), binary_sha256=digest,
+                                              uid=uid, selinux_context=context,
+                                              bootstrap_attempts=bootstrap_attempts), binary_sha256=digest,
                        source=run('git', 'rev-parse', 'HEAD', capture_output=True).stdout.strip())
     except (OSError, ValueError, subprocess.SubprocessError):
         if owned:
