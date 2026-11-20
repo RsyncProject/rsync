@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-from fixtures.checksum import BLOCK, colliding_block, transfer_stats
+from fixtures.checksum import BLOCK, DELTA_STATS_ARGS, colliding_block, transfer_stats
 from harness.environment import FROMDIR, TODIR
 from harness.filesystem import assert_same, rmtree
 from harness.results import test_fail
@@ -33,9 +33,7 @@ payload1 = (block_a * N_HEAD) + (block_b * N_DUP)
 src1.write_bytes(payload1)
 dst1.write_bytes(payload1)
 
-proc1 = run_rsync('-a', '-I', '--no-whole-file', f'--block-size={BLOCK}',
-                  '--no-compress', '--stats', '--debug=deltasum1',
-                  f'{src1}', f'{dst1}', capture_output=True)
+proc1 = run_rsync(*DELTA_STATS_ARGS, f'{src1}', f'{dst1}', capture_output=True)
 
 _, false_alarms1, literal1, matched1 = transfer_stats(proc1.stdout + proc1.stderr)
 
@@ -61,9 +59,7 @@ src2_payload = (block_a * 4) + (block_d * 4) + (block_b * 4) + (block_e * 4)
 dst2.write_bytes(dst2_payload)
 src2.write_bytes(src2_payload)
 
-proc2 = run_rsync('-a', '-I', '--no-whole-file', f'--block-size={BLOCK}',
-                  '--no-compress', '--stats', '--debug=deltasum1',
-                  f'{src2}', f'{dst2}', capture_output=True)
+proc2 = run_rsync(*DELTA_STATS_ARGS, f'{src2}', f'{dst2}', capture_output=True)
 
 _, false_alarms2, literal2, matched2 = transfer_stats(proc2.stdout + proc2.stderr)
 
@@ -87,10 +83,7 @@ N_TAIL = 20
 dst3.write_bytes(block_a + block_y + block_a + (block_y * N_TAIL) + (block_b * 1200))
 src3.write_bytes(block_a + block_d + block_x + (block_a * N_TAIL))
 
-proc3 = run_rsync('-a', '-I', '--inplace', '--no-whole-file',
-                  f'--block-size={BLOCK}', '--no-compress',
-                  '--stats', '--debug=deltasum1',
-                  f'{src3}', f'{dst3}', capture_output=True)
+proc3 = run_rsync(*DELTA_STATS_ARGS, '--inplace', f'{src3}', f'{dst3}', capture_output=True)
 
 _, _, literal3, matched3 = transfer_stats(proc3.stdout + proc3.stderr)
 
@@ -115,10 +108,7 @@ N_TRAIL_A = 16
 dst4.write_bytes(block_a + (block_b * N_PINNED_DUPS) + block_a)
 src4.write_bytes(block_a + (block_b * N_PINNED_DUPS) + block_x + (block_a * N_TRAIL_A))
 
-proc4 = run_rsync('-a', '-I', '--inplace', '--no-whole-file',
-                  f'--block-size={BLOCK}', '--no-compress',
-                  '--stats', '--debug=deltasum1',
-                  f'{src4}', f'{dst4}', capture_output=True)
+proc4 = run_rsync(*DELTA_STATS_ARGS, '--inplace', f'{src4}', f'{dst4}', capture_output=True)
 
 _, false_alarms4, literal4, matched4 = transfer_stats(proc4.stdout + proc4.stderr)
 
