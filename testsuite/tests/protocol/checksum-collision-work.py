@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 
-from fixtures.checksum import BLOCK, C_BYTE, spread_colliding_block, transfer_stats
+from fixtures.checksum import (
+    BLOCK, C_BYTE, DELTA_STATS_ARGS, spread_colliding_block, transfer_stats,
+)
 from harness.environment import FROMDIR, TODIR
 from harness.filesystem import assert_same, rmtree
 from harness.results import test_fail
@@ -43,9 +45,7 @@ for idx, run in enumerate(boundary_runs):
 src1_payload = b''.join(src1_parts)
 src1.write_bytes(src1_payload)
 
-proc1 = run_rsync('-a', '-I', '--no-whole-file', f'--block-size={BLOCK}',
-                  '--no-compress', '--stats', '--debug=deltasum1',
-                  f'{src1}', f'{dst1}', capture_output=True)
+proc1 = run_rsync(*DELTA_STATS_ARGS, f'{src1}', f'{dst1}', capture_output=True)
 
 hash_hits1, false_alarms1, literal1, matched1 = transfer_stats(
     proc1.stdout + proc1.stderr
@@ -79,9 +79,7 @@ N_FLOOD = 12
 dst2.write_bytes(block_a * N_FLOOD)
 src2.write_bytes(bytes([C_BYTE]) * (N_FLOOD * BLOCK))
 
-proc2 = run_rsync('-a', '-I', '--no-whole-file', f'--block-size={BLOCK}',
-                  '--no-compress', '--stats', '--debug=deltasum1',
-                  f'{src2}', f'{dst2}', capture_output=True)
+proc2 = run_rsync(*DELTA_STATS_ARGS, f'{src2}', f'{dst2}', capture_output=True)
 
 hash_hits2, false_alarms2, literal2, matched2 = transfer_stats(
     proc2.stdout + proc2.stderr
@@ -103,10 +101,7 @@ dst3 = TODIR / 'inplace_skip.bin'
 dst3.write_bytes(dst1_payload)
 src3.write_bytes(src1_payload)
 
-proc3 = run_rsync('-a', '-I', '--inplace', '--no-whole-file',
-                  f'--block-size={BLOCK}', '--no-compress',
-                  '--stats', '--debug=deltasum1',
-                  f'{src3}', f'{dst3}', capture_output=True)
+proc3 = run_rsync(*DELTA_STATS_ARGS, '--inplace', f'{src3}', f'{dst3}', capture_output=True)
 
 hash_hits3, _, literal3, matched3 = transfer_stats(proc3.stdout + proc3.stderr)
 
