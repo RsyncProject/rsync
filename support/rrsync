@@ -754,6 +754,7 @@ def validated_arg(opt, arg, typ=3, wild=False):
     ret = [ ]
     for arg in got:
         if args.dir != '/' and arg != '.' and (typ == 3 or (typ == 2 and not am_sender)):
+            source_arg = arg
             arg_has_trailing_slash = arg.endswith('/')
             arg_has_trailing_slash_dot = False
             if arg_has_trailing_slash:
@@ -812,18 +813,17 @@ def validated_arg(opt, arg, typ=3, wild=False):
             # rsync does with the argument, not about whether we can pin it, so
             # it has to hold on the BSDs, macOS, Solaris and Cygwin too -- where
             # otherwise a dangling symlink still resolved to nothing and died.
-            if (am_sender and opt == 'arg'
-                    and not arg_has_trailing_slash
-                    and not arg_has_trailing_slash_dot):
+            if am_sender and opt == 'arg':
                 try:
                     lst = os.lstat(arg)
                 except FileNotFoundError:
-                    # if client asked rsync to skip this arg anyway, drop it if
-                    # just the leaf is missing, but treat it as an error when
-                    # rsync would fail to change_dir()
+                    # Skip only an operand missing before the inode-pin attempt.
+                    # A later open failure may be a path replacement race.
                     if client_ignore_missing_args:
                         if client_relative:
-                            chdir = arg.partition('/./')[0] if '/./' in arg else ''
+                            chdir = source_arg.partition('/./')[0] if '/./' in source_arg else ''
+                        elif arg_has_trailing_slash or arg_has_trailing_slash_dot:
+                            chdir = arg
                         else:
                             chdir = os.path.dirname(arg)
                         if not os.path.isdir(chdir or '.'):
@@ -833,8 +833,10 @@ def validated_arg(opt, arg, typ=3, wild=False):
                     lst = None
                 except OSError:
                     lst = None
-                if lst is not None and not (stat.S_ISREG(lst.st_mode)
-                                            or stat.S_ISDIR(lst.st_mode)):
+                if (lst is not None and not arg_has_trailing_slash
+                        and not arg_has_trailing_slash_dot
+                        and not (stat.S_ISREG(lst.st_mode)
+                                 or stat.S_ISDIR(lst.st_mode))):
                     sender_leaf_unopened = True
             try:
                 if sender_leaf_unopened:

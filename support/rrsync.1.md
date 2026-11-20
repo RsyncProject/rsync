@@ -133,13 +133,16 @@ The [`--nice`](rsync.1#opt--nice) option is limited to local CPU nice 19, idle
 I/O priority or both.  Other values could raise the server process priority and
 are rejected.
 
-The rrsync script accepts rsync's [`--ignore-missing-args`](rsync.1#opt) as a
-sending server: missing source args are dropped before rsync is run. If all
-source args are missing, the transfer is refused with an error message and a
-non-zero exit status, as opposed to stock rsync, which would do an empty
-transfer and exit successfully in this case. Also, a missing parent directory
-in an arg causes rrsync to reject the whole transfer, while rsync would
-transfer other args and exit with status 23.
+The rrsync script accepts rsync's
+[`--ignore-missing-args`](rsync.1#opt--ignore-missing-args) as a sending server.
+It skips an operand found missing before opening or pinning it;
+a later open or pin failure remains an error. With `--relative`, a missing
+directory operand ending in `/` or `/.` is skipped when its source anchor
+exists. Without `--relative`, those operands remain directory errors. A missing
+source anchor also causes rrsync to reject the whole transfer, while stock
+rsync would transfer other operands and exit with status 23. If all source
+operands are missing, rrsync refuses the transfer rather than letting rsync
+send `.`; stock rsync would succeed with an empty transfer.
 
 The script (or a copy of it) can be manually edited if you want it to customize
 the option handling.
