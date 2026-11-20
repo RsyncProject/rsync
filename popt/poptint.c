@@ -1,7 +1,7 @@
 #include "system.h"
 #include <stdarg.h>
 #include <errno.h>
-#ifdef HAVE_LANGINFO_H
+#if defined HAVE_LANGINFO_H && defined HAVE_NL_LANGINFO
 #include <langinfo.h>
 #endif
 #include "poptint.h"
@@ -75,7 +75,7 @@ strdup_locale_from_utf8 (char * istr)
     if (istr == NULL)
 	return NULL;
 
-#ifdef HAVE_LANGINFO_H
+#if defined HAVE_LANGINFO_H && defined HAVE_NL_LANGINFO
     codeset = nl_langinfo ((nl_item)CODESET);
 #endif
 
