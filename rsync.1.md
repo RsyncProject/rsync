@@ -1618,6 +1618,10 @@ sign) if you want the local shell to expand it.
     behavior is the same as that of other file-copy utilities, such as **cp**(1)
     and **tar**(1).
 
+    If a filesystem refuses to apply an inferred mode to an already-open
+    destination, rsync may leave that mode unchanged. Path lookup failures and
+    refusals to apply requested modes are still reported as errors.
+
     In summary: to give destination files (both old and new) the source
     permissions, use `--perms`.  To give new files the destination-default
     permissions (while leaving existing files unchanged), make sure that the
