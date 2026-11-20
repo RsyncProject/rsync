@@ -1618,6 +1618,10 @@ sign) if you want the local shell to expand it.
     behavior is the same as that of other file-copy utilities, such as **cp**(1)
     and **tar**(1).
 
+    If a filesystem refuses to apply an inferred mode to an already-open
+    destination, rsync may leave that mode unchanged. Path lookup failures and
+    refusals to apply requested modes are still reported as errors.
+
     In summary: to give destination files (both old and new) the source
     permissions, use `--perms`.  To give new files the destination-default
     permissions (while leaving existing files unchanged), make sure that the
@@ -3511,6 +3515,19 @@ sign) if you want the local shell to expand it.
     as a client option, transfer logging will be enabled with a default format
     of "%i %n%L".  See the [`--log-file-format`](#opt) option if you wish to
     override this.
+
+    The file uses the character encoding of the writing process's
+    `LC_CTYPE` locale. Rsync preserves valid characters and escapes
+    undecodable bytes using the byte notation described under
+    [`--8-bit-output`](#opt). In the `C` and `POSIX` locales or when the
+    codeset or its decoder is unavailable, all non-ASCII bytes are escaped.
+    Control characters other than tabs are escaped within each message.
+    Each message ends with a newline. The `--8-bit-output` option itself
+    does not affect log files.
+
+    Rsync appends each complete message to a regular log file in one write.
+    Sharing such a log file between processes requires a filesystem that
+    supports atomic append. This does not apply to pipes or other devices.
 
     Here's an example command that requests the remote side to log what is
     happening:

@@ -5,6 +5,13 @@ from harness.results import test_fail
 BLOCK = 704
 C_BYTE = 100
 
+# These fixtures assert statistics for one transfer attempt. A changing seed
+# can make distinct blocks share a short checksum and trigger a valid retry.
+DELTA_STATS_ARGS = (
+    '-a', '-I', '--no-whole-file', f'--block-size={BLOCK}', '--no-compress',
+    '--checksum-seed=1', '--stats', '--debug=deltasum1',
+)
+
 def colliding_block(offset=-1, fill=C_BYTE):
     block = bytearray([fill]) * BLOCK
     if offset >= 0:

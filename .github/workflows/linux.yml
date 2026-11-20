@@ -117,7 +117,23 @@ jobs:
         run: sudo python3 -S testsuite/tools/check.py "$PWD" "$PWD/rsync" "root,${{ matrix.profiles }}" "$PWD/test-results/root/tcp" --use-tcp --daemon-tests-only -j8
       - name: Tests (non-root pipe)
         if: ${{ !cancelled() && steps.build.outcome == 'success' }}
-        run: python3 -S testsuite/tools/check.py "$PWD" "$PWD/rsync" "pipe,nonroot,${{ matrix.profiles }}" "$PWD/test-results/nonroot/pipe" -j8
+        run: |
+          if [ "${{ matrix.release }}" = '24.04' ] && [ "${{ matrix.arch }}" = 'amd64' ]; then
+            if [ ! -r /usr/share/i18n/locales/tr_TR ]; then
+              sudo apt-get install -y locales
+            fi
+            LOCPATH=$(mktemp -d "$RUNNER_TEMP/rsync-locales.XXXXXXXX")
+            export LOCPATH
+            localedef --no-archive -i en_US -f UTF-8 "$LOCPATH/en_US.UTF-8"
+            localedef --no-archive -i tr_TR -f UTF-8 "$LOCPATH/tr_TR.UTF-8"
+            localedef --no-archive -i tr_TR -f ISO-8859-9 "$LOCPATH/tr_TR.ISO-8859-9"
+            localedef --no-archive -i en_US -f ISO-8859-1 "$LOCPATH/en_US.ISO-8859-1"
+            localedef --no-archive -i mt_MT -f ISO-8859-3 "$LOCPATH/mt_MT.ISO-8859-3"
+            localedef --no-archive -i ja_JP -f EUC-JP "$LOCPATH/ja_JP.eucJP"
+            test "$(LC_ALL=tr_TR.UTF-8 locale charmap)" = UTF-8
+            test "$(LC_ALL=tr_TR.ISO-8859-9 locale charmap)" = ISO-8859-9
+          fi
+          python3 -S testsuite/tools/check.py "$PWD" "$PWD/rsync" "pipe,nonroot,${{ matrix.profiles }}" "$PWD/test-results/nonroot/pipe" -j8
       - name: Tests (non-root TCP)
         if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         run: python3 -S testsuite/tools/check.py "$PWD" "$PWD/rsync" "nonroot,${{ matrix.profiles }}" "$PWD/test-results/nonroot/tcp" --use-tcp --daemon-tests-only -j8

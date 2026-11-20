@@ -9,6 +9,7 @@ in the [stable/3.5 NEWS](https://github.com/RsyncProject/rsync/blob/stable/3.5/N
 
 - Fix locale-dependent option and daemon keyword matching and parse fractional
   sizes exactly.
+- Preserve complete logfile records and escape undecodable bytes (#1162).
 
 # NEWS for rsync 3.5.2 (4 Nov 2026)
 
