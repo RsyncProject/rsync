@@ -1,39 +1,32 @@
 #!/usr/bin/env python3
 # SHA-3 checksum support (sha3-256, sha3-384, sha3-512).
 #
-# Needs rsync built with OpenSSL against a libcrypto that provides the SHA-3
-# family (OpenSSL 1.1.1 or newer); without it the test reports the openssl
-# capability as unsupported.
-#
-# Each algorithm is used for the whole-file transfer checksum, for the
-# pre-transfer file checksum (-c), and as an explicit xfer,file pair; then a
-# delta update of a modified destination is checked with sha3-256.
-
 import json
 import os
+from random import Random
+import re
 
 from harness.environment import FROMDIR, TODIR
 from harness.filesystem import assert_same, makepath, rmtree, walk_files
-from harness.results import test_fail, test_skipped
+from harness.results import test_fail
 from harness.rsync import run_rsync
 from harness import metadata
 
-metadata(features={'openssl'}, transports={'pipe'})
+metadata(transports={'pipe'}, mutates={'environment', 'filesystem'}, tags={'transfer', 'regression'})
 
 ALGOS = ('sha3-256', 'sha3-384', 'sha3-512')
 
-vv = json.loads(run_rsync('-VV', check=True, capture_output=True).stdout)
-missing = [a for a in ALGOS if a not in vv.get('checksum_list', [])]
-if missing:
-    test_skipped(f"rsync was not built with OpenSSL SHA-3 support (missing: {', '.join(missing)})",
-                 capability='openssl')
+choices = json.loads(run_rsync('-VV', capture_output=True).stdout)['checksum_list']
+available = [algo for algo in ALGOS if algo in choices]
+os.environ.pop('RSYNC_CHECKSUM_LIST', None)
 
 rmtree(FROMDIR)
 makepath(FROMDIR / 'sub')
 # Empty, small and chunk-spanning sizes (CHUNK_SIZE is 32k internally).
 (FROMDIR / 'empty').write_bytes(b'')
 (FROMDIR / 'small').write_text('hello sha-3\n')
-(FROMDIR / 'sub' / 'big').write_bytes(os.urandom(70 * 1024))
+size = 70 * 1024
+(FROMDIR / 'sub' / 'big').write_bytes(Random(0).getrandbits(size * 8).to_bytes(size, 'big'))
 
 src, dst = f'{FROMDIR}/', f'{TODIR}/'
 
@@ -46,9 +39,26 @@ def check_tree(label):
         assert_same(TODIR / rel, FROMDIR / rel, label=f'{label} {rel}')
 
 
+rmtree(TODIR)
+result = run_rsync('-a', '--debug=NSTR2', src, dst, capture_output=True)
+for peer in ('Client', 'Server'):
+    prefix = f'{peer} checksum list (on client): '
+    offers = [line[len(prefix):].split() for line in result.stdout.splitlines()
+              if line.startswith(prefix)]
+    if len(offers) != 1 or set(offers[0]).intersection(ALGOS):
+        test_fail(f'{peer}: invalid default checksum offer: {offers!r}')
+check_tree('auto')
+
+
 for algo in ALGOS:
     # Whole-file path (transfer checksum only).
     rmtree(TODIR)
+    if algo not in available:
+        result = run_rsync('-a', f'--checksum-choice={algo}', src, dst,
+                           capture_output=True, check=False)
+        if result.returncode != 4 or f'unknown checksum name: {algo}' not in result.stderr:
+            test_fail(f'{algo}: an unavailable digest was not refused: {result.returncode}: {result.stderr}')
+        continue
     run_rsync('-a', f'--checksum-choice={algo}', src, dst)
     check_tree(algo)
     # Pre-transfer + transfer checksum path (-c forces file_checksum to run).
@@ -60,14 +70,23 @@ for algo in ALGOS:
     run_rsync('-ac', f'--checksum-choice={algo},{algo}', src, dst)
     check_tree(f'{algo},{algo} -c')
 
-# Delta-update path: change the destination, re-sync with SHA-3, confirm it matches again.
-rmtree(TODIR)
-run_rsync('-a', '--checksum-choice=sha3-256', src, dst)
-with open(TODIR / 'small', 'a') as f:
-    f.write('modified locally\n')
-run_rsync('-a', '--no-whole-file', '--checksum-choice=sha3-256', src, dst)
-check_tree('sha3-256 delta')
-if (TODIR / 'small').read_text() != 'hello sha-3\n':
-    test_fail('delta update with sha3-256 did not restore the source content')
+if available:
+    algo = available[0]
+    rmtree(TODIR)
+    os.environ['RSYNC_CHECKSUM_LIST'] = algo
+    result = run_rsync('-a', '--debug=NSTR2', src, dst, capture_output=True)
+    del os.environ['RSYNC_CHECKSUM_LIST']
+    if f'Client negotiated checksum: {algo}' not in result.stdout.splitlines():
+        test_fail(f'RSYNC_CHECKSUM_LIST did not negotiate {algo}: {result.stdout!r}')
+    check_tree(f'negotiated {algo}')
 
-print('checksum-sha3: sha3-256/384/512 transfer and file checksums, and a sha3-256 delta update')
+    with (TODIR / 'sub' / 'big').open('r+b') as stream:
+        stream.seek(32 * 1024)
+        stream.write(b'modified locally\n')
+    result = run_rsync('-ac', '--no-whole-file', '--stats', f'--checksum-choice={algo}',
+                       src, dst, capture_output=True)
+    for field in ('Matched', 'Literal'):
+        count = re.search(rf'^{field} data: ([0-9,]+) bytes$', result.stdout, re.MULTILINE)
+        if not count or int(count[1].replace(',', '')) == 0:
+            test_fail(f'{algo} delta: no {field.lower()} data: {result.stdout!r}')
+    check_tree(f'{algo} delta')

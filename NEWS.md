@@ -2,14 +2,10 @@
 
 ## Enhancements
 
-- Added SHA-3 (FIPS 202) as an opt-in `--checksum-choice` algorithm
-  family: `sha3-256`, `sha3-384`, and `sha3-512`. The implementation
-  uses OpenSSL EVP and so requires that rsync be built with OpenSSL
-  support and linked against libcrypto >= 1.1.1. Like `sha256` and
-  `sha512`, SHA-3 is never picked by `auto` negotiation; it must be
-  explicitly requested on both ends (e.g.
-  `--checksum-choice=sha3-256`) or made part of the
-  `RSYNC_CHECKSUM_LIST` environment override.
+- Added SHA-3 (FIPS 202) transfer checksum choices `sha3-256`,
+  `sha3-384` and `sha3-512` for builds with OpenSSL SHA-3 support.
+  Default negotiation is unchanged. Select SHA-3 with
+  `--checksum-choice` or include it in both peers' `RSYNC_CHECKSUM_LIST`.
 
 ## Bug fixes
 

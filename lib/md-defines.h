@@ -11,15 +11,15 @@
 #define MD4_DIGEST_LEN 16
 #define MD5_DIGEST_LEN 16
 
-/* SHA-3 (FIPS 202). OpenSSL exposes these via EVP only, with no
- * SHA3_*_DIGEST_LENGTH macros, so define our own. SHA3-512 shares
- * its 64-byte digest length with SHA-512, so MAX_DIGEST_LEN is
- * unaffected. */
+/* OpenSSL exposes SHA-3 via EVP without SHA3_*_DIGEST_LENGTH macros. */
 #define SHA3_256_DIGEST_LEN 32
 #define SHA3_384_DIGEST_LEN 48
 #define SHA3_512_DIGEST_LEN 64
 
-#if defined SHA512_DIGEST_LENGTH
+#if defined USE_OPENSSL
+/* SHA3-512 can be used even when SHA-512 is disabled. */
+#define MAX_DIGEST_LEN SHA3_512_DIGEST_LEN
+#elif defined SHA512_DIGEST_LENGTH
 #define MAX_DIGEST_LEN SHA512_DIGEST_LENGTH
 #elif defined SHA256_DIGEST_LENGTH
 #define MAX_DIGEST_LEN SHA256_DIGEST_LENGTH

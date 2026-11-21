@@ -43,10 +43,6 @@ extern int protocol_version;
 extern int proper_seed_order;
 extern const char *checksum_choice;
 
-#define NNI_BUILTIN (1<<0)
-#define NNI_EVP (1<<1)
-#define NNI_EVP_OK (1<<2)
-
 struct name_num_item valid_checksums_items[] = {
 #ifdef SUPPORT_XXH3
 	{ CSUM_XXH3_128, 0, "xxh128", NULL },
@@ -61,9 +57,9 @@ struct name_num_item valid_checksums_items[] = {
 	 * verify_digest() probes each entry at startup and disables any that the
 	 * linked libcrypto does not support, so listing them here is safe even
 	 * when the build environment is older. */
-	{ CSUM_SHA3_512, NNI_EVP, "sha3-512", NULL },
-	{ CSUM_SHA3_384, NNI_EVP, "sha3-384", NULL },
-	{ CSUM_SHA3_256, NNI_EVP, "sha3-256", NULL },
+	{ CSUM_SHA3_512, NNI_EVP|NNI_EXPLICIT_ONLY, "sha3-512", NULL },
+	{ CSUM_SHA3_384, NNI_EVP|NNI_EXPLICIT_ONLY, "sha3-384", NULL },
+	{ CSUM_SHA3_256, NNI_EVP|NNI_EXPLICIT_ONLY, "sha3-256", NULL },
 #endif
 	{ CSUM_MD5, NNI_BUILTIN|NNI_EVP, "md5", NULL },
 	{ CSUM_MD4, NNI_BUILTIN|NNI_EVP, "md4", NULL },

@@ -2046,11 +2046,11 @@ sign) if you want the local shell to expand it.
     - `none`
 
     The `sha3-*` choices require an rsync built with OpenSSL support and
-    a libcrypto that provides SHA-3 (OpenSSL 1.1.1 or newer).  They are
-    never selected by `auto` negotiation and must be requested explicitly.
+    a libcrypto that provides SHA-3. They are not offered during default
+    negotiation. Use `--checksum-choice` or include them in both peers'
+    [`RSYNC_CHECKSUM_LIST`](#).
 
-    Run `rsync --version` to see the default checksum list compiled into your
-    version (which may differ from the list above).
+    Run `rsync --version` to see the checksum choices available in your build.
 
     If "none" is specified for the first (or only) name, the [`--whole-file`](#opt)
     option is forced on and no checksum verification is performed on the

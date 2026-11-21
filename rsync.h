@@ -1235,6 +1235,11 @@ typedef struct {
 #define NSTR_CHECKSUM 0
 #define NSTR_COMPRESS 1
 
+#define NNI_BUILTIN (1<<0)
+#define NNI_EVP (1<<1)
+#define NNI_EVP_OK (1<<2)
+#define NNI_EXPLICIT_ONLY (1<<3)
+
 struct name_num_item {
 	int num, flags;
 	const char *name;
