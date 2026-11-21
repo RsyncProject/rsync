@@ -5,11 +5,12 @@ import json
 import os
 from random import Random
 import re
+import subprocess
 
 from harness.environment import FROMDIR, TODIR
 from harness.filesystem import assert_same, makepath, rmtree, walk_files
 from harness.results import test_fail
-from harness.rsync import run_rsync
+from harness.rsync import forced_protocol, rsync_argv, run_rsync
 from harness import metadata
 
 metadata(transports={'pipe'}, mutates={'environment', 'filesystem'}, tags={'transfer', 'regression'})
@@ -19,6 +20,8 @@ ALGOS = ('sha3-256', 'sha3-384', 'sha3-512')
 choices = json.loads(run_rsync('-VV', capture_output=True).stdout)['checksum_list']
 available = [algo for algo in ALGOS if algo in choices]
 os.environ.pop('RSYNC_CHECKSUM_LIST', None)
+protocol = forced_protocol()
+legacy_checksum = protocol is not None and protocol < 30
 
 rmtree(FROMDIR)
 makepath(FROMDIR / 'sub')
@@ -39,15 +42,47 @@ def check_tree(label):
         assert_same(TODIR / rel, FROMDIR / rel, label=f'{label} {rel}')
 
 
-rmtree(TODIR)
-result = run_rsync('-a', '--debug=NSTR2', src, dst, capture_output=True)
-for peer in ('Client', 'Server'):
-    prefix = f'{peer} checksum list (on client): '
-    offers = [line[len(prefix):].split() for line in result.stdout.splitlines()
-              if line.startswith(prefix)]
-    if len(offers) != 1 or set(offers[0]).intersection(ALGOS):
-        test_fail(f'{peer}: invalid default checksum offer: {offers!r}')
-check_tree('auto')
+def check_default_checksum():
+    rmtree(TODIR)
+    result = run_rsync('-a', '--debug=NSTR2', src, dst, capture_output=True, check=False)
+    if result.returncode:
+        test_fail(f'default checksum transfer failed: {result}')
+    lines = result.stdout.splitlines()
+    if legacy_checksum:
+        if 'Client checksum: md4' not in lines:
+            test_fail(f'protocol {protocol}: expected the MD4 default: {result.stdout!r}')
+    else:
+        for peer in ('Client', 'Server'):
+            prefix = f'{peer} checksum list (on client): '
+            offers = [line[len(prefix):].split() for line in lines if line.startswith(prefix)]
+            if len(offers) != 1 or set(offers[0]).intersection(ALGOS):
+                test_fail(f'{peer}: invalid default checksum offer: {offers!r}')
+    check_tree('auto')
+
+
+def transfer_with_checksum_list(choices):
+    return subprocess.run(rsync_argv('-a', '--debug=NSTR2', src, dst),
+                          env={**os.environ, 'RSYNC_CHECKSUM_LIST': choices},
+                          capture_output=True, text=True)
+
+
+def check_checksum_list(algo):
+    rmtree(TODIR)
+    result = transfer_with_checksum_list(algo)
+    expected = f'Client negotiated checksum: {algo}'
+    if legacy_checksum:
+        # Without negotiation the list may allow MD4 or refuse it, not replace it.
+        if result.returncode != 4 or 'Failed to negotiate a checksum choice.' not in result.stderr:
+            test_fail(f'protocol {protocol}: expected a SHA-3-only list to be refused: {result}')
+        rmtree(TODIR)
+        result = transfer_with_checksum_list(f'{algo} md4')
+        expected = 'Client checksum: md4'
+    if result.returncode or expected not in result.stdout.splitlines():
+        test_fail(f'RSYNC_CHECKSUM_LIST: expected {expected!r}: {result}')
+    check_tree('checksum list')
+
+
+check_default_checksum()
 
 
 for algo in ALGOS:
@@ -59,7 +94,10 @@ for algo in ALGOS:
         if result.returncode != 4 or f'unknown checksum name: {algo}' not in result.stderr:
             test_fail(f'{algo}: an unavailable digest was not refused: {result.returncode}: {result.stderr}')
         continue
-    run_rsync('-a', f'--checksum-choice={algo}', src, dst)
+    result = run_rsync('-a', f'--checksum-choice={algo}', '--debug=NSTR2', src, dst,
+                       capture_output=True, check=False)
+    if result.returncode or f'Client checksum: {algo}' not in result.stdout.splitlines():
+        test_fail(f'explicit choice did not select {algo}: {result}')
     check_tree(algo)
     # Pre-transfer + transfer checksum path (-c forces file_checksum to run).
     rmtree(TODIR)
@@ -72,14 +110,7 @@ for algo in ALGOS:
 
 if available:
     algo = available[0]
-    rmtree(TODIR)
-    os.environ['RSYNC_CHECKSUM_LIST'] = algo
-    result = run_rsync('-a', '--debug=NSTR2', src, dst, capture_output=True)
-    del os.environ['RSYNC_CHECKSUM_LIST']
-    if f'Client negotiated checksum: {algo}' not in result.stdout.splitlines():
-        test_fail(f'RSYNC_CHECKSUM_LIST did not negotiate {algo}: {result.stdout!r}')
-    check_tree(f'negotiated {algo}')
-
+    check_checksum_list(algo)
     with (TODIR / 'sub' / 'big').open('r+b') as stream:
         stream.seek(32 * 1024)
         stream.write(b'modified locally\n')
