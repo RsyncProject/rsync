@@ -75,4 +75,6 @@ Installed-binary checks exercise restricted SSH and local TLS with certificate a
 
 Android jobs execute static Bionic binaries, then reuse the X86-64 binary in an emulator and the Termux application sandbox with SELinux enforcing. Interoperability jobs run directed transfers between Linux, FreeBSD, NetBSD, OpenBSD, macOS, Solaris and Cygwin. They compare data and metadata, check unsupported-feature refusals and restore fake-super backups on their originating platform. The separate [network document](../.github/INTEROPERABILITY.md) describes admission and cleanup.
 
+The Termux job allows one app reset after overlapping bootstrap installers lose staging files. It waits for the installers to finish before testing the binary in the app sandbox.
+
 Jobs retain logs and receipts. The Required check rejects failed or missing selected jobs.
