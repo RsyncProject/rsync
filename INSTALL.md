@@ -7,6 +7,34 @@ option to use if you want to just skip that feature.  What follows are various
 support libraries that you may want to install to build rsync with the maximum
 features (the impatient can skip down to the package summary):
 
+## Ubuntu users: skip the build, use the PPA
+
+If you are on a currently supported Ubuntu series (jammy 22.04 LTS, noble
+24.04 LTS, questing 25.10, resolute 26.04 LTS) and just want the latest
+upstream rsync, the rsync project maintains a Launchpad PPA that tracks
+stable releases:
+
+>     sudo add-apt-repository ppa:rsyncproject/rsync
+>     sudo apt update && sudo apt install rsync
+
+See [the PPA page][ppa] for current build status across architectures.
+
+[ppa]: https://launchpad.net/~rsyncproject/+archive/ubuntu/rsync
+
+To test the upcoming release instead, there is also a [`rsync-latest`
+PPA][ppa-latest] that is rebuilt from the tip of the git master branch.  These
+are development snapshots whose version numbers (such as
+`3.5.0~git20260601...`) deliberately sort below the matching stable release, so
+the stable PPA above will never silently move you from a release onto a
+snapshot.  Use it for testing only -- it may contain unreleased changes:
+
+>     sudo add-apt-repository ppa:rsyncproject/rsync-latest
+>     sudo apt update && sudo apt install rsync
+
+[ppa-latest]: https://launchpad.net/~rsyncproject/+archive/ubuntu/rsync-latest
+
+The rest of this document covers building from source.
+
 ## The basic setup
 
 You need to have a C compiler installed and optionally a C++ compiler in order
@@ -86,6 +114,16 @@ checksums.
 
 [4]: https://www.openssl.org/docs/man1.0.2/man3/crypto.html
 
+## libidn2
+
+The [libidn2 library][5] converts an internationalized domain name into the
+IDNA A-label ("Punycode") form that a resolver understands.  Installing this
+development library lets rsync connect to a daemon whose name has non-ASCII
+characters in it, and lets a daemon's "hosts allow" & "hosts deny" settings be
+written the same way.
+
+[5]: https://www.gnu.org/software/libidn/#libidn2
+
 ## Package summary
 
 To help you get the libraries installed, here are some package install commands
@@ -103,6 +141,7 @@ like.
     >     sudo apt install -y libzstd-dev
     >     sudo apt install -y liblz4-dev
     >     sudo apt install -y libssl-dev
+    >     sudo apt install -y libidn2-dev
 
 Or run support/install_deps_ubuntu.sh
 
@@ -116,6 +155,7 @@ Or run support/install_deps_ubuntu.sh
     >     sudo yum -y install libzstd-devel
     >     sudo yum -y install lz4-devel
     >     sudo yum -y install openssl-devel
+    >     sudo yum -y install libidn2-devel
     >     python3 -mpip install --user commonmark
 
  -  For Fedora 33:
@@ -126,6 +166,7 @@ Or run support/install_deps_ubuntu.sh
     >     sudo dnf -y install libzstd-devel
     >     sudo dnf -y install lz4-devel
     >     sudo dnf -y install openssl-devel
+    >     sudo dnf -y install libidn2-devel
 
  -  For FreeBSD (this assumes that the python3 version is 3.7):
 
@@ -133,6 +174,7 @@ Or run support/install_deps_ubuntu.sh
     >     sudo pkg install -y xxhash
     >     sudo pkg install -y zstd
     >     sudo pkg install -y liblz4
+    >     sudo pkg install -y libidn2
 
  -  For macOS:
 
@@ -141,6 +183,7 @@ Or run support/install_deps_ubuntu.sh
     >     brew install zstd
     >     brew install lz4
     >     brew install openssl
+    >     brew install libidn2
 
  -  For Cygwin (with all cygwin programs stopped, run the appropriate setup program from a cmd shell):
 
@@ -149,6 +192,7 @@ Or run support/install_deps_ubuntu.sh
     >     setup-x86_64 --quiet-mode -P libzstd-devel
     >     setup-x86_64 --quiet-mode -P liblz4-devel
     >     setup-x86_64 --quiet-mode -P libssl-devel
+    >     setup-x86_64 --quiet-mode -P libidn2-devel
 
     Sometimes cygwin has commonmark packaged and sometimes it doesn't. Now that
     its python38 has stabilized, you could install python38-commonmark. Or just

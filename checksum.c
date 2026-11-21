@@ -27,6 +27,7 @@
  */
 
 #include "rsync.h"
+#include "itypes.h"
 
 #ifdef SUPPORT_XXHASH
 #include <xxhash.h>
@@ -87,6 +88,24 @@ struct name_num_obj valid_auth_checksums = {
 	"daemon auth checksum", NULL, 0, 0, valid_auth_checksums_items
 };
 
+/* Return the strength rank (0 = strongest) of a daemon-auth digest by name in
+ * valid_auth_checksums_items[], which is listed strongest-first; -1 if the name
+ * is not a supported auth digest on this build.  Used by the daemon's
+ * "auth digest" floor to compare the negotiated digest against the minimum. */
+int auth_digest_rank(const char *name)
+{
+	struct name_num_item *nni;
+	int rank = 0;
+
+	if (!name || !*name)
+		return -1;
+	for (nni = valid_auth_checksums_items; nni->name; nni++, rank++) {
+		if (ascii_strcasecmp(nni->name, name) == 0)
+			return rank;
+	}
+	return -1;
+}
+
 /* These cannot make use of openssl, so they're marked just as built-in */
 struct name_num_item implied_checksum_md4 =
     { CSUM_MD4, NNI_BUILTIN, "md4", NULL };
@@ -115,7 +134,7 @@ struct name_num_item *parse_csum_name(const char *name, int len)
 
 	init_checksum_choices();
 
-	if (!name || (len == 4 && strncasecmp(name, "auto", 4) == 0)) {
+	if (!name || (len == 4 && ascii_strncasecmp(name, "auto", 4) == 0)) {
 		if (protocol_version >= 30) {
 			if (!proper_seed_order)
 				return &implied_checksum_md5;
@@ -176,7 +195,7 @@ void parse_checksum_choice(int final_call)
 	if (valid_checksums.negotiated_nni)
 		xfer_sum_nni = file_sum_nni = valid_checksums.negotiated_nni;
 	else {
-		char *cp = checksum_choice ? strchr(checksum_choice, ',') : NULL;
+		const char *cp = checksum_choice ? strchr(checksum_choice, ',') : NULL;
 		if (cp) {
 			xfer_sum_nni = parse_csum_name(checksum_choice, cp - checksum_choice);
 			file_sum_nni = parse_csum_name(cp+1, -1);
@@ -366,9 +385,8 @@ void get_checksum2(char *buf, int32 len, char *sum)
 
 		mdfour_begin(&m);
 
-		if (len > len1) {
-			if (buf1)
-				free(buf1);
+		if (len > len1 || !buf1) {
+			free(buf1);
 			buf1 = new_array(char, len+4);
 			len1 = len;
 		}
