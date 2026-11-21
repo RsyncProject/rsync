@@ -21,16 +21,22 @@ export RSYNC_PASSWORD=XXXXXX
 
 ########################################################################
 
+# shellcheck disable=SC2006
 BACKUPDIR=`date +%A`
 OPTS="--force --ignore-errors --delete-excluded --exclude-from=$EXCLUDES 
       --delete --backup --backup-dir=/$BACKUPDIR -a"
 
+# shellcheck disable=SC2086
 export PATH=$PATH:/bin:/usr/bin:/usr/local/bin
 
 # the following line clears the last weeks incremental directory
+# shellcheck disable=SC2086
 [ -d $HOME/emptydir ] || mkdir $HOME/emptydir
+# shellcheck disable=SC2086
 rsync --delete -a $HOME/emptydir/ $BSERVER::$USER/$BACKUPDIR/
+# shellcheck disable=SC2086
 rmdir $HOME/emptydir
 
 # now the actual transfer
+# shellcheck disable=SC2086
 rsync $OPTS $BDIR $BSERVER::$USER/current

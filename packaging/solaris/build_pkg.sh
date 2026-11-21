@@ -1,4 +1,12 @@
 #!/bin/sh
+# The build target is Solaris 8. Its /bin/sh is the pre-POSIX Bourne
+# shell, which does not support "$(...)": keep the legacy backticks.
+# No values in this script are expected to contain spaces: ARCH, START,
+# FAKE_ROOT, OUTPUTFILE, PKGNAME and NAME derive from hardcoded constants
+# (PKGNAME=SMBrsync, VERSION="2.5.5", NAME=rsync, BASEDIR=/usr/local) or
+# single-token commands (`uname -p`, `pwd`), so the unquoted expansions of
+# FAKE_ROOT, OUTPUTFILE and PKGNAME are safe here.
+# shellcheck disable=SC2006,SC2086,SC2164,SC2103
 # Shell script for building Solaris package of rsync
 # Author: Jens Apel <jens.apel@web.de>
 # License: GPL

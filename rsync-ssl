@@ -29,6 +29,7 @@ function rsync_ssl_run {
     exec rsync --rsh="'$0' --HELPER" "${@}"
 }
 
+# shellcheck disable=SC1073,SC1009,SC1056,SC1072,SC2086
 function rsync_ssl_helper {
     if [[ -z "$RSYNC_SSL_TYPE" ]]; then
 	found=$(path_search openssl socat stunnel4 stunnel) || exit 1
