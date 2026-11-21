@@ -19,6 +19,9 @@ modules.
 
 ## FILE FORMAT
 
+Configuration keywords use ASCII letters and are matched without regard to
+ASCII letter case. Locale settings do not change the meaning of a keyword.
+
 The file consists of modules and parameters. A module begins with the name of
 the module in square brackets and continues until the next module begins.
 Modules contain parameters of the form `name = value`.
@@ -75,8 +78,13 @@ Replace "@BINDIR@/rsync" with the path to where you have rsync installed on
 your system.  You will then need to send inetd a HUP signal to tell it to
 reread its config file.
 
-Note that you should **not** send the rsync daemon a HUP signal to force it to
-reread the `rsyncd.conf` file. The file is re-read on each client connection.
+A standalone rsync daemon reads global settings at startup and opens the
+configuration again for each client connection. Keep the file readable for
+as long as the daemon is running. A pipe, such as a pipe-backed process
+substitution, cannot supply a fresh configuration for each connection.
+Do not send the rsync daemon a HUP signal to reload this file. Changes to
+listener settings such as the port require a restart. A daemon started by
+inetd or a remote shell reads the configuration for its single connection.
 
 ## GLOBAL PARAMETERS
 
@@ -441,6 +449,10 @@ in the values of parameters.  See that section for details.
     is called, allowing it to be placed outside the transfer.  If this value is
     set on a per-module basis instead of globally, the global log will still
     contain any authorization failures or config-file error messages.
+
+    File logging uses the daemon's locale and follows the same byte escaping
+    and line termination rules as [`--log-file`](rsync.1#opt--log-file).
+    These rules do not change what the daemon sends to syslog.
 
     If the daemon fails to open the specified file, it will fall back to using
     syslog and output an error about the failure.  (Note that the failure to
@@ -1388,14 +1400,14 @@ An example nginx proxy setup is as follows:
 > stream {
 >    server {
 >        listen 874 ssl;
->        listen as[::]:874 ssl;
+>        listen [::]:874 ssl;
 >
 >        ssl_certificate /etc/letsencrypt/example.com/fullchain.pem;
 >        ssl_certificate_key /etc/letsencrypt/example.com/privkey.pem;
 >
 >        proxy_pass localhost:873;
 >        proxy_protocol on; # Requires rsyncd.conf "proxy protocol = true"
->        proxy_tasimeout 1m;
+>        proxy_timeout 1m;
 >        proxy_connect_timeout 5s;
 >    }
 > }
@@ -1405,8 +1417,6 @@ If rsyncd should be accessible encrypted and unencrypted at the same time make
 the proxy listen on port 873 as well and let it handle both streams.
 
 ## DAEMON CONFIG EXAMPLES
-
-WARNING: Only the [GLOBAL PARAMETERS](#) are read on startup.  The file is re-read once per connection. It must be available to be reread, so bash process substitutions and other ephemeral files will be unreliable. There is no warning message when a modified config is re-read.
 
 A simple rsyncd.conf file that allow anonymous rsync to a ftp area at
 `/home/ftp` would be:

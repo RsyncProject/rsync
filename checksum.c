@@ -27,6 +27,7 @@
  */
 
 #include "rsync.h"
+#include "itypes.h"
 
 #ifdef SUPPORT_XXHASH
 #include <xxhash.h>
@@ -99,7 +100,7 @@ int auth_digest_rank(const char *name)
 	if (!name || !*name)
 		return -1;
 	for (nni = valid_auth_checksums_items; nni->name; nni++, rank++) {
-		if (strcasecmp(nni->name, name) == 0)
+		if (ascii_strcasecmp(nni->name, name) == 0)
 			return rank;
 	}
 	return -1;
@@ -133,7 +134,7 @@ struct name_num_item *parse_csum_name(const char *name, int len)
 
 	init_checksum_choices();
 
-	if (!name || (len == 4 && strncasecmp(name, "auto", 4) == 0)) {
+	if (!name || (len == 4 && ascii_strncasecmp(name, "auto", 4) == 0)) {
 		if (protocol_version >= 30) {
 			if (!proper_seed_order)
 				return &implied_checksum_md5;

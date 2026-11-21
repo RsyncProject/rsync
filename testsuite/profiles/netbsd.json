@@ -1,0 +1,27 @@
+{
+  "not_applicable": {
+    "darwin": "not Darwin",
+    "darwin_interpose": "no dyld interposition",
+    "group_auth": "Linux-only group-auth fixture",
+    "linux_acl": "Linux-only ACL semantics",
+    "linux_interpose": "Linux-only interposition",
+    "linux_nss_chroot": "Linux-only NSS chroot",
+    "linux_xattr": "Linux-only xattr semantics",
+    "noatime": "Linux-only O_NOATIME",
+    "proc_fd": "Linux-only descriptor fixture",
+    "protected_regular": "Linux-only protected_regular sysctl",
+    "user_namespace": "Linux-only user namespaces"
+  },
+  "unsupported": {
+    "acl": "no usable ACL fixture",
+    "crtimes": "no creation times",
+    "directory_sgid": "no directory setgid semantics",
+    "interpose": "no supported interposition fixture",
+    "preallocate": "no preallocation support",
+    "search_only": "no race-safe search-only directory descriptors",
+    "setpriv": "no setpriv launcher",
+    "simd": "no SIMD test build",
+    "xattr_runtime": "no user xattr fixture",
+    "xattr_wire": "no xattr wire fixture"
+  }
+}
