@@ -36,6 +36,12 @@ static const char proxyv2sig[] = "\r\n\r\n\0\r\nQUIT\n";
 
 static char ipaddr_buf[100];
 
+const char * const client_special_addrs[] = {
+	[CLIENT_UNKNOWN_ADDR] = "unknown:",
+	[CLIENT_UNIX_ADDR]    = "unix:",
+	NULL,
+};
+
 #define PROXY_V2_SIG_SIZE ((int)sizeof proxyv2sig - 1)
 #define PROXY_V2_HEADER_SIZE (PROXY_V2_SIG_SIZE + 1 + 1 + 2)
 
@@ -52,13 +58,16 @@ static int check_name(const char *ipaddr, const struct sockaddr_storage *ss, cha
 static int valid_ipaddr(const char *s, int allow_scope);
 
 /* Return the IP addr of the client as a string. */
-char *client_addr(int fd)
+const char *client_addr(int fd)
 {
+	static const char *ret_special_val = NULL;
 	struct sockaddr_storage ss;
 	socklen_t length = sizeof ss;
 
 	if (*ipaddr_buf)
 		return ipaddr_buf;
+	if (ret_special_val)
+		return ret_special_val;
 
 	if (am_daemon < 0) {	/* daemon over --rsh mode */
 		char *env_str;
@@ -78,9 +87,26 @@ char *client_addr(int fd)
 	}
 
 	client_sockaddr(fd, &ss, &length);
+	if (length < sizeof(sa_family_t)) {
+		ret_special_val = client_special_addrs[CLIENT_UNKNOWN_ADDR];
+		goto return_special;
+	}
+	switch (((struct sockaddr *)&ss)->sa_family) {
+		case AF_UNIX:
+			ret_special_val = client_special_addrs[CLIENT_UNIX_ADDR];
+			goto return_special;
+		case AF_INET:
+		case AF_INET6:
+			break;
+		default:
+			ret_special_val = client_special_addrs[CLIENT_UNKNOWN_ADDR];
+			goto return_special;
+	}
 	getnameinfo((struct sockaddr *)&ss, length, ipaddr_buf, sizeof ipaddr_buf, NULL, 0, NI_NUMERICHOST);
 
 	return ipaddr_buf;
+return_special:
+	return ret_special_val;
 }
 
 
