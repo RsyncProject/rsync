@@ -732,7 +732,7 @@ void send_files(int f_in, int f_out)
 			fd = -1;
 			errno = EISDIR;
 		}
-		if (fd == -1) {
+		if (fd < 0) {
 			if (errno == ENOENT) {
 				enum logcode c = am_daemon && protocol_version < 28 ? FERROR : FWARNING;
 				io_error |= IOERR_VANISHED;
