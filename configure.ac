@@ -1658,7 +1658,7 @@ if test x"$enable_xattr_support" = x"no"; then
     AC_MSG_RESULT(no)
 else
     case "$host_os" in
-    *linux*|*netbsd*|*cygwin*)
+    *linux*|*cygwin*)
 	AC_MSG_RESULT(Using Linux xattrs)
 	AC_DEFINE(HAVE_LINUX_XATTRS, 1, [True if you have Linux xattrs (or equivalent)])
 	AC_DEFINE(SUPPORT_XATTRS, 1)
@@ -1672,10 +1672,13 @@ else
 	AC_DEFINE(NO_DEVICE_XATTRS, 1, [True if device files do not support xattrs])
 	AC_DEFINE(NO_SPECIAL_XATTRS, 1, [True if special files do not support xattrs])
 	;;
-    freebsd*)
-	AC_MSG_RESULT(Using FreeBSD extattrs)
-	AC_DEFINE(HAVE_FREEBSD_XATTRS, 1, [True if you have FreeBSD xattrs])
+    freebsd*|*netbsd*)
+	AC_MSG_RESULT(Using BSD extattrs)
+	AC_DEFINE(HAVE_BSD_EXTATTRS, 1, [True if you use the BSD extattr interface])
 	AC_DEFINE(SUPPORT_XATTRS, 1)
+	case "$host_os" in
+	*netbsd*) AC_DEFINE(NO_SYMLINK_USER_XATTRS, 1) ;;
+	esac
 	;;
     solaris*)
 	AC_MSG_RESULT(Using Solaris xattrs)

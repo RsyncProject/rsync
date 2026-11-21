@@ -129,7 +129,20 @@ ssize_t sys_flistxattr(int filedes, char *list, size_t size)
 	return flistxattr(filedes, list, size, 0);
 }
 
-#elif HAVE_FREEBSD_XATTRS
+#elif HAVE_BSD_EXTATTRS
+
+#ifdef __NetBSD__
+/* Growing an existing value on NetBSD FFS can corrupt neighbouring xattrs. */
+static int netbsd_extattr_write_supported(ssize_t old_size, size_t size)
+{
+	if (old_size < 0)
+		return errno == ENOATTR;
+	if (size <= (size_t)old_size)
+		return 1;
+	errno = EOPNOTSUPP;
+	return 0;
+}
+#endif
 
 ssize_t sys_lgetxattr(const char *path, const char *name, void *value, size_t size)
 {
@@ -143,11 +156,19 @@ ssize_t sys_fgetxattr(int filedes, const char *name, void *value, size_t size)
 
 int sys_lsetxattr(const char *path, const char *name, const void *value, size_t size)
 {
+#ifdef __NetBSD__
+	if (!netbsd_extattr_write_supported(extattr_get_link(path, EXTATTR_NAMESPACE_USER, name, NULL, 0), size))
+		return -1;
+#endif
 	return extattr_set_link(path, EXTATTR_NAMESPACE_USER, name, value, size);
 }
 
 int sys_fsetxattr(int filedes, const char *name, const void *value, size_t size)
 {
+#ifdef __NetBSD__
+	if (!netbsd_extattr_write_supported(extattr_get_fd(filedes, EXTATTR_NAMESPACE_USER, name, NULL, 0), size))
+		return -1;
+#endif
 	return extattr_set_fd(filedes, EXTATTR_NAMESPACE_USER, name, value, size);
 }
 
@@ -161,11 +182,11 @@ int sys_fremovexattr(int filedes, const char *name)
 	return extattr_delete_fd(filedes, EXTATTR_NAMESPACE_USER, name);
 }
 
-/* Turn the FreeBSD extattr_list_xx() output (a single length byte before each
+/* Turn the BSD extattr_list_*() output (a single length byte before each
  * name, no '\0' terminator) into the series of null-terminated strings that the
  * rest of rsync expects.  Since the size is unchanged, transform in place.
  * Shared by the path and fd list variants. */
-static ssize_t freebsd_list_finish(char *list, size_t size, ssize_t len)
+static ssize_t extattr_list_finish(char *list, size_t size, ssize_t len)
 {
 	unsigned char keylen;
 	ssize_t off;
@@ -198,13 +219,13 @@ static ssize_t freebsd_list_finish(char *list, size_t size, ssize_t len)
 
 ssize_t sys_llistxattr(const char *path, char *list, size_t size)
 {
-	return freebsd_list_finish(list, size,
+	return extattr_list_finish(list, size,
 		extattr_list_link(path, EXTATTR_NAMESPACE_USER, list, size));
 }
 
 ssize_t sys_flistxattr(int filedes, char *list, size_t size)
 {
-	return freebsd_list_finish(list, size,
+	return extattr_list_finish(list, size,
 		extattr_list_fd(filedes, EXTATTR_NAMESPACE_USER, list, size));
 }
 

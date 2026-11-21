@@ -146,6 +146,7 @@ jobs:
           path: |
             config.log
             test-results/status
+            test-results/features.json
             test-results/nonroot/dirfd-probe.tsv
             test-results/*/*/receipt.json
             test-results/*/*/run.log

@@ -1,5 +1,12 @@
 # NEWS for rsync 4.0.0 (UNRELEASED)
 
+## Bug fixes
+
+- Fixed `-X` transfers of user xattrs on NetBSD by using the native BSD
+  extended attribute interface. Retain the requested modification time when
+  writing fake-super metadata. Refuse to grow an existing xattr on NetBSD
+  because FFS can corrupt other attributes during that operation.
+
 ## 3.5 maintenance line
 
 Release notes for compatible fixes and incremental improvements are maintained
