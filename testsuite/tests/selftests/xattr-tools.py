@@ -24,6 +24,8 @@ def test(context: TestContext):
     for system, write, read, value in (
         ('FreeBSD', ['setextattr', '-h', 'user', 'marker', 'value', str(path)],
          ['getextattr', '-qqh', 'user', 'marker', str(path)], b'value'),
+        ('NetBSD', ['setextattr', '-h', 'user', 'marker', 'value', str(path)],
+         ['getextattr', '-qh', 'user', 'marker', str(path)], b'value\n'),
         ('Darwin', ['xattr', '-w', 'marker', 'value', str(path)],
          ['xattr', '-px', 'marker', str(path)], b'76616c7565'),
     ):
@@ -36,6 +38,18 @@ def test(context: TestContext):
             if xattrs.get_value('marker', path) != b'value':
                 test_fail(f'{system} changed the xattr value')
             tool.assert_called_once_with(read)
+            if system == 'NetBSD':
+                for stored in (b'', b'value\n', b'\x00\xff\n'):
+                    tool.return_value = SimpleNamespace(stdout=stored + b'\n')
+                    if xattrs.get_value('marker', path) != stored:
+                        test_fail(f'{system} did not preserve {stored!r}')
+                tool.return_value = SimpleNamespace(stdout=b'no terminator')
+                try:
+                    xattrs.get_value('marker', path)
+                except xattrs.XattrError:
+                    pass
+                else:
+                    test_fail('NetBSD accepted a value without the tool delimiter')
             tool.reset_mock()
             xattrs.remove_value('marker', path)
             expected = (['xattr', '-d', 'marker', str(path)] if system == 'Darwin'

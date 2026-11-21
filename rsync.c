@@ -505,6 +505,7 @@ int set_file_attrs(const char *fname, struct file_struct *file, stat_x *sxp,
 		   const char *fnamecmp, int flags)
 {
 	int updated = 0;
+	int mtime_stale = 0;
 	stat_x sx2;
 	int change_uid, change_gid;
 	mode_t new_mode = file->mode;
@@ -711,7 +712,8 @@ int set_file_attrs(const char *fname, struct file_struct *file, stat_x *sxp,
 
 #ifdef SUPPORT_XATTRS
 	if (am_root < 0 && !op_refuse && !xattr_refuse)
-		set_stat_xattr(fname, file, new_mode, held_fd);
+		/* Changing the fake stat xattr can change mtime on disk. */
+		mtime_stale = set_stat_xattr(fname, file, new_mode, held_fd) > 0;
 	if (preserve_xattrs && fnamecmp && !op_refuse && !xattr_refuse)
 		set_xattr(fname, file, fnamecmp, sxp, held_fd);
 #endif
@@ -730,7 +732,8 @@ int set_file_attrs(const char *fname, struct file_struct *file, stat_x *sxp,
 	}
 	if (sxp != &sx2)
 		memcpy(&sx2.st, &sxp->st, sizeof sx2.st);
-	if (!(flags & ATTRS_SKIP_MTIME) && !same_mtime(file, &sxp->st, flags & ATTRS_ACCURATE_TIME)) {
+	if (!(flags & ATTRS_SKIP_MTIME)
+	 && (mtime_stale || !same_mtime(file, &sxp->st, flags & ATTRS_ACCURATE_TIME))) {
 		sx2.st.st_mtime = file->modtime;
 #ifdef ST_MTIME_NSEC
 		sx2.st.ST_MTIME_NSEC = F_MOD_NSEC_or_0(file);

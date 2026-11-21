@@ -9,6 +9,7 @@ from .process import run_rsync
 SYSTEM = platform.system()
 CYGWIN = SYSTEM.startswith('CYGWIN')
 LINUX_NAMESPACE = SYSTEM == 'Linux' or CYGWIN
+EXTATTR_SYSTEMS = ('FreeBSD', 'NetBSD')
 
 RSYNC_PREFIX = 'rsync'
 RUSR = 'rsync.nonuser' if SYSTEM in ('Darwin', 'SunOS') else 'rsync'
@@ -32,7 +33,7 @@ def is_supported():
         return shutil.which('setfattr') is not None
     if SYSTEM == 'Darwin':
         return shutil.which('xattr') is not None
-    if SYSTEM == 'FreeBSD':
+    if SYSTEM in EXTATTR_SYSTEMS:
         return shutil.which('setextattr') is not None
     if SYSTEM == 'SunOS':
         return shutil.which('runat') is not None
@@ -67,8 +68,9 @@ def get_value(name, path):
     elif SYSTEM == 'Darwin':
         argv = ['xattr', '-px', name, path]
         options = {}
-    elif SYSTEM == 'FreeBSD':
-        argv = ['getextattr', '-qqh', 'user', name, path]
+    elif SYSTEM in EXTATTR_SYSTEMS:
+        flags = '-qh' if SYSTEM == 'NetBSD' else '-qqh'
+        argv = ['getextattr', flags, 'user', name, path]
         options = {}
     elif SYSTEM == 'SunOS':
         argv = ['runat', path, '/bin/sh']
@@ -76,6 +78,11 @@ def get_value(name, path):
     else:
         raise NotImplementedError(f'xattr get on {SYSTEM}')
     result = _run(argv, **options)
+    if SYSTEM == 'NetBSD':
+        # The tool appends one newline even when the attribute is binary.
+        if not result.stdout.endswith(b'\n'):
+            raise XattrError('getextattr returned a value without its newline delimiter')
+        return result.stdout[:-1]
     if SYSTEM != 'Darwin':
         return result.stdout
     try:
@@ -94,7 +101,7 @@ def set_value(name, value, *paths):
             _run(['setfattr', '-n', name, '-v', value, path], text=True)
         elif SYSTEM == 'Darwin':
             _run(['xattr', '-w', name, value, path], text=True)
-        elif SYSTEM == 'FreeBSD':
+        elif SYSTEM in EXTATTR_SYSTEMS:
             _run(['setextattr', '-h', 'user', name, value, path], text=True)
         elif SYSTEM == 'SunOS':
             _run(['runat', path, '/bin/sh'], input='printf %s "$XVAL" > "$XNAME"\n',
@@ -110,7 +117,7 @@ def remove_value(name, path):
         _run(['setfattr', '-x', name, path])
     elif SYSTEM == 'Darwin':
         _run(['xattr', '-d', name, path])
-    elif SYSTEM == 'FreeBSD':
+    elif SYSTEM in EXTATTR_SYSTEMS:
         _run(['rmextattr', '-h', 'user', name, path])
     elif SYSTEM == 'SunOS':
         _run(['runat', path, '/bin/sh'], input=b'rm -- "$XNAME"\n', env={**os.environ, 'XNAME': name})
@@ -140,7 +147,7 @@ def dump_values(*paths):
             output.append('\n'.join(line.lstrip(' \t') for line in value.splitlines()))
             output.append('\n')
         return ''.join(output)
-    if SYSTEM == 'FreeBSD':
+    if SYSTEM in EXTATTR_SYSTEMS:
         output = []
         for path in paths:
             names = subprocess.check_output(

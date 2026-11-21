@@ -1674,6 +1674,10 @@ sign) if you want the local shell to expand it.
     This option causes rsync to update the destination extended attributes to
     be the same as the source ones.
 
+    On NetBSD rsync refuses to grow an existing extended attribute because
+    growing a value on NetBSD FFS can damage other attributes on the same
+    file. This also applies to attributes used by [`--fake-super`](#opt).
+
     For systems that support extended-attribute namespaces, a copy being done
     by a super-user copies all namespaces except system.\*.  A normal user only
     copies the user.\* namespace.  To be able to backup and restore non-user
