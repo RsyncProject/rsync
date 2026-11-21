@@ -1,0 +1,74 @@
+From:   "Mike McHenry" <mmchen@minn.net>
+Subject: Rsync 2.3.1 WinNT binaries and instructions available
+Date:   Fri, 15 Oct 1999 02:53:30 +1000
+
+
+Hello all,
+
+I have created Windows NT binaries for rsync 2.3.1 and have decided to make
+them available for others to download. These binaries have been tested on
+Windows NT Server 4.0 SP5 and WILL run in daemon mode if you follow my
+instructions below. I make no guarantees about these binaries, they have
+however been working for me for weeks on several NT machines.
+
+Binaries at ftp://ftp.minn.net/usr/mmchen/
+
+Instructions for running in daemon mode:
+
+1. You will need two files, rsync.exe and cygwin1.dll. Place rsync.exe
+anywhere you like (I chose c:\program files\rsync\rsync.exe) and put
+cygwin1.dll in c:\winnt\system32
+
+2. You will need a program from the NT Server resource kit called
+srvany.exe. This program allows you to run any executable as a service. If
+you simply install the entire service pack it will be located in c:\ntreskit
+
+3. Create a service for rsync by typing the following:
+  instsrv Rsync "C:\ntreskit\srvany.exe"
+
+4. You should now have a new service called Rsync and you can verify by
+looking in Start->Control Panel->Services DON'T START IT YET!
+
+5. If you want to run rsync in daemon mode you will need a configuration
+file. Here is the one I use, call it rsyncd.conf and place it in the same
+directory as rsync (C:\Program files\rsync\rsyncd.conf)
+  use chroot = false
+  strict modes = false
+  hosts allow = *
+
+  [backup]
+     path = /
+     read only = yes
+     list = no
+
+This example configuration will make one big anonymous anonymous rsync area
+available, I use this to backup my NT machines from a central Unix machine.
+This configuration might not be ideal for you, change to suit your tastes.
+The first two lines are important for rsync to work on Windows NT however.
+
+6. You are going to need to hack some keys in the registry to make it work.
+Don't do this unless you are comfortable with the changes! Run regedit32 and
+add the following keys and values (quotation marks ARE IMPORTANT):
+  HKEY_LOCAL_MACHINE->SYSTEM->CurrentControlSet->Services->Rsync
+    Edit->Add Key->  Key Name: Paramaters
+    Edit->Add Value->  Value Name: AppDirectory  Value: "C:\programfiles\rsync"
+    Edit->Add Value->  Value Name: Application  Value: "C:\programfiles\rsync\rsync.exe"
+    Edit->Add Value->  Value Name: AppParamters  Value: --config="C:\programfiles\rsync\rsyncd.conf" --daemon
+
+7. That's it, you should be able to start and stop the rsync service at will
+using the Services Control Panel. When running with the above configuration
+you should be able to test by attempting to telnet to port 873 from a remote
+machine.
+  telnet rsync.server.com 873 (replacing rsync.server.com with your own
+server's address)
+You should get a connection to the rsync daemon running on your NT box.
+
+8. If you have problems you are on your own, sorry, I have enough to do :) I
+would suggest triple-checking your spelling on EVERYTHING (filenames,
+configs, reg keys). If you have any comments or suggestions I would be happy
+to hear them at mmchen@minn.net.
+
+Mike McHenry
+ Systems Administrator
+ MinnNet Communications, Inc.
+

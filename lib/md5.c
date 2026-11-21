@@ -197,7 +197,7 @@ void md5_update(md_context *ctx, const uchar *input, uint32 length)
 		memcpy(ctx->buffer + left, input, length);
 }
 
-static uchar md5_padding[CSUM_CHUNK] = { 0x80 };
+static const uchar md5_padding[CSUM_CHUNK] = { 0x80 };
 
 void md5_result(md_context *ctx, uchar digest[MD5_DIGEST_LEN])
 {

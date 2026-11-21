@@ -1,1 +1,9 @@
 * text=auto eol=lf
+
+# Website content is published separately from the release source archive.
+/rsync-web/ export-ignore
+
+# Archived peers must retain their bytes and stay out of release archives.
+/old_versions/rsync_* binary
+/old_versions/rsync_* export-ignore
+/old_versions/binaries.json export-ignore

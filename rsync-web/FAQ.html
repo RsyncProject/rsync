@@ -1,0 +1,284 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 3.2//EN">
+<HTML>
+<HEAD>
+<TITLE>rsync FAQ</TITLE>
+</HEAD>
+<!--#include virtual="header.html" -->
+
+<H2 align="center">Frequently Asked Questions</H2>
+
+<table><tr valign=top><td><ul>
+<li><a href="#1">the transfer fails to finish</a><br>
+<li><a href="#2">rsync recopies the same files</a><br>
+<li><a href="#3">is your shell clean</a><br>
+<li><a href="#4">memory usage</a><br>
+<li><a href="#5">out of memory</a><br>
+<li><a href="#6">rsync through a firewall</a><br>
+<li><a href="#7">rsync and cron</a><br>
+</ul></td><td>&nbsp;&nbsp;&nbsp;&nbsp;</td><td><ul>
+<li><a href="#8">rsync: Command not found</a><br>
+<li><a href="#9">spaces in filenames</a><br>
+<li><a href="#10">ignore "vanished files" warning</a><br>
+<li><a href="#11">read-only file system</a><br>
+<li><a href="#12">multiplexing overflow 101:7104843</a><br>
+<li><a href="#13">inflate (token) returned -5</a><br>
+</ul></td></tr></table>
+
+<hr>
+<h3><a name=1>the transfer fails to finish</a></h3>
+
+<p>If you get an error like one of these:
+
+<pre>rsync: error writing 4 unbuffered bytes - exiting: Broken pipe
+rsync error: error in rsync protocol data stream (code 12) at io.c(463)
+</pre>
+
+<p>or
+
+<pre>rsync: connection unexpectedly closed (24 bytes read so far)
+rsync error: error in rsync protocol data stream (code 12) at io.c(342)
+</pre>
+
+<p>please read the <a href="issues.html">issues and debugging page</a>
+for details on how you can try to figure out what is going wrong.
+
+<hr>
+<h3><a name=2>rsync recopies the same files</a></h3>
+
+<p>Some people occasionally report that rsync copies too many files when
+they expect it to copy only a few. In most cases the explanation is
+that you forgot to include the --times (-t) option in the original copy,
+so rsync is forced to (efficiently) transfer every file that differs in
+its modified time to discover what data (if any) has changed.
+
+<p>Another common cause involves sending files to an Microsoft filesystem:
+if the file's modified time is an odd value but the receiving filesystem
+can only store even values, then rsync will re-transfer too many files.
+You can avoid this by specifying the --modify-window=1 option.
+
+<p>Yet another periodic case can happen when daylight-savings time
+changes if your OS+filesystem saves file times in local time instead of
+UTC.  For a full explanation of this and some suggestions on how to
+avoid them problem, see <a href="daylight-savings.html">this document</a>.
+
+<p>Something else that can trip up rsync is a filesystem changeing the
+filename behind the scenes.  This can happen when a filesystem changes
+an all-uppercase name into lowercase, or when it decomposes UTF-8 behind
+your back.
+
+<blockquote>
+
+<p>An example of the latter can occur with HFS+ on Mac OS X:  if you
+copy a directory with a file that has a UTF-8 character sequence in it,
+say a 2-byte umlaut-u (\0303\0274), the file will get that character
+stored by the filesystem using 3 bytes (\0165\0314\0210), and rsync will
+not know that these differing filenames are the same file (it will, in
+fact, remove a prior copy of the file if --delete is enabled, and then
+recreate it).
+
+<p>You can avoid a charset problem by passing an appropriate --iconv
+option to rsync that tells it what character-set the source files are,
+and what character-set the destination files get stored in.  For
+instance, the above Mac OS X problem would be dealt with by using
+--iconv=UTF-8,UTF8-MAC (UTF8-MAC is a pseudo-charset recognized by Mac
+OS X iconv in which all characters are decomposed).
+
+</blockquote>
+
+<p>If you think that rsync is copying too many files, look at the
+itemized output (-i) to see why rsync is doing the update (e.g. the 't'
+flag indicates that the time differs, or all pluses indicates that rsync
+thinks the file doesn't exist).  You can also look at the stats produced
+with -v and see if rsync is really sending all the data.  See also the
+--checksum (-c) option for one way to avoid the extra copying of files
+that don't have synchronized modified times (but keep in mind that the
+-c option eats lots of disk I/O, and can be rather slow).
+
+<hr>
+<h3><a name=3>is your shell clean</a></h3>
+
+<p>The "is your shell clean" message and the "protocol mismatch" message
+are usually caused by having some sort of program in your .cshrc, .profile,
+.bashrc or equivalent file that writes a message every time you connect
+using a remote-shell program (such as ssh or rsh).  Data written in this
+way corrupts the rsync data stream. rsync detects this at startup and
+produces those error messages.  However, if you are using rsync-daemon
+syntax (host::path or rsync://) without using a remote-shell program (no
+--rsh or -e option), there is not remote-shell program involved, and the
+problem is probably caused by an error on the daemon side (so check the
+daemon logs).
+
+<p>A good way to test if your remote-shell connection is clean is to try
+something like this (use ssh or rsh, as appropriate):
+
+<blockquote><pre>ssh remotesystem /bin/true &gt; test.dat</pre></blockquote>
+
+<p>That should create a file called test.dat with nothing in it. If
+test.dat is not of zero length then your shell is not clean.  Look at the
+contents of test.dat to see what was sent. Look at all the startup files on
+remotesystem to try and find the problem.
+
+<hr>
+<h3><a name=4>memory usage</a></h3>
+
+<p>Rsync versions before 3.0.0 always build the entire list of files to be
+transferred at the beginning and hold it in memory for the entire run.  Rsync
+needs about 100 bytes to store all the relevant information for one file,
+so (for example) a run with 800,000 files would consume about 80M of
+memory.  -H and --delete increase the memory usage further.
+
+<p>Version 3.0.0 slightly reduced the memory used per file by not storing fields
+not needed for a particular file.  It also introduced an incremental recursion
+mode that builds the file list in chunks and holds each chunk in memory only as
+long as it is needed.  This mode dramatically reduces memory usage, but it
+only works provided that both sides are 3.0.0 or newer and certain options that
+rsync currently can't handle in this mode are not being used.
+
+<hr>
+<h3><a name=5>out of memory</a></h3>
+
+<p>The usual reason for "out of memory" when running rsync is that you are
+transferring a _very_ large number of files.  The size of the files doesn't
+matter, only the total number of files.  If memory is a problem, first try to
+use the incremental recursion mode: upgrade both sides to rsync 3.0.0 or
+newer and avoid options that disable incremental recursion (e.g., use
+<tt>--delete-delay</tt> instead of <tt>--delete-after</tt>).  If this is not
+possible, you can break the rsync run into smaller chunks operating on
+individual subdirectories using <tt>--relative</tt> and/or exclude rules.
+
+<hr>
+<h3><a name=6>rsync through a firewall</a></h3>
+
+<p>If you have a setup where there is no way to directly connect two
+systems for an rsync transfer, there are several ways to get a firewall
+system to act as an intermediary in the transfer.  You'll find full details
+on the <a href="firewall.html">firewall methods</a> page.
+
+<hr>
+<h3><a name=7>rsync and cron</a></h3>
+
+<p>On some systems (notably SunOS4) cron supplies what looks like a socket
+to rsync, so rsync thinks that stdin is a socket. This means that if you
+start rsync with the --daemon switch from a cron job you end up rsync
+thinking it has been started from inetd. The fix is simple&mdash;just
+redirect stdin from /dev/null in your cron job.
+
+<hr>
+<h3><a name=8>rsync: Command not found</a></h3>
+
+<p>This error is produced when the remote shell is unable to locate the rsync
+binary in your path. There are 3 possible solutions:
+
+<ol>
+
+<li>install rsync in a "standard" location that is in your remote path. 
+
+<li>modify your .cshrc, .bashrc etc on the remote system to include the path
+that rsync is in
+
+<li>use the --rsync-path option to explicitly specify the path on the
+remote system where rsync is installed
+
+</ol>
+
+<p>You may echo find the command:
+
+<blockquote><pre>ssh host 'echo $PATH'</pre></blockquote>
+
+<p>for determining what your remote path is.
+
+<hr>
+<h3><a name=9>spaces in filenames</a></h3>
+
+<p>Can rsync copy files with spaces in them?
+
+<p>Short answer: Yes, rsync can handle filenames with spaces.
+
+<p>Long answer: 
+
+<p>Rsync handles spaces just like any other unix command line application.
+Within the code spaces are treated just like any other character so a
+filename with a space is no different from a filename with any other
+character in it.
+
+<p>The problem of spaces is in the argv processing done to interpret the
+command line.  As with any other unix application you have to escape spaces
+in some way on the command line or they will be used to separate arguments. 
+
+<p>It is slightly trickier in rsync (and other remote-copy programs like
+scp) because rsync sends a command line to the remote system to launch the
+peer copy of rsync (this assumes that we're not talking about daemon mode,
+which is not affected by this problem because no remote shell is involved
+in the reception of the filenames).  The command line is interpreted by the
+remote shell and thus the spaces need to arrive on the remote system
+escaped so that the shell doesn't split such filenames into multiple
+arguments.
+
+<p>For example:
+
+<blockquote><pre>rsync -av host:'a long filename' /tmp/</pre></blockquote>
+
+<p>This is usually a request for rsync to copy 3 files from the remote
+system, "a", "long", and "filename" (the only exception to this is for a
+system running a shell that does not word-split arguments in its commands,
+and that is exceedingly rare).  If you wanted to request a single file with
+spaces, you need to get some kind of space-quoting characters to the remote
+shell that is running the remote rsync command.  The following commands
+should all work:
+
+<blockquote><pre>rsync -av host:'"a long filename"' /tmp/
+rsync -av host:'a\ long\ filename' /tmp/
+rsync -av host:a\\\ long\\\ filename /tmp/</pre></blockquote>
+
+<p>You might also like to use a '?' in place of a space as long as there
+are no other matching filenames than the one with spaces (since '?' matches
+any character):
+
+<blockquote><pre>rsync -av host:a?long?filename /tmp/</pre></blockquote>
+
+<p>As long as you know that the remote filenames on the command line
+are interpreted by the remote shell then it all works fine. 
+
+<hr>
+<h3><a name=10>ignore "vanished files" warning</a></h3>
+
+<p>Some folks would like to ignore the "vanished files" warning, which
+manifests as an exit-code 24.  The easiest way to do this is to create
+a shell script wrapper.  For instance, name this something like
+"rsync-no24":
+
+<blockquote><pre>#!/bin/sh
+rsync "$@"
+e=$?
+if test $e = 24; then
+    exit 0
+fi
+exit $e</pre></blockquote>
+
+<hr>
+<h3><a name=11>read-only file system</a></h3>
+
+<p>If you get "Read-only file system" as an error when sending to a rsync
+daemon then you probably forgot to set "read only = no" for that module.
+
+<hr>
+<h3><a name=12>multiplexing overflow 101:7104843</a></h3>
+
+<p>This mysterious error, or the similar "invalid message 101:7104843", can
+happen if one of the rsync processes is killed for some reason and a message
+beginning with the four characters "Kill" gets inserted into the protocol
+stream as a result.  To solve the problem, you'll need to figure out why rsync
+is being killed.
+
+<hr>
+<h3><a name=13>inflate (token) returned -5</a></h3>
+
+This error means that rsync failed to handle an expected error from the
+compression code for a file that happened to be transferred with a block size
+of 32816 bytes.  You can avoid this issue for the affected file by transferring
+it with a manually-set block size (e.g. --block-size=33000), or by upgrading
+the receiving side to rsync 3.0.7.
+
+<hr>
+
+<!--#include virtual="footer.html" -->

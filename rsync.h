@@ -92,6 +92,8 @@
 #define FLAG_SKIP_GROUP (1<<10)	/* receiver/generator */
 #define FLAG_TIME_FAILED (1<<11)/* generator */
 #define FLAG_MOD_NSEC (1<<12)	/* sender/receiver/generator */
+#define FLAG_GOT_DIR_FLIST (1<<13)/* sender/receiver/generator - dir_flist only */
+#define FLAG_HLINK_WAIT (1<<14) /* generator (w/FLAG_HLINKED): counted in in_progress, pending hard-link processing */
 
 /* These flags are passed to functions but not stored. */
 
@@ -110,7 +112,7 @@
 
 /* Update this if you make incompatible changes and ALSO update the
  * SUBPROTOCOL_VERSION if it is not a final (official) release. */
-#define PROTOCOL_VERSION 31
+#define PROTOCOL_VERSION 33
 
 /* This is used when working on a new protocol version or for any unofficial
  * protocol tweaks.  It should be a non-zero value for each pre-release repo
@@ -162,11 +164,41 @@
 /* For compatibility with older rsyncs */
 #define OLD_MAX_BLOCK_SIZE ((int32)1 << 29)
 
+/* Policy ceilings on attacker-controlled wire values. Picked well above any
+ * legitimate filesystem / protocol traffic but well below sizes that could
+ * cause integer overflow or DoS-grade allocations. See input_checking.txt.
+ *
+ * Note on MAX_WIRE_XATTR_DATALEN: xattr datum size is bounded only by the
+ * wire-format maximum (signed int32 varint, ~2GB). macOS resource forks
+ * are transferred as the com.apple.ResourceFork xattr and can legitimately
+ * be many GB; --max-alloc (default 1GB, configurable) is the real
+ * allocation cap. read_varint_size() still rejects negative values so a
+ * hostile peer cannot wrap to ~SIZE_MAX. */
+#define MAX_WIRE_XATTR_COUNT   65536
+#define MAX_WIRE_XATTR_NAMELEN 4096
+#define MAX_WIRE_XATTR_DATALEN ((int32)0x7fffffff)
+#define MAX_WIRE_ACL_COUNT     65536
+#define MAX_WIRE_NSEC          999999999
+/* MAX_WIRE_DEL_STAT is the per-category cap for read_del_stats() in main.c,
+ * which accumulates 5 wire-supplied counts into the int32 stats.deleted_files
+ * accumulator.  Capped at 2^28 so 5 * 2^28 = 1.34 GB stays under INT32_MAX
+ * (2.15 GB) with margin -- a higher cap (e.g. 2^30) would let a hostile peer
+ * supplying 3+ max-sized counts overflow the accumulator, which is signed-int
+ * UB.  2^28 is still well above any plausible real transfer's deletion count. */
+#define MAX_WIRE_DEL_STAT      ((int32)1 << 28)
+
 #define ROUND_UP_1024(siz) ((siz) & (1024-1) ? ((siz) | (1024-1)) + 1 : (siz))
 
 #define IOERR_GENERAL	(1<<0) /* For backward compatibility, this must == 1 */
 #define IOERR_VANISHED	(1<<1)
 #define IOERR_DEL_LIMIT (1<<2)
+
+/* Mask of all currently defined IOERR_* bits.  Used to sanitize values
+ * received from a peer via MSG_IO_ERROR so a malicious peer cannot set
+ * arbitrary (undefined) bits in the local io_error, which would then be
+ * stored and re-forwarded upstream.  (Undefined bits never reach the exit
+ * code: cleanup.c maps only these defined bits onto RERR_* values.) */
+#define IOERR_VALID_MASK (IOERR_GENERAL | IOERR_VANISHED | IOERR_DEL_LIMIT)
 
 #define MAX_ARGS 1000
 #define MAX_BASIS_DIRS 20
@@ -268,6 +300,7 @@ enum msgcode {
 	MSG_LOG=FLOG, MSG_CLIENT=FCLIENT, /* sibling logging */
 	MSG_REDO=9,	/* reprocess indicated flist index */
 	MSG_STATS=10,	/* message has stats data for generator */
+	MSG_BLOCK_STATS=11,/* message has block-level stats for sender */
 	MSG_IO_ERROR=22,/* the sending side had an I/O error */
 	MSG_IO_TIMEOUT=33,/* tell client about a daemon's timeout value */
 	MSG_NOOP=42,	/* a do-nothing message (legacy protocol-30 only) */
@@ -379,6 +412,21 @@ enum delret {
 #endif
 #endif
 
+/* O_CLOEXEC is absent on some still-supported targets.  Defining it to zero
+ * preserves the open flags there; the test macro exercises that fallback on
+ * build hosts that provide O_CLOEXEC. */
+#ifdef RSYNC_TEST_NO_O_CLOEXEC
+#undef O_CLOEXEC
+#endif
+#ifndef O_CLOEXEC
+#define O_CLOEXEC 0
+#endif
+
+/* Exercise the O_DIRECTORY portability path on build hosts that provide it. */
+#ifdef RSYNC_TEST_NO_O_DIRECTORY
+#undef O_DIRECTORY
+#endif
+
 #ifdef HAVE_SYS_IOCTL_H
 #include <sys/ioctl.h>
 #endif
@@ -398,6 +446,16 @@ enum delret {
 #include <grp.h>
 #endif
 #include <errno.h>
+
+/* O_NOFOLLOW refuses a final-component symlink with ELOOP on Linux, EMLINK on
+ * FreeBSD, and EFTYPE on NetBSD/OpenBSD. Treat all three as "hit a symlink". A
+ * genuine EMLINK (too many hard links) is harmless where this is used: callers
+ * fall through to a readlink/lstat, which restores the real error. */
+#ifdef EFTYPE
+# define NOFOLLOW_HIT_SYMLINK(e) ((e) == ELOOP || (e) == EMLINK || (e) == EFTYPE)
+#else
+# define NOFOLLOW_HIT_SYMLINK(e) ((e) == ELOOP || (e) == EMLINK)
+#endif
 
 #ifdef HAVE_UTIME_H
 #include <utime.h>
@@ -674,6 +732,8 @@ typedef unsigned int size_t;
 # define SIZEOF_INT64 SIZEOF_OFF_T
 #endif
 
+#define MAX_INT32 ((int32)0x7fffffff)
+
 #define HT_KEY32 0
 #define HT_KEY64 1
 
@@ -694,7 +754,7 @@ struct ht_int64_node {
 	int64 key;
 };
 
-#define HT_NODE(tbl, bkts, i) ((void*)((char*)(bkts) + (i)*(tbl)->node_size))
+#define HT_NODE(tbl, bkts, i) ((void*)((char*)(bkts) + (size_t)(i)*(tbl)->node_size))
 #define HT_KEY(node, k64) ((k64)? ((struct ht_int64_node*)(node))->key \
 			 : (int64)((struct ht_int32_node*)(node))->key)
 
@@ -958,12 +1018,12 @@ struct sum_buf {
 	uint32 sum1;	        /**< simple checksum */
 	int32 chain;		/**< next hash-table collision */
 	short flags;		/**< flag bits */
-	char sum2[SUM_LENGTH];	/**< checksum  */
 };
 
 struct sum_struct {
 	OFF_T flength;		/**< total file length */
 	struct sum_buf *sums;	/**< points to info for each chunk */
+	char *sum2_array;	/**< checksums of length xfer_sum_len */
 	int32 count;		/**< how many chunks */
 	int32 blength;		/**< block_length */
 	int32 remainder;	/**< flength % block_length */
@@ -981,6 +1041,8 @@ struct map_struct {
 	int fd;			/* File Descriptor			*/
 	int status;		/* first errno from read errors		*/
 };
+
+#define sum2_at(s, i)	((s)->sum2_array + ((size_t)(i) * xfer_sum_len))
 
 #define NAME_IS_FILE		(0)    /* filter name as a file */
 #define NAME_IS_DIR		(1<<0) /* filter name as a dir */
@@ -1007,6 +1069,7 @@ struct map_struct {
 #define FILTRULE_CLEAR_LIST	(1<<18)/* this item is the "!" token */
 #define FILTRULE_PERISHABLE	(1<<19)/* perishable if parent dir goes away */
 #define FILTRULE_XATTR		(1<<20)/* rule only applies to xattr names */
+#define FILTRULE_FROM_FILE	(1<<21)/* pattern text came from a file's contents */
 
 #define FILTRULES_SIDES (FILTRULE_SENDER_SIDE | FILTRULE_RECEIVER_SIDE)
 
@@ -1034,6 +1097,7 @@ struct stats {
 	int64 total_read;
 	int64 literal_data;
 	int64 matched_data;
+	int64 touched_blocks_4k;
 	int64 flist_buildtime;
 	int64 flist_xfertime;
 	int64 flist_size;
@@ -1128,6 +1192,20 @@ typedef struct {
 #define UNUSED(x) x __attribute__((__unused__))
 #ifndef NORETURN
 #define NORETURN __attribute__((__noreturn__))
+#endif
+
+/* Under --enable-coverage, gcov flushes counters via an atexit handler that
+ * _exit() bypasses.  Forked helpers that terminate via _exit() -- the
+ * pre/post-xfer-exec children, the become_daemon original process, the
+ * per-connection accept-loop child on early return -- must dump explicitly
+ * or their counters are lost, which systematically under-reports daemon-side
+ * coverage.  cleanup.c and main.c already inline this for the two main exit
+ * paths; this macro covers the rest.  No-op when not a coverage build. */
+#ifdef GCOV_COVERAGE
+extern void __gcov_dump(void);
+#define gcov_flush() __gcov_dump()
+#else
+#define gcov_flush() ((void)0)
 #endif
 
 typedef struct {
