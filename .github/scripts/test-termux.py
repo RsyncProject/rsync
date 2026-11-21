@@ -14,6 +14,17 @@ from unittest.mock import Mock, patch
 termux = runpy.run_path(str(Path(__file__).with_name('termux.py')))
 Termux = termux['Termux']
 ROOT = termux['HOME'] + '/rsync-ci.12345678'
+INSTALL = 'Installing Termux bootstrap packages.'
+READY = 'Bootstrap packages installed successfully.'
+BOOTSTRAP_ERROR = 'Bootstrap Error:'
+CHMOD_GONE = 'android.system.ErrnoException: chmod failed: ENOENT'
+OPEN_GONE = ('java.io.FileNotFoundException: /data/data/com.termux/files/usr-staging/bin/termux-open: '
+             'open failed: ENOENT (No such file or directory)')
+
+
+def installer_log(*messages):
+    return '\n'.join(f'{"I" if message in (INSTALL, READY) else "E"}/Termux:TermuxInstaller( 2221): {message}'
+                     for message in messages)
 
 
 class Sandbox(unittest.TestCase):
@@ -117,8 +128,9 @@ class Sandbox(unittest.TestCase):
             session.command('sleep', '300', capture_output=True)
 
     def test_bootstrap(self):
-        for message, expected in (('Bootstrap packages installed successfully.', None),
-                                  ('Bootstrap Error: failed', ValueError), ('extracting packages', TimeoutError)):
+        for message, expected in ((installer_log(INSTALL, READY), None),
+                                  (installer_log(INSTALL, BOOTSTRAP_ERROR, 'failed'), ValueError),
+                                  (installer_log(INSTALL), TimeoutError)):
             def adb(*args, **kwargs):
                 if args[0] == 'shell':
                     return SimpleNamespace(stdout='2221\n')
@@ -137,8 +149,8 @@ class Sandbox(unittest.TestCase):
 
     def test_bootstrap_uses_latest_outcome(self):
         for message, fails in (
-                ('Bootstrap Error: first attempt\nBootstrap packages installed successfully.', False),
-                ('Bootstrap packages installed successfully.\nBootstrap Error: later attempt', True)):
+                (installer_log(INSTALL, INSTALL, BOOTSTRAP_ERROR, OPEN_GONE, READY), False),
+                (installer_log(INSTALL, READY, INSTALL, BOOTSTRAP_ERROR, 'failed'), True)):
             def adb(*args, **kwargs):
                 return SimpleNamespace(stdout='2221\n' if args[0] == 'shell' else message)
             with self.subTest(fails=fails), patch('time.monotonic', side_effect=[0, 1]):
@@ -147,6 +159,15 @@ class Sandbox(unittest.TestCase):
                         termux['wait_for_bootstrap'](adb)
                 else:
                     termux['wait_for_bootstrap'](adb)
+
+    def test_bootstrap_waits_for_the_remaining_installer(self):
+        logs = iter((installer_log(INSTALL, INSTALL, READY),
+                     installer_log(INSTALL, INSTALL, READY, READY)))
+        def adb(*args, **kwargs):
+            return SimpleNamespace(stdout='2221\n' if args[0] == 'shell' else next(logs))
+        with patch('time.sleep') as sleep:
+            termux['wait_for_bootstrap'](adb)
+        sleep.assert_called_once()
 
     def test_refuses_an_existing_installation(self):
         adb = Mock(return_value=SimpleNamespace(stdout='package:com.termux\n'))
@@ -162,21 +183,42 @@ class Sandbox(unittest.TestCase):
             binary.write_bytes(b'candidate')
             digest = hashlib.sha256(binary.read_bytes()).hexdigest()
             for failure in ('install', 'identity', 'transfer', 'cleanup', 'remaining', 'running',
-                            'process-check', 'bootstrap-race', 'bootstrap-single',
+                            'process-check', 'bootstrap-chmod', 'bootstrap-open', 'bootstrap-single',
+                            'bootstrap-outside', 'bootstrap-foreign', 'bootstrap-stale',
+                            'bootstrap-after-success',
                             'bootstrap-clear', 'bootstrap-repeat', None):
                 output = root / str(failure)
                 output.mkdir()
                 calls = []
                 primary = subprocess.CalledProcessError(1, 'adb install')
-                starts = 1 if failure == 'bootstrap-single' else 2
-                bootstrap_log = ('Installing Termux bootstrap packages.\n' * starts
-                                 + 'Bootstrap Error:\n'
-                                 + 'android.system.ErrnoException: chmod failed: ENOENT\n')
+                bootstrap_logs = {
+                    'bootstrap-chmod': installer_log(INSTALL, INSTALL, BOOTSTRAP_ERROR, CHMOD_GONE),
+                    'bootstrap-open': installer_log(INSTALL, INSTALL, BOOTSTRAP_ERROR, OPEN_GONE),
+                    'bootstrap-single': installer_log(INSTALL, BOOTSTRAP_ERROR, OPEN_GONE),
+                    'bootstrap-outside': installer_log(INSTALL, INSTALL, BOOTSTRAP_ERROR,
+                                                      OPEN_GONE.replace('usr-staging/', 'usr/')),
+                    'bootstrap-foreign': (installer_log(INSTALL, INSTALL, BOOTSTRAP_ERROR, 'permission denied')
+                                          + '\nE/Other( 2221): ' + OPEN_GONE),
+                    'bootstrap-stale': installer_log(INSTALL, INSTALL, BOOTSTRAP_ERROR, CHMOD_GONE,
+                                                    READY, INSTALL, BOOTSTRAP_ERROR, 'permission denied'),
+                    'bootstrap-after-success': installer_log(INSTALL, READY, INSTALL, BOOTSTRAP_ERROR, OPEN_GONE),
+                    'bootstrap-clear': installer_log(INSTALL, INSTALL, BOOTSTRAP_ERROR, CHMOD_GONE),
+                    'bootstrap-repeat': installer_log(INSTALL, INSTALL, BOOTSTRAP_ERROR, OPEN_GONE),
+                }
+                bootstrap_log = bootstrap_logs.get(failure)
+                recovery = ('shell', '-T', 'pm clear com.termux')
+                recovers = failure in ('bootstrap-chmod', 'bootstrap-open')
                 def adb(*args, **kwargs):
                     calls.append(args)
                     if args[0] == 'install' and failure == 'install':
                         raise primary
                     stdout = ''
+                    if args == ('shell', 'pidof', '-s', 'com.termux'):
+                        stdout = '2221\n'
+                    if args[0] == 'logcat':
+                        reset_succeeded = recovery in calls and failure != 'bootstrap-repeat'
+                        stdout = (bootstrap_log if bootstrap_log and not reset_succeeded
+                                  else installer_log(INSTALL, READY))
                     if args[-1] == 'pm clear com.termux':
                         stdout = 'Failed\n' if failure == 'bootstrap-clear' else 'Success\n'
                     if args[-1].startswith('pm list packages -U'):
@@ -205,40 +247,34 @@ class Sandbox(unittest.TestCase):
                     return SimpleNamespace(returncode=code, stdout=stdout, stderr=stderr)
                 session = SimpleNamespace(command=command, run_as=Mock(), write_file=Mock(), read_file=Mock())
                 fixture = Mock(side_effect=ValueError('transfer failed') if failure == 'transfer' else None)
-                bootstrap = Mock()
-                if failure in ('bootstrap-race', 'bootstrap-repeat'):
-                    bootstrap.side_effect = [termux['BootstrapFailure'](bootstrap_log),
-                                             termux['BootstrapFailure'](bootstrap_log)
-                                             if failure == 'bootstrap-repeat' else None]
-                elif failure in ('bootstrap-single', 'bootstrap-clear'):
-                    bootstrap.side_effect = termux['BootstrapFailure'](bootstrap_log)
                 with self.subTest(failure=failure), patch.dict(termux['check_transfer'].__globals__,
                         download_apk=Mock(), Termux=Mock(return_value=session), transfer=fixture,
-                        wait_for_bootstrap=bootstrap,
                         run=Mock(return_value=SimpleNamespace(stdout='revision\n'))), redirect_stderr(StringIO()):
-                    if failure and failure != 'bootstrap-race':
+                    if failure and not recovers:
                         with self.assertRaises(subprocess.CalledProcessError if failure == 'install' else ValueError) as caught:
                             termux['check_transfer'](adb, binary, output, {})
                         if failure == 'install':
                             self.assertIs(caught.exception, primary)
                         self.assertFalse((output / 'receipt.json').exists())
-                        if failure == 'bootstrap-single':
-                            self.assertFalse(any(call[-1] == 'pm clear com.termux' for call in calls))
+                        if failure in ('bootstrap-single', 'bootstrap-outside', 'bootstrap-foreign',
+                                       'bootstrap-stale', 'bootstrap-after-success'):
+                            self.assertNotIn(recovery, calls)
                         if failure in ('bootstrap-clear', 'bootstrap-repeat'):
                             self.assertTrue((output / 'bootstrap-first-attempt.log').is_file())
-                            self.assertEqual(bootstrap.call_count,
-                                             2 if failure == 'bootstrap-repeat' else 1)
+                            self.assertEqual(calls.count(recovery), 1)
                     else:
                         termux['check_transfer'](adb, binary, output, {})
                         app = json.loads((output / 'receipt.json').read_text())['app']
                         self.assertIs(app['cleaned'], True)
-                        self.assertEqual(app['bootstrap_attempts'],
-                                         2 if failure == 'bootstrap-race' else 1)
-                        if failure == 'bootstrap-race':
-                            self.assertEqual(bootstrap.call_count, 2)
-                            self.assertIn('chmod failed: ENOENT',
-                                          (output / 'bootstrap-first-attempt.log').read_text())
-                            self.assertIn(('shell', '-T', 'pm clear com.termux'), calls)
+                        self.assertEqual(app['bootstrap_attempts'], 2 if recovers else 1)
+                        if recovers:
+                            self.assertEqual((output / 'bootstrap-first-attempt.log').read_text(), bootstrap_log)
+                            self.assertEqual(calls.count(recovery), 1)
+                            reset = calls.index(recovery)
+                            self.assertEqual(calls[reset - 1], ('shell', '-T', 'am force-stop com.termux'))
+                            launch = ('shell', '-T', 'am start -n com.termux/.app.TermuxActivity')
+                            self.assertEqual(calls[:reset].count(launch), 1)
+                            self.assertEqual(calls[reset + 1:].count(launch), 1)
                 self.assertIn(('shell', 'am', 'force-stop', 'com.termux'), calls)
                 self.assertIn(('uninstall', 'com.termux'), calls)
 
