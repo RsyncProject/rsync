@@ -2037,13 +2037,20 @@ sign) if you want the local shell to expand it.
     - `xxh128`
     - `xxh3`
     - `xxh64` (aka `xxhash`)
+    - `sha3-512`
+    - `sha3-384`
+    - `sha3-256`
     - `md5`
     - `md4`
     - `sha1`
     - `none`
 
-    Run `rsync --version` to see the default checksum list compiled into your
-    version (which may differ from the list above).
+    The `sha3-*` choices require an rsync built with OpenSSL support and
+    a libcrypto that provides SHA-3. They are not offered during default
+    negotiation. Use `--checksum-choice` or include them in both peers'
+    [`RSYNC_CHECKSUM_LIST`](#).
+
+    Run `rsync --version` to see the checksum choices available in your build.
 
     If "none" is specified for the first (or only) name, the [`--whole-file`](#opt)
     option is forced on and no checksum verification is performed on the
