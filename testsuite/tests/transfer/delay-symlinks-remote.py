@@ -15,10 +15,11 @@ import sys
 from harness import metadata
 from harness.environment import FROMDIR, SCRATCHDIR, SRCDIR, TODIR
 from harness.filesystem import rmtree
+from harness.profile import archived_peer_supported_here
 from harness.results import test_fail, test_skipped
 from harness.rsync import forced_protocol, rsh_cmd, rsync_path_arg, run_rsync
 
-metadata(protocols={29, 30, 31, 32, 33}, transports={'pipe', 'tcp'}, min_peer='3.5.2', tags={'version-mix'})
+metadata(protocols={29, 30, 31, 32, 33}, transports={'pipe'}, min_peer='3.5.2', tags={'version-mix'})
 
 proto = forced_protocol()
 if proto is not None and proto < 29:
@@ -103,11 +104,13 @@ for paths in ((f'{FROMDIR}/', f'{TODIR}/'), (f'{FROMDIR}/', f'lh:{TODIR}/')):
 # A remote rsync from before the option rejects it when it is the receiver,
 # before anything is transferred, and isn't sent it when it is the sender.
 old = SRCDIR / 'old_versions' / 'rsync_3.4.1'
-try:
-    runnable = subprocess.run([str(old), '--version'], capture_output=True,
-                              timeout=10).returncode == 0
-except (OSError, subprocess.TimeoutExpired):
-    runnable = False
+runnable = archived_peer_supported_here(old)
+if runnable:
+    try:
+        runnable = subprocess.run([str(old), '--version'], capture_output=True,
+                                  timeout=10).returncode == 0
+    except (OSError, subprocess.TimeoutExpired):
+        runnable = False
 if runnable:
     old_path = rsync_path_arg(str(old))
     proc, remote = remote_run('push', '--delay-symlinks', rsync_path=old_path)
@@ -124,3 +127,5 @@ if runnable:
                   f"{proc.stderr}")
     if os.readlink(TODIR / 'sub' / 'link') != 'target':
         test_fail("pull from rsync 3.4.1: the symlink wasn't transferred")
+else:
+    print("delay-symlinks-remote: archived peer subcase unavailable on this host")

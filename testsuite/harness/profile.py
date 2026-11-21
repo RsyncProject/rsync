@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import platform
 import re
 from dataclasses import dataclass
 from pathlib import Path
@@ -69,6 +70,19 @@ def load_binaries(directory):
         if path.is_symlink() or not path.is_file() or file_digest(path) != record['sha256']:
             raise ValueError(f'archived binary differs from its manifest: {name}')
     return data
+
+
+def archive_host_supported():
+    return platform.system() == 'Linux' and platform.machine().lower() in ('x86_64', 'amd64')
+
+
+def archived_peer_supported_here(path, record=None):
+    path = Path(path)
+    if not path.is_file() or not archive_host_supported():
+        return False
+    if record is None:
+        record = load_binaries(path.parent)[path.name]
+    return record['target'] == 'x86_64-linux-gnu'
 
 def parse_peer_banner(text):
     match = re.search(rf'^rsync\s+version\s+({EXECUTABLE_VERSION_PATTERN})(?:-\S+)?'

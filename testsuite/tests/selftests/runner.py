@@ -222,8 +222,25 @@ def test(context: TestContext):
                         'print("rsync  version 3.2.7  protocol version 31")\n')
     archived.chmod(0o755)
     record = {'source': 'a' * 40, 'protocol': 31, 'sha256': runner.file_digest(archived),
-              'recipe': 'b' * 64, 'compiler': 'test compiler', 'target': 'test target', 'libc': 'test libc'}
+              'recipe': 'b' * 64, 'compiler': 'test compiler',
+              'target': 'x86_64-linux-gnu', 'libc': 'test libc'}
     (directory / 'binaries.json').write_text(json.dumps({archived.name: record}))
+    receipt_args = SimpleNamespace(check_receipt='fixture', rsync_bin=str(archived),
+                                   rsync_bin2=None, profiles=None, archived_role=None)
+    with patch.object(config, 'parse_args', return_value=receipt_args), \
+            patch.object(runner, 'read_receipt', return_value={'run': {}}), \
+            patch.object(config, 'archive_host_supported', return_value=False), \
+            patch.object(runner, 'file_digest',
+                         side_effect=AssertionError('foreign peer was read')):
+        try:
+            runner.main()
+        except SystemExit as error:
+            if error.code != Exit.ERROR:
+                test_fail('receipt verification returned the wrong foreign-peer status')
+        else:
+            test_fail('receipt verification executed a foreign archived peer')
+    if executed.exists():
+        test_fail('receipt verification launched a foreign archived peer')
     archived.write_text(archived.read_text() + '# changed\n')
     try:
         config.validate_run_paths(str(context.tools), str(archive), binary, str(archived))
@@ -246,14 +263,27 @@ def test(context: TestContext):
             test_fail('an archived peer with the wrong source was accepted')
     if executed.exists():
         test_fail('an archived peer ran before its source was checked')
-    with patch.object(runner.subprocess, 'check_output', return_value='a' * 40):
+    with patch.object(runner.subprocess, 'check_output', return_value='a' * 40), \
+            patch.object(config, 'archived_peer_supported_here', return_value=False):
+        try:
+            config.validate_run_paths(str(context.tools), str(archive), binary, str(archived))
+        except ValueError as error:
+            if 'targets another OS or architecture' not in str(error):
+                test_fail(f'an incompatible archive produced the wrong refusal: {error}')
+        else:
+            test_fail('a foreign archived peer was accepted')
+    if executed.exists():
+        test_fail('a foreign archived peer was executed')
+    with patch.object(runner.subprocess, 'check_output', return_value='a' * 40), \
+            patch.object(config, 'archived_peer_supported_here', return_value=True):
         config.validate_run_paths(str(context.tools), str(archive), binary, str(archived))
     if not executed.is_file():
         test_fail('a qualified archived peer was not checked')
     executed.unlink()
     record['protocol'] = 32
     (directory / 'binaries.json').write_text(json.dumps({archived.name: record}))
-    with patch.object(runner.subprocess, 'check_output', return_value='a' * 40):
+    with patch.object(runner.subprocess, 'check_output', return_value='a' * 40), \
+            patch.object(config, 'archived_peer_supported_here', return_value=True):
         try:
             config.validate_run_paths(str(context.tools), str(archive), binary, str(archived))
         except ValueError:

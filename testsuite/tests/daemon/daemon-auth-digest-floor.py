@@ -7,6 +7,7 @@ from harness.daemon_config import write_daemon_conf
 from harness.daemon import start_test_daemon
 from harness.environment import FROMDIR, RSYNC, SCRATCHDIR, SRCDIR
 from harness.filesystem import make_tree, makepath, rmtree
+from harness.profile import archived_peer_supported_here
 from harness.process import split_rsync_cmd
 from harness.results import test_fail, test_skipped
 from harness.rsync import rsync_argv, run_rsync
@@ -75,6 +76,11 @@ old_rsync = SRCDIR / 'old_versions' / 'rsync_3.1.3'
 if not old_rsync.is_file() or not os.access(old_rsync, os.X_OK):
     print("daemon auth-digest floor: strong client accepted, bad-floor refused; "
           "skipped the md5-downgrade case (no old_versions/rsync_3.1.3 here)")
+    raise SystemExit(0)
+
+if not archived_peer_supported_here(old_rsync):
+    print("daemon auth-digest floor: strong client accepted, bad-floor refused; "
+          "skipped the md5-downgrade case (archived peer targets another OS or architecture)")
     raise SystemExit(0)
 
 try:

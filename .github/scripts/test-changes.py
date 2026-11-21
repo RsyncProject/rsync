@@ -32,6 +32,9 @@ class Changes(unittest.TestCase):
             with self.subTest(path=path):
                 self.assertEqual(self.enabled([path]), {'archive', 'diagnostics'})
 
+    def test_editorconfig_selects_no_test_family(self):
+        self.assertEqual(self.enabled(['.editorconfig']), set())
+
     def test_production_paths_select_the_full_matrix(self):
         for path in ('receiver.c', 'Makefile.in', 'packaging/release.py',
                      'README.c', 'support/README.md', 'lib/new.c', 'wildtest.txt',
