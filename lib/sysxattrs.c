@@ -60,14 +60,34 @@ int sys_fremovexattr(int filedes, const char *name)
 	return fremovexattr(filedes, name);
 }
 
+#ifdef __CYGWIN__
+/* Cygwin can return a partial list and set ERANGE instead of returning -1. */
+static ssize_t cygwin_list_xattr(const char *path, int filedes, char *list, size_t size)
+{
+	ssize_t len;
+
+	errno = 0;
+	len = path ? llistxattr(path, list, size) : flistxattr(filedes, list, size);
+	return errno == ERANGE ? -1 : len;
+}
+#endif
+
 ssize_t sys_llistxattr(const char *path, char *list, size_t size)
 {
+#ifdef __CYGWIN__
+	return cygwin_list_xattr(path, -1, list, size);
+#else
 	return llistxattr(path, list, size);
+#endif
 }
 
 ssize_t sys_flistxattr(int filedes, char *list, size_t size)
 {
+#ifdef __CYGWIN__
+	return cygwin_list_xattr(NULL, filedes, list, size);
+#else
 	return flistxattr(filedes, list, size);
+#endif
 }
 
 #elif HAVE_OSX_XATTRS
