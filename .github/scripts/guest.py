@@ -106,6 +106,7 @@ def main():
 
         flags = ['--with-rrsync']
         features = []
+        feature_options = []
         profiles = f'non-asan,self-peer,{args.platform}'
         if args.platform == 'freebsd':
             env.update(CPPFLAGS='-I/usr/local/include', LDFLAGS='-L/usr/local/lib')
@@ -120,6 +121,9 @@ def main():
         elif args.platform in ('netbsd', 'solaris'):
             flags += ['--disable-zstd', '--disable-md2man', '--disable-xxhash', '--disable-lz4', '--disable-idn']
             profiles += ',no-idn,no-xxhash,no-zstd-threads'
+            if args.platform == 'netbsd':
+                flags.append('--enable-xattr-support')
+                features = ['xattrs']
         elif args.platform == 'openbsd':
             env.update(AUTOCONF_VERSION='2.71', AUTOMAKE_VERSION='1.16',
                        CPPFLAGS='-I/usr/local/include -DXXH_INLINE_ALL=1', LDFLAGS='-L/usr/local/lib',
@@ -127,6 +131,7 @@ def main():
                        RSYNC_EXCLUDE='acl-symlink-race,sender-symlink-target-race,sender-remove-source-secure')
             flags += ['--disable-md2man', '--enable-iconv']
             features = ['zstd', 'lz4', 'xxh128', 'xxh3', 'xxh64', 'iconv', 'IDN']
+            feature_options = ['--unsupported', 'xattrs']
         else:
             flags += ['--enable-iconv', '--enable-acl-support', '--enable-xattr-support']
             features = ['zstd', 'lz4', 'xxh128', 'xxh3', 'xxh64', 'iconv', 'IDN', 'ACLs', 'xattrs']
@@ -141,7 +146,7 @@ def main():
                 raise ValueError('Unexpected Alpine binary or file-offset width')
         if features:
             status |= bool(command('Features', [sys.executable, '-S', 'testsuite/tools/check-features.py',
-                                               str(source / 'rsync'), *features], required=False,
+                                               str(source / 'rsync'), *features, *feature_options], required=False,
                                    destination=output / 'features.json'))
         if args.platform == 'alpine':
             for argv in (['addgroup', '-S', 'rsynctest'], ['addgroup', '-S', 'rsynctest-extra'],

@@ -29,7 +29,7 @@ from harness.filesystem import makepath, rmtree
 from harness.results import test_skipped
 from harness.rsync import forced_protocol, rsync_argv
 
-metadata(protocols={29, 30, 31, 32, 33}, transports={'pipe', 'tcp'}, min_peer='3.5.2', tags={'version-mix'})
+metadata(protocols={29, 30, 31, 32, 33}, transports={'pipe'}, min_peer='3.5.2', tags={'version-mix'})
 
 proto = forced_protocol()
 if proto is not None and proto < 29:

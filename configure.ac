@@ -486,8 +486,10 @@ AC_MSG_CHECKING([whether to use included zlib])
 if test x"$with_included_zlib" = x"yes"; then
     AC_MSG_RESULT($srcdir/zlib)
     BUILD_ZLIB='$(zlib_OBJS)'
+    BUNDLED_ZLIB_HEADERS='zlib/zconf.h zlib/zlib.h'
     CFLAGS="-I$srcdir/zlib $CFLAGS"
 else
+    BUNDLED_ZLIB_HEADERS=''
     AC_DEFINE(EXTERNAL_ZLIB, 1, [Define to 1 if using external zlib])
     AC_MSG_RESULT(no)
 fi
@@ -1397,6 +1399,7 @@ AC_MSG_CHECKING([whether to use included libpopt])
 if test x"$with_included_popt" = x"yes"; then
     AC_MSG_RESULT($srcdir/popt)
     BUILD_POPT='$(popt_OBJS)'
+    BUNDLED_POPT_HEADERS='popt/popt.h'
     CFLAGS="-I$srcdir/popt $CFLAGS"
     AC_DEFINE(POPT_SYSCONFDIR, "/etc", [sysconfig dir for popt])
     AC_DEFINE(PACKAGE, "rsync", [package name for rsync])
@@ -1407,6 +1410,7 @@ if test x"$with_included_popt" = x"yes"; then
 	AC_MSG_WARN([included libpopt will use malloc, not alloca (which wastes a small amount of memory)])
     fi
 else
+    BUNDLED_POPT_HEADERS=''
     AC_MSG_RESULT(no)
 fi
 
@@ -1552,6 +1556,8 @@ AC_SUBST(OBJ_RESTORE)
 AC_SUBST(CC_SHOBJ_FLAG)
 AC_SUBST(BUILD_POPT)
 AC_SUBST(BUILD_ZLIB)
+AC_SUBST(BUNDLED_POPT_HEADERS)
+AC_SUBST(BUNDLED_ZLIB_HEADERS)
 AC_SUBST(MAKE_RRSYNC)
 AC_SUBST(MAKE_RRSYNC_1)
 AC_SUBST(GEN_RRSYNC)
@@ -1658,7 +1664,7 @@ if test x"$enable_xattr_support" = x"no"; then
     AC_MSG_RESULT(no)
 else
     case "$host_os" in
-    *linux*|*netbsd*|*cygwin*)
+    *linux*|*cygwin*)
 	AC_MSG_RESULT(Using Linux xattrs)
 	AC_DEFINE(HAVE_LINUX_XATTRS, 1, [True if you have Linux xattrs (or equivalent)])
 	AC_DEFINE(SUPPORT_XATTRS, 1)
@@ -1672,10 +1678,13 @@ else
 	AC_DEFINE(NO_DEVICE_XATTRS, 1, [True if device files do not support xattrs])
 	AC_DEFINE(NO_SPECIAL_XATTRS, 1, [True if special files do not support xattrs])
 	;;
-    freebsd*)
-	AC_MSG_RESULT(Using FreeBSD extattrs)
-	AC_DEFINE(HAVE_FREEBSD_XATTRS, 1, [True if you have FreeBSD xattrs])
+    freebsd*|*netbsd*)
+	AC_MSG_RESULT(Using BSD extattrs)
+	AC_DEFINE(HAVE_BSD_EXTATTRS, 1, [True if you use the BSD extattr interface])
 	AC_DEFINE(SUPPORT_XATTRS, 1)
+	case "$host_os" in
+	*netbsd*) AC_DEFINE(NO_SYMLINK_USER_XATTRS, 1) ;;
+	esac
 	;;
     solaris*)
 	AC_MSG_RESULT(Using Solaris xattrs)

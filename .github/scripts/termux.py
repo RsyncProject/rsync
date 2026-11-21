@@ -17,12 +17,16 @@ VERSION = '0.118.3'
 APK_SHA256 = '3550e61f4d9eb49b712fd1bd9519dc37085a4d8eb597c57a340f0a64859b7144'
 PREFIX = '/data/data/com.termux/files/usr'
 HOME = '/data/data/com.termux/files/home'
+INSTALLER_LOG = re.compile(r'([A-Z])/Termux:TermuxInstaller\(\s*\d+\): (.*)')
+MISSING_STAGED_FILE = re.compile(r'java\.io\.FileNotFoundException: '
+                                + re.escape(PREFIX + '-staging/') + r'(.+): open failed: ENOENT\b')
 
 
 class BootstrapFailure(ValueError):
-    def __init__(self, log):
+    def __init__(self, log, retryable_overlap):
         super().__init__('Termux bootstrap failed')
         self.log = log
+        self.retryable_overlap = retryable_overlap
 
 
 def download_apk(path):
@@ -49,6 +53,40 @@ def check_identity(uid, context, expected_uid):
         raise ValueError('Termux command did not use the application SELinux domain')
 
 
+def staging_disappeared(message):
+    # The installer can lose an executable between creating and chmodding it.
+    if re.search(r'\bchmod failed: ENOENT\b', message):
+        return True
+    match = MISSING_STAGED_FILE.match(message)
+    return match is not None and '..' not in PurePosixPath(match[1]).parts
+
+
+def bootstrap_outcome(log):
+    active = 0
+    overlap = failed_overlap = missing_staging = False
+    outcome = None
+    for line in log.splitlines():
+        record = INSTALLER_LOG.fullmatch(line)
+        if not record:
+            continue
+        level, message = record.groups()
+        if level == 'I' and message == 'Installing Termux bootstrap packages.':
+            overlap = active > 0
+            active += 1
+            outcome = None
+        elif level == 'I' and message == 'Bootstrap packages installed successfully.':
+            active = max(0, active - 1)
+            outcome = None if active else 'ready'
+        elif level == 'E' and message.startswith('Bootstrap Error:'):
+            failed_overlap = overlap and active > 0
+            active = max(0, active - 1)
+            outcome = 'failed'
+            missing_staging = staging_disappeared(message.partition(':')[2].lstrip())
+        elif level == 'E' and outcome == 'failed':
+            missing_staging |= staging_disappeared(message)
+    return outcome, outcome == 'failed' and failed_overlap and missing_staging
+
+
 def wait_for_bootstrap(adb, timeout=180):
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
@@ -56,12 +94,11 @@ def wait_for_bootstrap(adb, timeout=180):
         if re.fullmatch(r'\d+', pid):
             log = adb('logcat', '-d', '--pid=' + pid, '-v', 'brief', '-t', '1000',
                       capture_output=True, encoding='utf-8', errors='replace').stdout
-            failure = log.rfind('Bootstrap Error:')
-            success = log.rfind('Bootstrap packages installed successfully.')
-            if success > failure:
+            outcome, retryable_overlap = bootstrap_outcome(log)
+            if outcome == 'ready':
                 return
-            if failure >= 0:
-                raise BootstrapFailure(log)
+            if outcome == 'failed':
+                raise BootstrapFailure(log, retryable_overlap)
         time.sleep(1)
     raise TimeoutError('Termux bootstrap did not finish')
 
@@ -160,9 +197,7 @@ def check_transfer(adb, binary, output, device):
         try:
             wait_for_bootstrap(adb)
         except BootstrapFailure as error:
-            # The observed duplicate installers both clear the staging directory.
-            if (error.log.count('Installing Termux bootstrap packages.') < 2
-                    or 'chmod failed: ENOENT' not in error.log):
+            if not error.retryable_overlap:
                 raise
             (output / 'bootstrap-first-attempt.log').write_text(error.log)
             shell('am', 'force-stop', PACKAGE, capture_output=True)

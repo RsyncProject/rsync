@@ -5,6 +5,7 @@ import subprocess
 from pathlib import Path
 
 from harness.mutation import find_attacker_uid
+from harness.profile import archived_peer_supported_here
 from harness.daemon_config import write_daemon_conf
 from harness.daemon import require_tcp, start_test_daemon
 from harness.environment import RSYNC, RSYNC_PEER, SCRATCHDIR
@@ -35,7 +36,7 @@ _repo = Path(os.environ['srcdir'])
 ORACLE_BIN = None
 if RSYNC_PEER != RSYNC:
     ORACLE_BIN = RSYNC_PEER
-elif (_repo / 'old_versions' / 'rsync_3.2.7').is_file():
+elif archived_peer_supported_here(_repo / 'old_versions' / 'rsync_3.2.7'):
     ORACLE_BIN = str(_repo / 'old_versions' / 'rsync_3.2.7')
 
 if ORACLE_BIN:
@@ -220,5 +221,5 @@ if problems:
     test_fail("\n".join(problems))
 
 oracle_note = ("vs a real 3.2.7 daemon oracle" if url_oracle
-               else "vs the static fallback contract (no 3.2.7 binary present)")
+               else "vs the static fallback contract (no compatible 3.2.7 peer)")
 print(f'daemon symlink matrix stayed confined; insecure-links control: {oracle_note}')

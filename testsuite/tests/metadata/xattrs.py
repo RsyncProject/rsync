@@ -13,7 +13,7 @@ from harness.results import test_fail, test_skipped
 from harness.rsync import run_rsync
 from harness.xattrs import (
     RSYNC_PREFIX, RUSR, dump_values as xattr_dump, get_value as xattr_get,
-    is_supported as xattrs_supported, set_value as xset,
+    is_supported as xattrs_supported, set_value,
 )
 from harness import metadata
 
@@ -22,6 +22,15 @@ metadata(features={'xattr_runtime'}, transports={'pipe'})
 if not xattrs_supported():
     test_skipped("Rsync is configured without xattr support (or no xattr "
                  "tooling on this platform)", capability='xattr_runtime')
+
+
+def xset(name, value, *paths):
+    # The directory comparisons also check timestamps. Keep them independent of the fixture xattrs.
+    for path in paths:
+        before = os.stat(path)
+        set_value(name, value, path)
+        os.utime(path, ns=(before.st_atime_ns, before.st_mtime_ns))
+
 
 script_name = os.path.basename(sys.argv[0] if sys.argv[0] else __file__)
 hlink_variant = 'hard-links' in script_name
@@ -74,7 +83,8 @@ xset('long',
      'a long attribute for our new file that tests to ensure that this works',
      'file2')
 
-xset('dir1', 'need to test directory xattrs too', 'foo')
+dir1_value = 'need to test directory xattrs too'
+xset('dir1', dir1_value, 'foo')
 xset('dir2', 'another xattr', 'foo')
 xset('dir3', 'this is one last one for the moment', 'foo')
 
@@ -91,9 +101,9 @@ xset(f'{RUSR}.equal',
      'foo/file3', 'foo/bar/file5')
 
 xset('dir0', 'old extra value', CHKDIR / 'foo')
-xset('dir1', 'old dir value', CHKDIR / 'foo')
+xset('dir1', 'x' * len(dir1_value), CHKDIR / 'foo')
 
-xset('short', 'old short', CHKDIR / 'file1')
+xset('short', 'was different', CHKDIR / 'file1')
 xset('extra', 'remove me', CHKDIR / 'file1')
 
 xset('foo', 'old foo', CHKDIR / 'foo' / 'file3')
@@ -155,7 +165,7 @@ if dashH:
 os.chdir(FROMDIR)
 shutil.rmtree(TODIR, ignore_errors=True)
 
-xset('nice', 'this is nice, but different', 'file1')
+xset('nice', 'changed nice', 'file1')
 
 _save_xattrs(dirs + files, SCRATCHDIR / 'xattrs.txt')
 
@@ -192,7 +202,7 @@ os.chmod('.', 0o700)
 for p in dirs + files:
     os.chmod(p, os.stat(p).st_mode & ~0o077)
 
-xset('nice', 'this is nice, but different', 'file1')
+xset('nice', 'changed nice', 'file1')
 xset(f'{RSYNC_PREFIX}.%stat', f'40000 0,0 {uid_gid}', *dirs)
 xset(f'{RSYNC_PREFIX}.%stat', f'100000 0,0 {uid_gid}', *files)
 

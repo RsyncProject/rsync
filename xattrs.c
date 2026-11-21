@@ -1273,6 +1273,7 @@ int get_stat_xattr(const char *fname, int fd, STRUCT_STAT *fst, STRUCT_STAT *xst
  * permission reset and the xattr write/remove go through it so a parent-symlink
  * race can't redirect them.  fd < 0 keeps the path-based behavior (symlinks,
  * devices/specials, non-hardened receivers, platforms without the f-variants). */
+/* Return 1 if the stat xattr changed, 0 if unchanged or -1 on error. */
 int set_stat_xattr(const char *fname, struct file_struct *file, mode_t new_mode, int fd)
 {
 	STRUCT_STAT fst, xst;
@@ -1327,15 +1328,16 @@ int set_stat_xattr(const char *fname, struct file_struct *file, mode_t new_mode,
 
 	if (mode == fmode && fst.st_rdev == rdev
 	 && fst.st_uid == F_OWNER(file) && fst.st_gid == F_GROUP(file)) {
-		/* xst.st_mode will be 0 if there's no current stat xattr */
-		if (xst.st_mode && (fd >= 0 ? sys_fremovexattr(fd, XSTAT_ATTR)
-					    : sys_lremovexattr(fname, XSTAT_ATTR)) < 0) {
+		if (!xst.st_mode)
+			return 0;
+		if ((fd >= 0 ? sys_fremovexattr(fd, XSTAT_ATTR)
+			     : sys_lremovexattr(fname, XSTAT_ATTR)) < 0) {
 			rsyserr(FERROR_XFER, errno,
 				"delete of stat xattr failed for %s",
 				full_fname(fname));
 			return -1;
 		}
-		return 0;
+		return 1;
 	}
 
 	if (xst.st_mode != fmode || xst.st_rdev != rdev
@@ -1354,6 +1356,7 @@ int set_stat_xattr(const char *fname, struct file_struct *file, mode_t new_mode,
 				XSTAT_ATTR, full_fname(fname));
 			return -1;
 		}
+		return 1;
 	}
 
 	return 0;

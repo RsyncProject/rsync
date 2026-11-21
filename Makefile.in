@@ -39,7 +39,7 @@ GENFILES=configure.sh aclocal.m4 config.h.in rsync.1 rsync.1.html \
 	 rsync-ssl.1 rsync-ssl.1.html rsyncd.conf.5 rsyncd.conf.5.html \
 	 @GEN_RRSYNC@
 HEADERS=byteorder.h config.h errcode.h proto.h rsync.h ifuncs.h itypes.h inums.h \
-	lib/pool_alloc.h lib/mdigest.h lib/md-defines.h
+	lib/addrinfo.h lib/md-defines.h lib/mdigest.h lib/permstring.h lib/pool_alloc.h lib/wildmatch.h
 LIBOBJ=lib/wildmatch.o lib/compat.o lib/snprintf.o lib/mdfour.o lib/md5.o \
 	lib/permstring.o lib/pool_alloc.o lib/sysacls.o lib/sysxattrs.o lib/acl.o @LIBOBJS@
 zlib_OBJS=zlib/deflate.o zlib/inffast.o zlib/inflate.o zlib/inftrees.o \
@@ -183,9 +183,20 @@ rrsync: support/rrsync
 
 $(OBJS): $(HEADERS)
 $(CHECK_OBJS): $(HEADERS)
-tls.o xattrs.o: lib/sysxattrs.h
+acls.o lib/sysacls.o: lib/sysacls.h
+cleanup.o util1.o: case_N.h
+flist.o flist-no-o-directory.o main.o t_safe_arg_main.o uidlist.o: io.h
+lib/sysxattrs.o tls.o xattrs.o: lib/sysxattrs.h
+batch.o token.o: @BUNDLED_ZLIB_HEADERS@
+main.o options.o t_safe_arg_main.o tls.o wildtest.o: @BUNDLED_POPT_HEADERS@
 usage.o: version.h latest-year.h help-rsync.h help-rsyncd.h git-version.h default-cvsignore.h
 loadparm.o: default-dont-compress.h daemon-parm.h
+
+$(popt_OBJS): popt/popt.h popt/poptint.h popt/system.h
+popt/poptint.o: popt/lookup3.c
+$(zlib_OBJS): zlib/crc32.h zlib/deflate.h zlib/gzguts.h zlib/inffast.h \
+	zlib/inffixed.h zlib/inflate.h zlib/inftrees.h zlib/trees.h \
+	zlib/zconf.h zlib/zlib.h zlib/zutil.h
 
 flist.o: rounding.h
 log.o: rounding.h
