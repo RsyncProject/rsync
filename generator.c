@@ -72,6 +72,7 @@ extern int csum_length;
 extern int xfer_sum_len;
 extern int ignore_times;
 extern int size_only;
+extern int time_only;
 extern OFF_T max_size;
 extern OFF_T min_size;
 extern int io_error;
@@ -718,6 +719,17 @@ int quick_check_ok(enum filetype ftype, const char *fn, struct file_struct *file
 		return -1;
 	}
 	return 1;
+}
+
+/* The destination may select different checks; alternate bases still use the
+ * shared quick check.  Size and time are independent requirements here. */
+static int destination_quick_check_ok(const char *fname, struct file_struct *file,
+				      STRUCT_STAT *st, uchar fnamecmp_type)
+{
+	if (time_only && fnamecmp_type == FNAMECMP_FNAME)
+		return !ignore_times && !mtime_differs(st, file)
+		    && (size_only <= 0 || st->st_size == F_LENGTH(file));
+	return quick_check_ok(FT_REG, fname, file, st);
 }
 
 /*
@@ -1659,7 +1671,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 	stat_x sx = {0}, real_sx = {0};
 	STRUCT_STAT partial_st;
 	struct file_struct *back_file = NULL;
-	int statret, real_ret, stat_errno;
+	int statret, real_ret, stat_errno, dest_checks_match = 0;
 	char *fnamecmp, *partialptr, *backupptr = NULL;
 	char fnamecmpbuf[MAXPATHLEN];
 	uchar fnamecmp_type;
@@ -2193,7 +2205,12 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 		stat_errno = ENOENT;
 	}
 
-	if (basis_dir[0] != NULL && (statret != 0 || alt_dest_type != COPY_DEST)) {
+	/* An existing destination's timestamp takes precedence over alternate
+	 * bases. A missing destination must still use the normal basis check. */
+	dest_checks_match = time_only && statret == 0 && stype == FT_REG
+	    && destination_quick_check_ok(fname, file, &sx.st, FNAMECMP_FNAME);
+	if (!dest_checks_match && basis_dir[0] != NULL
+	 && (statret != 0 || alt_dest_type != COPY_DEST)) {
 		int j = try_dests_reg(file, fname, ndx, fnamecmpbuf, &sx, statret == 0, itemizing, code);
 		if (j == -2) {
 			if (remove_source_files == 1)
@@ -2275,7 +2292,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 		;
 	else if (fnamecmp_type >= FNAMECMP_FUZZY)
 		;
-	else if (quick_check_ok(FT_REG, fnamecmp, file, &sx.st)) {
+	else if (destination_quick_check_ok(fnamecmp, file, &sx.st, fnamecmp_type)) {
 		if (partialptr) {
 			/* The --partial-dir basis is an operator/peer path: unlink it
 			 * through the exclude-aware ownership walk so a symlinked
