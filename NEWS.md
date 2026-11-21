@@ -1,5 +1,19 @@
 # NEWS for rsync 4.0.0 (UNRELEASED)
 
+## Enhancements
+
+- Reduce directory lookups when linking unchanged regular files with non-daemon
+  `--link-dest` transfers. Reuse checked receiver and basis directories.
+- Reuse checked directories for ordinary scans and file reads beneath a
+  verified sender root. Avoid a redundant directory probe for sender file
+  reads. Set close-on-exec at open time where supported.
+- Avoid redundant stats when creating children of a fresh receiver directory.
+- Try an exact `--link-dest` match without a destination stat in new
+  incremental directories. Use the normal lookup path if the link fails.
+- Keep the checked root of a single absolute alternate destination open
+  across directories in ordinary non-daemon transfers. Reuse checked parents
+  for rechecks and delta reads.
+
 ## 3.5 maintenance line
 
 Release notes for compatible fixes and incremental improvements are maintained

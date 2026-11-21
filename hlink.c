@@ -487,9 +487,9 @@ int hard_link_check(struct file_struct *file, int ndx, char *fname,
 }
 
 int hard_link_one(struct file_struct *file, const char *fname,
-		  const char *oldname, int old_parent_fd, int terse)
+		  const char *oldname, int old_parent_fd, int new_parent_fd, int terse)
 {
-	if (do_link_at_from(old_parent_fd, oldname, fname) < 0) {
+	if (do_link_at_from(old_parent_fd, oldname, new_parent_fd, fname) < 0) {
 		enum logcode code;
 		if (terse) {
 			if (!INFO_GTE(NAME, 1))
