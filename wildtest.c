@@ -23,6 +23,7 @@
 #include "lib/wildmatch.c"
 
 #include <popt.h>
+#include <stdbool.h>
 
 #ifdef COMPARE_WITH_FNMATCH
 #include <fnmatch.h>
@@ -32,15 +33,13 @@ int fnmatch_errors = 0;
 
 int wildmatch_errors = 0;
 
-typedef char bool;
-
 int output_iterations = 0;
 int explode_mod = 0;
 int empties_mod = 0;
 int empty_at_start = 0;
 int empty_at_end = 0;
 
-static struct poptOption long_options[] = {
+static const struct poptOption long_options[] = {
   /* longName, shortName, argInfo, argPtr, value, descrip, argDesc */
   {"iterations",     'i', POPT_ARG_NONE,   &output_iterations, 0, 0, 0},
   {"empties",        'e', POPT_ARG_STRING, 0, 'e', 0, 0},
@@ -161,14 +160,17 @@ main(int argc, char **argv)
 		flag[i] = 0;
 	    else
 		flag[i] = -1;
-	    if (*++s != ' ' && *s != '\t')
+	    if (!*s || (*++s != ' ' && *s != '\t'))
 		flag[i] = -1;
 	    if (flag[i] < 0) {
 		fprintf(stderr, "Invalid flag syntax on line %d of %s:\n%s",
 			line, *argv, buf);
 		exit(1);
 	    }
-	    while (*++s == ' ' || *s == '\t') {}
+	    if (*s)
+		s++;
+	    while (*s == ' ' || *s == '\t')
+		s++;
 	}
 	for (i = 0; i <= 1; i++) {
 	    if (*s == '\'' || *s == '"' || *s == '`') {
@@ -192,7 +194,10 @@ main(int argc, char **argv)
 		while (*++s && *s != ' ' && *s != '\t' && *s != '\n') {}
 		end[i] = s;
 	    }
-	    while (*++s == ' ' || *s == '\t') {}
+	    if (*s)
+		s++;
+	    while (*s == ' ' || *s == '\t')
+		s++;
 	}
 	*end[0] = *end[1] = '\0';
 	run_test(line, flag[0],
@@ -201,6 +206,8 @@ main(int argc, char **argv)
 #endif
 		 string[0], string[1]);
     }
+
+    fclose(fp);
 
     if (!wildmatch_errors)
 	fputs("No", stdout);

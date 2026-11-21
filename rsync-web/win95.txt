@@ -1,0 +1,110 @@
+Compiling rsync for MS Windows 95
+=================================
+
+Caveat: 
+There are no doubt other ways to do this, but I have not tried them.
+
+This will produce an rsync binary which runs under win95/NT which can _send_
+data to a UNIX rsync host but not receive. This is suitable for my requirements
+as I am backing up a bunch of win95 machines to a linux server, but it may
+not be what _you_ require.
+
+NOTE: I am now told (by patl@curl.com) that receiving as well as
+sending works with the current cygwin32 toolkit.
+
+
+Step 1. Get the Cygnus development kit
+--------------------------------------
+
+If you do not already know about this wonderful project undertaken by cygnus,
+grab the latest copy of the gnu-win32 runtime system from 
+
+    http://www.cygnus.com/misc/gnu-win32/
+
+You will want the CDK-B19.EXE self-installing binary (be warned - it's 12M
+in size) which contains gcc+binutils+DLLs required by the system. Read the
+instructions about this and install it. You will then have something which 
+looks _very_ close to a UNIX box as far as any UNIX software ic concerned.
+
+Also grab the updated version (B19.1) of the DLL as this fixes some problems
+(it's pretty small at ~190k).
+
+Take a bit of time to play with this stuff - have a look at the registry
+entries that define mount points etc so you know where/how your windows
+directories are mapped.
+
+Step 2. Compile rsync
+---------------------
+
+Once the magic BASH$ prompt appears in your cygnus dos box, you can download
+and compile rsync right out of the box. You might want to do this:
+
+    tar xvzf rsync-2.0.17.tar.gz  (or whatever version...)
+    cd rsync-2.0.17
+    chmod +x configure		(exec is not set automatically)
+    ./configure
+    make
+
+and you will have a working RSYNC.EXE
+
+Before you can do a "make install" you must edit the Makefile so that
+it knows about "rsync.exe" rather than "rsync".
+
+Step 3 (optional) - compile and install SSH
+-------------------------------------------
+
+If you want to use ssh as the transport then you better grab a copy and compile
+it - again, no surprises. It compiles ok under gnuwin32, and you can generate
+keys etc in the normal way.
+
+Problems
+--------
+
+Well, it _almost_ works seamlessly. Here are a couple of problems I have
+encountered so far - I do not know why these symptoms occur, and they are
+probably nothing to do with rsync, but if you follow this course then you
+will probably run into these things also...
+
+1. rsync will not _receive_ data onto a windows box. It seems to do everything
+   ok, but then hangs at the last step and no files actually appear. When
+   transferring via my modem, I can see data being received, but it never 
+   appears in my directory.
+
+NOTE: This now appears to be fixed.
+
+2. rsync, ssh and other gnuwin32-compiled programs can be called directly from
+   a DOS prompt, but argument passing seems to be broken. This means that
+   starting SSH directly is difficult.
+
+   After a bit of experimenting I found a workaround, which is not pretty
+   but worked for me :-)
+
+   Lets say you want to call ssh from a normal DOS prompt. Set up a batch
+   file called "SSH.BAT" which sets up the cygnus environment and calls bash
+   with the argument "ssh.sh %1 %2 %3 %4 %5 %6 %7 %8 %9". You can copy the
+   cygnus.bat file and use it as a template if you like. here is my ssh.bat:
+
+
+    @ECHO OFF
+    SET TERM=ansi
+    SET MAKE_MODE=unix
+    SET CYGFS=e:/apps/cygnus
+    SET GCC_EXEC_PREFIX=/lib\gcc-lib\
+    SET TCL_LIBRARY=%CYGROOT%\share\tcl8.0\
+    SET HOME=/home/awesley
+    SET GDBTK_LIBRARY=%CYGFS%/share/gdbtcl
+    bash /scripts/ssh.sh %1 %2 %3 %4 %5 %6 %7 %8 %9
+
+
+   Create a shell script called ssh.sh containing:
+
+    /usr/local/bin/ssh $*
+
+   which is then run by bash and calls the ssh binary (wherever you have
+   installed it).
+
+   I suspect that there is a better way, but I have not yet had time to 
+   look for it.
+
+
+Cheers, Anthony Wesley

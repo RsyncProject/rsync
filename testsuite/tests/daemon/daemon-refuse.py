@@ -1,0 +1,60 @@
+#!/usr/bin/env python3
+
+import subprocess
+
+from harness.daemon_config import write_daemon_conf
+from harness.comparison import verify_dirs
+from harness.daemon import start_test_daemon
+from harness.environment import FROMDIR, SCRATCHDIR
+from harness.filesystem import make_tree, makepath, rmtree
+from harness.results import test_fail
+from harness.rsync import rsync_argv
+from harness import metadata
+
+metadata(features={'daemon'}, transports={'pipe', 'tcp'},
+         min_peer={'primary': '2.6.0', 'secondary': '3.0.0'},
+         mutates={'filesystem', 'process', 'socket'}, tags={'configuration', 'daemon', 'version-mix'})
+
+DAEMON_PORT = 12891
+
+src = FROMDIR
+rmtree(src)
+make_tree(src, depth=3)
+
+deldir = SCRATCHDIR / 'deldest'
+makepath(deldir)
+
+conf = write_daemon_conf([
+    ('refuse-delete', {'path': deldir, 'read only': 'no',
+                       'refuse options': 'delete'}),
+    ('refuse-wild',   {'path': src, 'read only': 'yes',
+                       'refuse options': 'checksum*'}),
+])
+url = start_test_daemon(conf, DAEMON_PORT)
+
+def refused(args, what):
+    proc = subprocess.run(rsync_argv(*args),
+                          stdout=subprocess.DEVNULL, stderr=subprocess.PIPE,
+                          text=True)
+    if proc.returncode == 0:
+        test_fail(f"{what} was not refused")
+    return proc.stderr
+
+def allowed(args, what, expected=None, actual=None):
+    proc = subprocess.run(rsync_argv(*args),
+                          stdout=subprocess.DEVNULL, stderr=subprocess.PIPE,
+                          text=True)
+    if proc.returncode not in (0, 23):
+        test_fail(f"{what} was unexpectedly refused: {proc.stderr}")
+    if expected is not None:
+        verify_dirs(expected, actual, label=what)
+
+refused(['-a', '--delete', f'{src}/', f'{url}refuse-delete/'],
+        "--delete on a refuse=delete module")
+allowed(['-a', f'{src}/', f'{url}refuse-delete/'],
+        "plain push to a refuse=delete module", src, deldir)
+
+dest = SCRATCHDIR / 'wilddest'
+makepath(dest)
+refused(['-a', '--checksum', f'{url}refuse-wild/', f'{dest}/'],
+        "--checksum on a refuse=checksum* module")
