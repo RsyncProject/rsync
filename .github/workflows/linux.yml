@@ -134,6 +134,31 @@ jobs:
             test "$(LC_ALL=tr_TR.ISO-8859-9 locale charmap)" = ISO-8859-9
           fi
           python3 -S testsuite/tools/check.py "$PWD" "$PWD/rsync" "pipe,nonroot,${{ matrix.profiles }}" "$PWD/test-results/nonroot/pipe" -j8
+      - name: Tests (explicit protocols and transports)
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.release == '24.04' && matrix.arch == 'amd64' }}
+        run: |
+          status=0
+          for protocol in 27 28 29 30 31 32 33; do
+            for transport in pipe tcp; do
+              profiles="nonroot,${{ matrix.profiles }}"
+              set -- --protocol="$protocol" -j4
+              if [ "$transport" = tcp ]; then
+                set -- "$@" --use-tcp --daemon-tests-only
+              else
+                profiles="pipe,$profiles"
+              fi
+              set -- "$@" password-file-first-line
+              if [ "$protocol" -ge 29 ]; then
+                set -- "$@" daemon-files-from-subdir delay-symlinks-daemon
+                if [ "$transport" = pipe ]; then
+                  set -- "$@" delay-symlinks delay-symlinks-remote rrsync-no-overwrite-delay-symlinks
+                fi
+              fi
+              python3 -S testsuite/tools/check.py "$PWD" "$PWD/rsync" "$profiles" \
+                "$PWD/test-results/nonroot/$transport-protocol-$protocol" "$@" || status=1
+            done
+          done
+          exit "$status"
       - name: Tests (non-root TCP)
         if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         run: python3 -S testsuite/tools/check.py "$PWD" "$PWD/rsync" "nonroot,${{ matrix.profiles }}" "$PWD/test-results/nonroot/tcp" --use-tcp --daemon-tests-only -j8

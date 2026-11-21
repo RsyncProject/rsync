@@ -274,6 +274,12 @@ def main():
     if args.check_receipt:
         try:
             data = read_receipt(args.check_receipt)
+            for binary in (args.rsync_bin, args.rsync_bin2):
+                path = Path(binary) if binary else None
+                if (path and path.parent.name == 'old_versions'
+                        and path.name.startswith('rsync_')
+                        and not config.archive_host_supported()):
+                    raise ValueError('archived peer targets another OS or architecture')
             if args.rsync_bin:
                 if data['run'].get('primary_sha256') != file_digest(args.rsync_bin):
                     raise ValueError('receipt identifies a different primary binary')

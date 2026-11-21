@@ -32,6 +32,8 @@ Tests are grouped under tests/ by build, daemon, metadata, path, protocol, rrsyn
 
 Tests declare applicability with `@requires(...)` or a top-level `metadata(...)` call. Transports, protocol versions, peer-version limits and required capabilities determine selection. A min_peer value can set separate primary and secondary release limits. The --describe-tests output lists these declarations.
 
+A TCP declaration requires a test that uses the daemon's TCP transport. Local transfers and remote-shell tests belong in the pipe selection. The Ubuntu 24.04 X86-64 job runs the explicit protocol and transport combinations in addition to the default-protocol suites.
+
 Regression tests should fail against the faulty implementation and check the affected behaviour directly. Fixtures must keep their data inside the test's scratch directory, tolerate parallel execution and stop their child processes. Sleeps cannot establish ordering or prove that a race was exercised.
 
 Tests which build mutated executables may report unavailable build capabilities as unsupported. Missing or ambiguous source replacement targets, missing compiler-flag replacements and failed configured builds are test failures rather than unavailable capabilities.
