@@ -9,7 +9,7 @@ from harness import metadata
 from harness.environment import SCRATCHDIR
 from harness.filesystem import assert_hardlinked, assert_not_hardlinked, assert_same, makepath
 from harness.results import test_fail
-from harness.rsync import rsync_argv, run_rsync
+from harness.rsync import rsync_argv, run_rsync, under_valgrind
 
 metadata(features={'hardlinks', 'symlink'}, transports={'pipe'}, mutates={'filesystem'},
          tags={'path', 'regression'})
@@ -42,7 +42,9 @@ for branch in branches:
 
 args = ('-a', '--no-whole-file', '--stats', '--no-human-readable',
         f'--link-dest={latest}/', f'{source}/', f'{dest}/')
-if sys.platform.startswith('linux'):
+# Valgrind reserves descriptors from the inherited limit. Apply the
+# 30-descriptor boundary only to native Linux runs.
+if sys.platform.startswith('linux') and not under_valgrind():
     import resource
 
     def limit_descriptors():
