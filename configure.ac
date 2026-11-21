@@ -486,8 +486,10 @@ AC_MSG_CHECKING([whether to use included zlib])
 if test x"$with_included_zlib" = x"yes"; then
     AC_MSG_RESULT($srcdir/zlib)
     BUILD_ZLIB='$(zlib_OBJS)'
+    BUNDLED_ZLIB_HEADERS='zlib/zconf.h zlib/zlib.h'
     CFLAGS="-I$srcdir/zlib $CFLAGS"
 else
+    BUNDLED_ZLIB_HEADERS=''
     AC_DEFINE(EXTERNAL_ZLIB, 1, [Define to 1 if using external zlib])
     AC_MSG_RESULT(no)
 fi
@@ -1397,6 +1399,7 @@ AC_MSG_CHECKING([whether to use included libpopt])
 if test x"$with_included_popt" = x"yes"; then
     AC_MSG_RESULT($srcdir/popt)
     BUILD_POPT='$(popt_OBJS)'
+    BUNDLED_POPT_HEADERS='popt/popt.h'
     CFLAGS="-I$srcdir/popt $CFLAGS"
     AC_DEFINE(POPT_SYSCONFDIR, "/etc", [sysconfig dir for popt])
     AC_DEFINE(PACKAGE, "rsync", [package name for rsync])
@@ -1407,6 +1410,7 @@ if test x"$with_included_popt" = x"yes"; then
 	AC_MSG_WARN([included libpopt will use malloc, not alloca (which wastes a small amount of memory)])
     fi
 else
+    BUNDLED_POPT_HEADERS=''
     AC_MSG_RESULT(no)
 fi
 
@@ -1552,6 +1556,8 @@ AC_SUBST(OBJ_RESTORE)
 AC_SUBST(CC_SHOBJ_FLAG)
 AC_SUBST(BUILD_POPT)
 AC_SUBST(BUILD_ZLIB)
+AC_SUBST(BUNDLED_POPT_HEADERS)
+AC_SUBST(BUNDLED_ZLIB_HEADERS)
 AC_SUBST(MAKE_RRSYNC)
 AC_SUBST(MAKE_RRSYNC_1)
 AC_SUBST(GEN_RRSYNC)
