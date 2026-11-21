@@ -25,6 +25,7 @@
 extern int dry_run;
 extern int do_xfers;
 extern int am_root;
+extern int am_daemon;
 extern int am_server;
 extern int inc_recurse;
 extern int log_before_transfer;
@@ -70,6 +71,8 @@ extern int fuzzy_basis;
 
 extern struct name_num_item *xfer_sum_nni;
 extern int xfer_sum_len;
+extern int use_secure_symlinks;
+extern int operator_path_resolve;
 
 static struct bitbag *delayed_bits = NULL;
 static int phase = 0, redoing = 0;
@@ -81,6 +84,220 @@ static int updating_basis_or_equiv;
 #define TMPNAME_SUFFIX_LEN ((int)sizeof TMPNAME_SUFFIX - 1)
 #define MAX_UNIQUE_NUMBER 999999
 #define MAX_UNIQUE_LOOP 100
+
+/* Open a basis/output path that may legitimately be an operator-trusted
+ * ABSOLUTE path -- e.g. an absolute --partial-dir ("a directory reserved for
+ * partial-dir work") or --backup-dir. secure_relative_open() deliberately
+ * rejects an absolute relpath, so feeding it the whole absolute partialptr
+ * (with a NULL basedir) returns EINVAL: the basis fd is then -1, no basis is
+ * mapped, and receive_data() omits every matched block from the whole-file
+ * verification checksum -> a spurious "failed verification" that strands the
+ * (correct) data in the partial-dir forever.
+ *
+ * The operator's directory is trusted; only the leaf basename is peer-supplied.
+ * So when basedir is NULL and relpath is absolute, split it into its directory
+ * (trusted) and leaf and confine just the leaf -- exactly how secure_relative_
+ * open already trusts an absolute basedir while O_NOFOLLOW-confining the leaf.
+ * Anything else is a straight pass-through that preserves the strict contract. */
+static int secure_basis_open(const char *basedir, const char *relpath, int flags, mode_t mode)
+{
+	extern int am_daemon, am_chrooted;
+	extern unsigned int module_dirlen;
+
+	/* "insecure links = yes": restore the 3.2.7 plain open so an operator/peer
+	 * alt-dest basis follows symlinks like legacy rsync, the same opt-out the
+	 * other daemon symlink sites honour. */
+	if (symlink_optout_allowed()) {
+		if (basedir) {
+			char fullpath[MAXPATHLEN];
+			if (pathjoin(fullpath, sizeof fullpath, basedir, relpath) >= sizeof fullpath) {
+				errno = ENAMETOOLONG;
+				return -1;
+			}
+			return do_open(fullpath, flags, mode);
+		}
+		return do_open(relpath, flags, mode);
+	}
+
+	/* A peer-supplied --partial-dir basis/staging path (operator_path_resolve set
+	 * by recv_files) may be absolute (module_dir-prefixed on a non-chroot daemon)
+	 * and traverse a symlink the secure_relative_open path can't confine: resolve
+	 * it with the ownership walk, which follows a uid0/euid-owned symlink but
+	 * refuses a foreign one AND (via abspath_excluded_by_module) refuses a target
+	 * the module's exclude hides -- closing the partial-dir exclude bypass.  The
+	 * final component is opened with O_NOFOLLOW so an operator-path leaf symlink
+	 * cannot be selected as an alternate basis. */
+#if defined AT_FDCWD && defined O_NOFOLLOW && defined O_DIRECTORY
+	if (operator_path_resolve) {
+		char fullpath[MAXPATHLEN];
+		const char *p = relpath;
+		const char *leaf;
+		int dfd, fd, saved_errno;
+		if (basedir) {
+			if (pathjoin(fullpath, sizeof fullpath, basedir, relpath) >= sizeof fullpath) {
+				errno = ENAMETOOLONG;
+				return -1;
+			}
+			p = fullpath;
+		}
+		dfd = owner_walk_parent(p, &leaf);
+		if (dfd < 0)
+			return -1;
+		fd = do_open_atfd(dfd, leaf, flags, mode);
+		saved_errno = fd < 0 ? errno : 0;
+		close(dfd);
+		errno = saved_errno;
+		return fd;
+	}
+#endif
+
+	/* The confined resolver is needed for the sanitizing daemon
+	 * (am_daemon && !am_chrooted) and for a /./ inner-module chroot
+	 * (am_chrooted && module_dirlen) -- in the latter the kernel chroot confines
+	 * only the outer path, so a peer-chosen alt-dest basis index (fnamecmp_type)
+	 * could otherwise reach an outside-inner-module file through a symlinked
+	 * parent.  Local / remote-shell mode has no module boundary, and a plain
+	 * "use chroot = yes" makes the kernel root the boundary, so there an alt-dest
+	 * basis like --link-dest=../01 must resolve against the cwd as a bare open did
+	 * before the hardening (confining it would reject the legitimate sibling
+	 * "..", #915).  The re-anchoring in secure_relative_open() covers the
+	 * in-module ".." climb for the inner-module case too. */
+	if (!am_daemon || (am_chrooted && !module_dirlen)) {
+		if (basedir) {
+			char fullpath[MAXPATHLEN];
+			if (pathjoin(fullpath, sizeof fullpath, basedir, relpath) >= sizeof fullpath) {
+				errno = ENAMETOOLONG;
+				return -1;
+			}
+			return do_open(fullpath, flags, mode);
+		}
+		return do_open(relpath, flags, mode);
+	}
+
+	if (!basedir && relpath && *relpath == '/') {
+		const char *slash = strrchr(relpath, '/');
+		const char *leaf = slash + 1;
+		char dirbuf[MAXPATHLEN];
+		const char *dir;
+		if (slash == relpath)
+			dir = "/";
+		else {
+			size_t dlen = slash - relpath;
+			if (dlen >= sizeof dirbuf) {
+				errno = ENAMETOOLONG;
+				return -1;
+			}
+			memcpy(dirbuf, relpath, dlen);
+			dirbuf[dlen] = '\0';
+			dir = dirbuf;
+		}
+		return secure_relative_open(dir, leaf, flags, mode);
+	}
+	return secure_relative_open(basedir, relpath, flags, mode);
+}
+
+/* Keep the ownership policy for every attempt to open a one-inplace partial
+ * output.  In particular, Linux's protected_regular compatibility retries
+ * must not downgrade an operator-path open to the ordinary path resolver. */
+static int secure_recv_open(const char *path, int flags, mode_t mode, int owner_walk)
+{
+	int fd, save = operator_path_resolve;
+
+	if (owner_walk)
+		operator_path_resolve = 1;
+	fd = secure_basis_open(NULL, path, flags, mode);
+	operator_path_resolve = save;
+	return fd;
+}
+
+/* Open a read-only regular file for an in-place update without leaving its
+ * mode relaxed while protocol data is received.  Once a writable descriptor is
+ * open, later writes no longer depend on the pathname's permission bits, so
+ * restore the exact prior mode before returning to the transfer loop -- an
+ * abort (peer EOF, checksum failure, a signal) must not strand the file at
+ * 0600.  Requires a regular file: O_NOFOLLOW refuses a symlink at the leaf but
+ * not a directory swapped in after the type probe. */
+static int open_readonly_inplace(const char *fname, int one_inplace)
+{
+	STRUCT_STAT cst;
+	mode_t prior_mode;
+	int cfd = -1, fd = -1;
+	int open_errno, restore_errno;
+
+	if (use_secure_symlinks || one_inplace) {
+#ifdef O_NOFOLLOW
+		cfd = secure_recv_open(fname, O_RDONLY|O_NOFOLLOW, 0, one_inplace);
+		if (cfd < 0)
+			goto failed;
+		if (do_fstat(cfd, &cst) < 0 || !S_ISREG(cst.st_mode)) {
+			errno = EACCES;	/* refused: not the read-only regular file we recover */
+			goto failed;
+		}
+		prior_mode = cst.st_mode & CHMOD_BITS;
+		if (prior_mode & S_IWUSR) {
+			/* Already owner-writable, so adding S_IWUSR cannot be what an
+			 * EACCES is about (an ACL, or the parent dir).  Don't touch the
+			 * mode for nothing: each chmod risks losing a special bit. */
+			errno = EACCES;
+			goto failed;
+		}
+		if (fchmod(cfd, prior_mode | S_IWUSR) < 0)
+			goto failed;
+		fd = secure_recv_open(fname, O_WRONLY, 0600, one_inplace);
+		open_errno = errno;
+		if (fchmod(cfd, prior_mode) < 0) {
+			restore_errno = errno;
+			if (fd >= 0)
+				close(fd);
+			fd = -1;
+			open_errno = restore_errno;
+		}
+		close(cfd);
+		errno = open_errno;
+		return fd;
+#else
+		/* Without O_NOFOLLOW the resolver's oldest fallback would follow a
+		 * raced symlink, so fail closed rather than chmod through it. */
+		errno = EACCES;
+		return -1;
+#endif
+	}
+
+	/* Local and chrooted transfers retain the existing pathname semantics.
+	 * Note the S_ISREG test here is a type check on a stable path, NOT race
+	 * protection: do_stat() follows a leaf symlink and each call below
+	 * re-resolves the name.  The fd-based branch above is the one that
+	 * pins an inode; a chroot is what confines this one. */
+	if (do_stat(fname, &cst) < 0) {
+		errno = EACCES;
+		return -1;
+	}
+	if (!S_ISREG(cst.st_mode) || (cst.st_mode & CHMOD_BITS & S_IWUSR)) {
+		errno = EACCES;
+		return -1;
+	}
+	prior_mode = cst.st_mode & CHMOD_BITS;
+	if (do_chmod_at(fname, prior_mode | S_IWUSR) < 0)
+		return -1;
+	fd = do_open(fname, O_WRONLY, 0600);
+	open_errno = errno;
+	if (do_chmod_at(fname, prior_mode) < 0) {
+		restore_errno = errno;
+		if (fd >= 0)
+			close(fd);
+		fd = -1;
+		open_errno = restore_errno;
+	}
+	errno = open_errno;
+	return fd;
+
+  failed:
+	open_errno = errno;
+	if (cfd >= 0)
+		close(cfd);
+	errno = open_errno;
+	return -1;
+}
 
 /* get_tmpname() - create a tmp filename for a given filename
  *
@@ -214,7 +431,24 @@ int open_tmpfile(char *fnametmp, const char *fname, struct file_struct *file)
 	 * access to ensure that there is no race condition.  They will be
 	 * correctly updated after the right owner and group info is set.
 	 * (Thanks to snabb@epipe.fi for pointing this out.) */
-	fd = do_mkstemp(fnametmp, (file->mode|added_perms) & INITACCESSPERMS);
+	/* For any non-chrooted receiver (secure_relpath_active()), create the
+	 * temp file securely so a parent-symlink race can't redirect it.  When
+	 * the temp lives in the entry's own dir (the common case, no --temp-dir)
+	 * use the cached held dir fd; otherwise fall back to secure_mkstemp.  An
+	 * operator-supplied --temp-dir (tmpdir) gets the ownership-walk resolver
+	 * (it may legitimately point outside the tree); the deep-entry-dir fallback,
+	 * when the held-dirfd cache declines, gets the strict transfer-path one. */
+	if (secure_relpath_active()) {
+		int dfd = held_dfd_for(fnametmp, file);
+		if (dfd >= 0) {
+			char *slash = strrchr(fnametmp, '/');
+			fd = do_mkstemp_atfd(dfd, slash ? slash + 1 : fnametmp,
+					     (file->mode|added_perms) & INITACCESSPERMS);
+		} else
+			fd = secure_mkstemp(fnametmp, (file->mode|added_perms) & INITACCESSPERMS,
+					    tmpdir != NULL);
+	} else
+		fd = do_mkstemp(fnametmp, (file->mode|added_perms) & INITACCESSPERMS);
 
 #if 0
 	/* In most cases parent directories will already exist because their
@@ -250,6 +484,9 @@ static int receive_data(int f_in, char *fname_r, int fd_r, OFF_T size_r,
 	char *data;
 	int32 i;
 	char *map = NULL;
+
+	/* Reset the block tracker's per-file state in case the OS reuses an fd. */
+	reset_block_tracker();
 
 #ifdef SUPPORT_PREALLOCATION
 	if (preallocate_files && fd != -1 && total_size > 0 && (!inplace_sizing || total_size > size_r)) {
@@ -312,7 +549,12 @@ static int receive_data(int f_in, char *fname_r, int fd_r, OFF_T size_r,
 		}
 	}
 
-	while ((i = recv_token(f_in, &data)) != 0) {
+	while (1) {
+		data = NULL;
+		i = recv_token(f_in, &data);
+		if (i == 0)
+			break;
+
 		if (INFO_GTE(PROGRESS, 1))
 			show_progress(offset, total_size);
 
@@ -320,6 +562,10 @@ static int receive_data(int f_in, char *fname_r, int fd_r, OFF_T size_r,
 			maybe_send_keepalive(time(NULL), MSK_ALLOW_FLUSH | MSK_ACTIVE_RECEIVER);
 
 		if (i > 0) {
+			if (!data) {
+				rprintf(FERROR, "Invalid literal token with no data [%s]\n", who_am_i());
+				exit_cleanup(RERR_PROTOCOL);
+			}
 			if (DEBUG_GTE(DELTASUM, 3)) {
 				rprintf(FINFO,"data recv %d at %s\n",
 					i, big_num(offset));
@@ -337,12 +583,45 @@ static int receive_data(int f_in, char *fname_r, int fd_r, OFF_T size_r,
 		}
 
 		i = -(i+1);
+		if (i < 0 || i >= sum.count) {
+			rprintf(FERROR, "Invalid block index %d (count=%ld) [%s]\n",
+				i, (long)sum.count, who_am_i());
+			exit_cleanup(RERR_PROTOCOL);
+		}
 		offset2 = i * (OFF_T)sum.blength;
 		len = sum.blength;
 		if (i == (int)sum.count-1 && sum.remainder != 0)
 			len = sum.remainder;
 
 		stats.matched_data += len;
+
+		/* A block match with no mapped basis is a protocol inconsistency
+		 * ONLY when we are actually producing output (fd != -1): the
+		 * generator told the sender a basis existed but the receiver could
+		 * not open it, so honoring the match would silently omit these
+		 * bytes from the verification checksum (a spurious failure) or
+		 * leave a hole in the output. Fail cleanly in that case.
+		 *
+		 * On the DISCARD path (fd == -1, fname == NULL) there is no output
+		 * and no verification: discard_receive_data() deliberately drains a
+		 * delta the receiver never intends to write (basis fstat failed,
+		 * basis is a directory, output open failed, batch skip, ...). The
+		 * sender does not know the data is being discarded and streams an
+		 * ordinary delta, so a match token here is NORMAL protocol, not
+		 * malformed. Absorb it benignly (advance the offset and continue),
+		 * as the pre-existing "if (mapbuf)" guards did before this check was
+		 * added in 31fbb17d -- erroring would wrongly break legitimate
+		 * transfers, and full_fname(fname) with fname==NULL would
+		 * dereference NULL (a receiver crash on a normal transfer). */
+		if (!mapbuf) {
+			if (fd != -1) {
+				rprintf(FERROR, "got a block match with no basis file for %s [%s]\n",
+					full_fname(fname), who_am_i());
+				exit_cleanup(RERR_PROTOCOL);
+			}
+			offset += len;
+			continue;
+		}
 
 		if (DEBUG_GTE(DELTASUM, 3)) {
 			rprintf(FINFO,
@@ -435,8 +714,15 @@ static void handle_delayed_updates(char *local_name)
 					partialptr, fname);
 			}
 			/* We don't use robust_rename() here because the
-			 * partial-dir must be on the same drive. */
-			if (do_rename(partialptr, fname) < 0) {
+			 * partial-dir must be on the same drive.  Resolve the
+			 * --partial-dir source through the exclude-aware ownership
+			 * walk so a symlinked partial-dir can't move a file out of
+			 * an excluded subtree. */
+			int rret;
+			operator_path_resolve = 1;
+			rret = do_rename_at(partialptr, fname);
+			operator_path_resolve = 0;
+			if (rret < 0) {
 				rsyserr(FERROR_XFER, errno,
 					"rename failed for %s (from %s)",
 					full_fname(fname), partialptr);
@@ -452,7 +738,10 @@ static void handle_delayed_updates(char *local_name)
 static void no_batched_update(int ndx, BOOL is_redo)
 {
 	struct file_list *flist = flist_for_ndx(ndx, "no_batched_update");
-	struct file_struct *file = flist->files[ndx - flist->ndx_start];
+	struct file_struct *file;
+	if (ndx < flist->ndx_start)
+		exit_cleanup(RERR_PROTOCOL);
+	file = flist->files[ndx - flist->ndx_start];
 
 	rprintf(FERROR_XFER, "(No batched update for%s \"%s\")\n",
 		is_redo ? " resend of" : "", f_name(file, NULL));
@@ -538,7 +827,8 @@ int recv_files(int f_in, int f_out, char *local_name)
 #ifdef SUPPORT_ACLS
 	const char *parent_dirname = "";
 #endif
-	int ndx, recv_ok, one_inplace;
+	int ndx, recv_ok, one_inplace, write_to_device;
+	mode_t write_devices_saved_mode = 0;
 
 	if (DEBUG_GTE(RECV, 1))
 		rprintf(FINFO, "recv_files(%d) starting\n", cur_flist->used);
@@ -589,8 +879,22 @@ int recv_files(int f_in, int f_out, char *local_name)
 
 		if (ndx - cur_flist->ndx_start >= 0)
 			file = cur_flist->files[ndx - cur_flist->ndx_start];
+		else if (cur_flist->parent_ndx < 0
+		      || cur_flist->parent_ndx >= dir_flist->used)
+			exit_cleanup(RERR_PROTOCOL);
 		else
 			file = dir_flist->files[cur_flist->parent_ndx];
+		if (!F_IS_ACTIVE(file)) {
+			/* A peer that sends duplicate file-list entries gets
+			 * one of them clear_file()'d by flist_sort_and_clean();
+			 * referencing that slot here yields fname == NULL and
+			 * a crash in the first deref (daemon filter check,
+			 * set_file_attrs → full_fname, …). */
+			rprintf(FERROR,
+				"rsync: refusing transfer of cleared file index %d\n",
+				ndx);
+			exit_cleanup(RERR_PROTOCOL);
+		}
 		fname = local_name ? local_name : f_name(file, fbuf);
 
 		if (DEBUG_GTE(RECV, 1))
@@ -768,8 +1072,55 @@ int recv_files(int f_in, int f_out, char *local_name)
 				fnamecmp = fname;
 		}
 
-		/* open the file */
-		fd1 = secure_relative_open(basedir, fnamecmp, O_RDONLY, 0);
+		/* Open the delta basis.  When it lives in the entry's own dir (no
+		 * alternate basedir), read it via the held dir fd with O_NOFOLLOW: a
+		 * regular-file basis is never legitimately a symlink, and refusing a
+		 * planted one avoids both an escape and a basis-content info-leak.
+		 * Otherwise use secure_basis_open, which also tolerates an operator-
+		 * trusted absolute fnamecmp (e.g. an absolute --partial-dir basis). */
+		{
+			int bdfd;
+			if (fnamecmp_type == FNAMECMP_PARTIAL_DIR
+			 && fnamecmp && *fnamecmp != '/') {
+				/* The relative partial path contains peer-derived directory
+				 * components.  It is not an operator-trusted path as a whole. */
+				fd1 = secure_relative_open(NULL, fnamecmp, O_RDONLY, 0);
+			} else if (!basedir && (bdfd = held_dfd_for(fnamecmp, file)) >= 0) {
+				const char *slash;
+				assert(fnamecmp != NULL); /* set on every path above */
+				slash = strrchr(fnamecmp, '/');
+				fd1 = do_open_atfd(bdfd, slash ? slash + 1 : fnamecmp, O_RDONLY, 0);
+			} else {
+				/* An operator-supplied basis -- a --partial-dir, or an
+				 * alt-dest basedir (--copy-dest/--compare-dest/--link-dest) --
+				 * is a peer/operator path: resolve it with the exclude-aware
+				 * ownership walk so a flipped foreign-owned parent symlink can't
+				 * read (and feed back as delta) an out-of-tree / excluded file.
+				 * The walk still allows the legitimate "../sibling" basis (#915)
+				 * and the operator's own uid0/euid symlinks.  A daemon keeps its
+				 * stronger confinement branch in secure_basis_open(), so only
+				 * route the alt-dest basedir read through the walk off-daemon. */
+				if ((basedir && !am_daemon) || fnamecmp_type == FNAMECMP_PARTIAL_DIR)
+					operator_path_resolve = 1;
+				fd1 = secure_basis_open(basedir, fnamecmp, O_RDONLY, 0);
+				operator_path_resolve = 0;
+			}
+		}
+		if (fnamecmp_type == FNAMECMP_PARTIAL_DIR && fd1 == -1) {
+			/* The sender may claim a partial basis even when the generator's
+			 * confined lookup rejected it.  Drop that path as the delta basis
+			 * and in-place output target.  A daemon that negotiated in-place
+			 * partial updates rejects the unsafe peer option; otherwise (a pre-30
+			 * peer, where no in-place partial redirect is possible, or a pull
+			 * client) fall back to a safe no-basis update. */
+			if (am_daemon && inplace_partial) {
+				rprintf(FERROR,
+					"rsync: refusing unconfined partial basis for %s\n", fname);
+				exit_cleanup(RERR_PROTOCOL);
+			}
+			fnamecmp = fname;
+			fnamecmp_type = FNAMECMP_FNAME;
+		}
 
 		if (fd1 == -1 && protocol_version < 29) {
 			if (fnamecmp != fname) {
@@ -783,7 +1134,10 @@ int recv_files(int f_in, int f_out, char *local_name)
 				basedir = basis_dir[0];
 				fnamecmp = fname;
 				fnamecmp_type = FNAMECMP_BASIS_DIR_LOW;
-				fd1 = secure_relative_open(basedir, fnamecmp, O_RDONLY, 0);
+				if (!am_daemon)
+					operator_path_resolve = 1;
+				fd1 = secure_basis_open(basedir, fnamecmp, O_RDONLY, 0);
+				operator_path_resolve = 0;
 			}
 		}
 
@@ -794,7 +1148,11 @@ int recv_files(int f_in, int f_out, char *local_name)
 			fnamecmp = fnamecmpbuf;
 		}
 
-		one_inplace = inplace_partial && fnamecmp_type == FNAMECMP_PARTIAL_DIR;
+		/* A peer's basis selector cannot enable direct output through a path
+		 * that the confined basis open did not validate. */
+		one_inplace = inplace_partial && partial_dir
+			   && fnamecmp_type == FNAMECMP_PARTIAL_DIR
+			   && fd1 != -1;
 		updating_basis_or_equiv = one_inplace
 		    || (inplace && (fnamecmp == fname || fnamecmp_type == FNAMECMP_BACKUP));
 
@@ -826,11 +1184,10 @@ int recv_files(int f_in, int f_out, char *local_name)
 			continue;
 		}
 
-		if (write_devices && IS_DEVICE(st.st_mode)) {
+		write_to_device = write_devices && IS_DEVICE(st.st_mode);
+		if (write_to_device) {
 			if (fd1 != -1 && st.st_size == 0)
 				st.st_size = get_device_size(fd1, fname);
-			/* Mark the file entry as a device so that we don't try to truncate it later on. */
-			file->mode = S_IFBLK | (file->mode & ACCESSPERMS);
 		} else if (fd1 != -1 && !(S_ISREG(st.st_mode))) {
 			close(fd1);
 			fd1 = -1;
@@ -854,13 +1211,34 @@ int recv_files(int f_in, int f_out, char *local_name)
 		/* We now check to see if we are writing the file "inplace" */
 		if (inplace || one_inplace)  {
 			fnametmp = one_inplace ? partialptr : fname;
-			fd2 = do_open(fnametmp, O_WRONLY|O_CREAT, 0600);
+			/* For any non-chrooted receiver (secure_relpath_active()),
+			 * use secure open to prevent symlink race attacks where an
+			 * attacker could switch a directory to a symlink between
+			 * path validation and file open. */
+			/* one_inplace stages into the operator/peer --partial-dir path:
+			 * resolve it with the ownership walk (exclude-aware) so it can't be
+			 * redirected through a symlink into an excluded subtree. */
+			if (secure_relpath_active())
+				fd2 = secure_recv_open(fnametmp, O_WRONLY|O_CREAT, 0600,
+						      one_inplace);
+			else
+				fd2 = do_open(fnametmp, O_WRONLY|O_CREAT, 0600);
 #ifdef linux
 			if (fd2 == -1 && errno == EACCES) {
 				/* Maybe the error was due to protected_regular setting? */
-				fd2 = do_open(fname, O_WRONLY, 0600);
+				if (use_secure_symlinks || one_inplace)
+					fd2 = secure_recv_open(fnametmp, O_WRONLY, 0600,
+							      one_inplace);
+				else
+					fd2 = do_open(fnametmp, O_WRONLY, 0600);
 			}
 #endif
+			if (fd2 == -1 && errno == EACCES) {
+				/* Temporarily add owner-write access only long enough to open
+				 * a writable descriptor; the helper restores the old mode
+				 * before any network data is consumed, including on failure. */
+				fd2 = open_readonly_inplace(fnametmp, one_inplace);
+			}
 			if (fd2 == -1) {
 				rsyserr(FERROR_XFER, errno, "open %s failed",
 					full_fname(fnametmp));
@@ -888,8 +1266,26 @@ int recv_files(int f_in, int f_out, char *local_name)
 		else if (!am_server && INFO_GTE(NAME, 1) && INFO_EQ(PROGRESS, 1))
 			rprintf(FINFO, "%s\n", fname);
 
+		/* --write-devices writes a regular source file's content into an
+		 * existing destination device.  Flip file->mode to S_IFBLK just for
+		 * receive_data()'s ftruncate gate (!IS_DEVICE), then restore it right
+		 * after -- the file_struct was built as a regular file with no
+		 * DEV_EXTRA_CNT, so leaving it S_IFBLK would make set_stat_xattr's
+		 * F_RDEV_P() read past the allocation.  Kept tight here (after the
+		 * pre-transfer log and the fd2 bail-out) so no continue skips the
+		 * restore and dest_mode() above ran on the real mode. */
+		if (write_to_device) {
+			write_devices_saved_mode = file->mode;
+			file->mode = S_IFBLK | (file->mode & ACCESSPERMS);
+		}
+
 		/* recv file data */
 		recv_ok = receive_data(f_in, fnamecmp, fd1, st.st_size, fname, fd2, file, inplace || one_inplace);
+
+		if (write_to_device) {
+			file->mode = write_devices_saved_mode;
+			write_devices_saved_mode = 0;
+		}
 
 		log_item(log_code, file, iflags, NULL);
 		if (want_progress_now)
@@ -909,8 +1305,14 @@ int recv_files(int f_in, int f_out, char *local_name)
 			if (!finish_transfer(fname, fnametmp, fnamecmp, partialptr, file, recv_ok, 1))
 				recv_ok = -1;
 			else if (fnamecmp == partialptr) {
-				if (!one_inplace)
-					do_unlink(partialptr);
+				if (!one_inplace) {
+					/* Unlink the consumed --partial-dir basis through the
+					 * exclude-aware ownership walk (a symlinked partial-dir
+					 * must not delete a file in an excluded subtree). */
+					operator_path_resolve = 1;
+					do_unlink_at(partialptr);
+					operator_path_resolve = 0;
+				}
 				handle_partial_dir(partialptr, PDIR_DELETE);
 			}
 		} else if (keep_partial && partialptr && (!one_inplace || delay_updates)) {
@@ -919,7 +1321,7 @@ int recv_files(int f_in, int f_out, char *local_name)
 					"Unable to create partial-dir for %s -- discarding %s.\n",
 					local_name ? local_name : f_name(file, NULL),
 					recv_ok ? "completed file" : "partial file");
-				do_unlink(fnametmp);
+				do_unlink_at(fnametmp);
 				recv_ok = -1;
 			} else if (!finish_transfer(partialptr, fnametmp, fnamecmp, NULL,
 						    file, recv_ok, !partial_dir))
@@ -930,7 +1332,7 @@ int recv_files(int f_in, int f_out, char *local_name)
 			} else
 				partialptr = NULL;
 		} else if (!one_inplace)
-			do_unlink(fnametmp);
+			do_unlink_at(fnametmp);
 
 		cleanup_disable();
 

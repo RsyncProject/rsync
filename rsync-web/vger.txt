@@ -1,0 +1,35 @@
+The vger.rutgers.edu cvs tree is mirrored onto cvs.samba.org via
+anonymous rsync using the following script.
+
+    #!/bin/bash
+
+    cd /var/www/cvs/vger/
+    PATH=/usr/local/bin:/usr/freeware/bin:/usr/bin:/bin
+
+    RUN=`lps x | grep rsync | grep -v grep | wc -l`
+    if [ "$RUN" -gt 0 ]; then
+	    echo already running
+	    exit 1
+    fi
+
+    rsync -az vger.rutgers.edu::cvs/CVSROOT/ChangeLog $HOME/ChangeLog
+
+    sum1=`sum $HOME/ChangeLog`
+    sum2=`sum /var/www/cvs/vger/CVSROOT/ChangeLog`
+
+    if [ "$sum1" = "$sum2" ]; then
+	    echo nothing to do
+	    exit 0
+    fi
+
+    rsync -az --delete --force vger.rutgers.edu::cvs/ /var/www/cvs/vger/
+    exit 0
+
+Note in particular the initial rsync of the ChangeLog to determine if
+anything has changed. This could be omitted but it would mean that the
+rsyncd on vger would have to build a complete listing of the cvs area
+at each run. As most of the time nothing will have changed I wanted to
+save the time on vger by only doing a full rsync if the ChangeLog has
+changed. This helped quite a lot because vger is low on memory and
+generally quite heavily loaded, so doing a listing on such a large
+tree every hour would have been excessive.

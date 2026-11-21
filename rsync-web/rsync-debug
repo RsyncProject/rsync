@@ -1,0 +1,10 @@
+#!/bin/sh
+
+ulimit -c unlimited
+
+# Some systems have "truss" or "tusc" instead of "strace".
+# The -f option tells strace to follow children too.
+# The -t option asks for timestamps.
+# The -s 1024 option increases the string decoding limit per function call.
+# The -o option tells strace where to send its output.
+strace -f -t -s 1024 -o /tmp/rsync-$$.out rsync "${@}"
