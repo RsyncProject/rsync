@@ -1,5 +1,12 @@
 # NEWS for rsync 4.0.0 (UNRELEASED)
 
+## Enhancements
+
+- Added SHA-3 (FIPS 202) transfer checksum choices `sha3-256`,
+  `sha3-384` and `sha3-512` for builds with OpenSSL SHA-3 support.
+  Default negotiation is unchanged. Select SHA-3 with
+  `--checksum-choice` or include it in both peers' `RSYNC_CHECKSUM_LIST`.
+
 ## Bug fixes
 
 - Fixed `-X` transfers of user xattrs on NetBSD by using the native BSD

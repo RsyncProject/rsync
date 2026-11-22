@@ -459,7 +459,8 @@ void validate_choice_vs_env(int ntype, int num1, int num2)
  * for the order of the args in the array.  If dup_markup == '\0', duplicates
  * are removed otherwise the char is prefixed to the duplicate term and, if it
  * is an opening paren/bracket/brace, the matching closing char is suffixed.
- * "none" is removed on the client side unless dup_markup != '\0'. */
+ * "none" is removed on the client side unless dup_markup != '\0'.
+ * Negotiation lists omit explicit-only choices. Display lists keep them. */
 int get_default_nno_list(struct name_num_obj *nno, char *to_buf, int to_buf_len, char dup_markup)
 {
 	struct name_num_item *nni;
@@ -476,7 +477,7 @@ int get_default_nno_list(struct name_num_obj *nno, char *to_buf, int to_buf_len,
 	init_nno_saw(nno, 0);
 
 	for (nni = nno->list, len = 0; nni->name; nni++) {
-		if (nni->num == CSUM_gone)
+		if (nni->num == CSUM_gone || (!dup_markup && (nni->flags & NNI_EXPLICIT_ONLY)))
 			continue;
 		if (nni->main_nni) {
 			if (!dup_markup || nni->main_nni->num == CSUM_gone)
