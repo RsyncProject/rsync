@@ -66,6 +66,17 @@ daemon using `rsync --daemon --no-detach`, while `rsync.socket` and
 files may need local adjustment to match your installed rsync path, packaging
 layout, and module policy.
 
+The optional `50-rsync-hardening.conf` example restricts process execution.
+To opt in, copy it into `rsync.service.d/` or `rsync@.service.d/` under
+`/etc/systemd/system/` for the service in use. Reload systemd and restart
+the standalone daemon if it is running. Remove the drop-in and repeat these
+steps to return to the shipped defaults.
+
+The drop-in does not change module paths or network settings. It can affect
+programs started by daemon hooks, such as programs that need executable
+memory generated at runtime or invoke a non-native system call ABI. Verify
+the modules and hooks used by the installation before enabling it.
+
 When run via inetd you should add a line like this to /etc/services:
 
 >     rsync           873/tcp
