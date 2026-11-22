@@ -1,4 +1,5 @@
 import json
+from datetime import datetime, timedelta
 from functools import lru_cache
 import os
 import re
@@ -13,7 +14,10 @@ API = 'https://api.github.com/repos/RsyncProject/rsync'
 WORKFLOW = 'RsyncProject/rsync/.github/workflows/interoperability-tests.yml@'
 CONTROLLER_FIELDS = ('control_run_id', 'control_attempt', 'control_sha')
 STARTUP_TIMEOUT = 1800
+CONTROLLER_POLL_CAP = 60
+CONTROLLER_LOOKBACK = 75 * 60
 TIMESTAMP = r'\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z'
+TIMESTAMP_FORMAT = '%Y-%m-%dT%H:%M:%SZ'
 bound = None
 api_cache = {}
 
@@ -141,6 +145,7 @@ def source():
             or not re.fullmatch(TIMESTAMP, run.get('created_at', ''))
             or not isinstance(run.get('display_title'), str) or not run['display_title']):
         raise NetworkError('CI run does not match its event')
+    created = run['created_at']
     # The controller makes its own selection before it can obtain authority.
     if event_name == 'workflow_run' and not selected(run):
         raise NotSelected('CI has not selected interoperability')
@@ -151,6 +156,8 @@ def source():
         run = api('/actions/runs/' + str(run_id))
         if run.get('run_attempt') != attempt:
             raise NetworkError('CI attempt changed during workflow selection')
+        if run.get('created_at') != created:
+            raise NetworkError('CI creation time changed during workflow selection')
         references = [item for item in run.get('referenced_workflows', []) if item.get('path', '').startswith(WORKFLOW)]
     if len(references) != 1 or not re.fullmatch(r'[0-9a-f]{40}', references[0].get('sha', '')):
         if not references:
@@ -162,7 +169,8 @@ def source():
     if not isinstance(started, str) or not re.fullmatch(TIMESTAMP, started):
         raise NetworkError('CI attempt has no valid start time')
     return dict(run_id=str(run_id), run_attempt=str(attempt), source_sha=references[0]['sha'],
-                head_sha=run['head_sha'], display_title=run['display_title'], attempt_started_at=started)
+                head_sha=run['head_sha'], display_title=run['display_title'],
+                created_at=created, attempt_started_at=started)
 
 
 def identity():
@@ -283,25 +291,30 @@ def records(kind, roles=ROLES, control=None, timeout=600):
 
 def find_controller(exclude=None):
     state = source()
-    titles = {'Network controller', f"Network CI {state['run_id']} attempt {state['run_attempt']}"}
-    started = state['attempt_started_at']
-    query = dict(branch='master', event='workflow_run', created='>=' + started, per_page=20)
+    title = f"Network CI {state['run_id']} attempt {state['run_attempt']}"
+    created = max(datetime.strptime(state['created_at'], TIMESTAMP_FORMAT),
+                  datetime.strptime(state['attempt_started_at'], TIMESTAMP_FORMAT)
+                  - timedelta(seconds=CONTROLLER_LOOKBACK)).strftime(TIMESTAMP_FORMAT)
+    query = dict(branch='master', event='workflow_run', created='>=' + created, per_page=40)
     runs = []
     for page in range(1, 6):
         listing = api('/actions/workflows/interoperability.yml/runs?' + urlencode(dict(query, page=page)))
         batch = listing.get('workflow_runs')
         count = listing.get('total_count')
-        if (type(count) is not int or count < 0 or not isinstance(batch, list) or len(batch) > 20
+        if (type(count) is not int or count < 0 or not isinstance(batch, list)
+                or len(batch) > 40 or count < (page - 1) * 40 + len(batch)
                 or any(not isinstance(run, dict)
                        or not re.fullmatch(TIMESTAMP, run.get('created_at', '')) for run in batch)):
             raise NetworkError('Invalid controller run listing')
-        runs.extend(run for run in batch if run['created_at'] >= started)
-        if len(batch) < 20 or any(run['created_at'] < started for run in batch):
+        runs.extend(run for run in batch if run['created_at'] >= created)
+        if len(batch) < 40 or count <= page * 40 or any(run['created_at'] < created for run in batch):
             break
     else:
         raise NetworkError('Controller run listing exceeds limit')
-    for run in sorted(runs, key=lambda value: value['id']):
-        if run.get('display_title') not in titles or str(run['id']) == exclude:
+    exact = [run for run in runs if run.get('display_title') == title and str(run.get('id')) != exclude]
+    candidates = exact or [run for run in runs if run.get('display_title') == 'Network controller']
+    for run in sorted(candidates, key=lambda value: value['id']):
+        if str(run.get('id')) == exclude:
             continue
         control = controller_binding(run)
         names = {'interoperability-context-attempt-' + str(run['run_attempt']),
@@ -329,13 +342,18 @@ def find_controller(exclude=None):
 
 def controller():
     deadline = time.monotonic() + STARTUP_TIMEOUT
-    while time.monotonic() < deadline:
+    delay = 5
+    while True:
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            break
         run = find_controller()
         if run is not None:
             if run.get('conclusion') in ('failure', 'cancelled', 'timed_out'):
                 raise PeerUnavailable('Network controller failed')
             return controller_binding(run)
-        time.sleep(5)
+        time.sleep(min(delay, remaining))
+        delay = min(delay * 2, CONTROLLER_POLL_CAP)
     raise NetworkError('Trusted controller did not start')
 
 

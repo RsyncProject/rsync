@@ -83,6 +83,7 @@ class Changes(unittest.TestCase):
             '.github/scripts/test-changes.py': {'diagnostics'},
             '.github/scripts/check-platform.py': {'linux', 'macos', 'other', 'diagnostics'},
             '.github/actions/interoperability/action.yml': {'interoperability', 'diagnostics'},
+            '.github/actions/interop-upload/action.yml': {'interoperability', 'diagnostics'},
         }
         for path, expected in cases.items():
             with self.subTest(path=path):
