@@ -1838,7 +1838,7 @@ static int gen_entry_copy_xattrs(const char *src, const char *fname, struct file
 #endif
 
 static void recv_generator(char *fname, struct file_struct *file, int ndx,
-			   int itemizing, enum logcode code, int f_out)
+			   int itemizing, enum logcode code, int f_out, BOOL replacing_hlink)
 {
 	static const char *parent_dirname = "";
 	static struct file_struct *prior_dir_file = NULL;
@@ -1868,6 +1868,10 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 		   : inc_recurse && ndx != cur_flist->ndx_start - 1 ? -1
 		   : 1;
 
+#ifndef SUPPORT_HARD_LINKS
+	(void)replacing_hlink;
+#endif
+
 	if (DEBUG_GTE(GENR, 1))
 		rprintf(FINFO, "recv_generator(%s,%d)\n", fname, ndx);
 
@@ -1886,7 +1890,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 			if (is_dir)
 				file->flags |= FLAG_MISSING_DIR;
 #ifdef SUPPORT_HARD_LINKS
-			else if (F_IS_HLINKED(file))
+			else if (!replacing_hlink && F_IS_HLINKED(file))
 				handle_skipped_hlink(file, itemizing, code, f_out);
 #endif
 			return;
@@ -1900,7 +1904,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 			if (is_dir < 0)
 				return;
 #ifdef SUPPORT_HARD_LINKS
-			if (F_IS_HLINKED(file))
+			if (!replacing_hlink && F_IS_HLINKED(file))
 				handle_skipped_hlink(file, itemizing, code, f_out);
 #endif
 			rprintf(FERROR_XFER,
@@ -2021,7 +2025,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 			file->flags |= FLAG_MISSING_DIR;
 		}
 #ifdef SUPPORT_HARD_LINKS
-		else if (F_IS_HLINKED(file))
+		else if (!replacing_hlink && F_IS_HLINKED(file))
 			handle_skipped_hlink(file, itemizing, code, f_out);
 #endif
 		if (INFO_GTE(SKIP, 1)) {
@@ -2057,7 +2061,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 			rprintf(FINFO, "%s exists%s\n", fname, suf);
 		}
 #ifdef SUPPORT_HARD_LINKS
-		if (F_IS_HLINKED(file))
+		if (!replacing_hlink && F_IS_HLINKED(file))
 			handle_skipped_hlink(file, itemizing, code, f_out);
 #endif
 		goto cleanup;
@@ -2399,7 +2403,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 		if (INFO_GTE(SKIP, 1))
 			rprintf(FINFO, "%s is newer\n", fname);
 #ifdef SUPPORT_HARD_LINKS
-		if (F_IS_HLINKED(file))
+		if (!replacing_hlink && F_IS_HLINKED(file))
 			handle_skipped_hlink(file, itemizing, code, f_out);
 #endif
 		goto cleanup;
@@ -2475,7 +2479,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 
 	if (statret != 0) {
 #ifdef SUPPORT_HARD_LINKS
-		if (preserve_hard_links && F_HLINK_NOT_LAST(file)) {
+		if (!replacing_hlink && preserve_hard_links && F_HLINK_NOT_LAST(file)) {
 			file->flags |= FLAG_HLINK_WAIT;
 			cur_flist->in_progress++;
 			goto cleanup;
@@ -2525,7 +2529,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 
 	if (append_mode > 0 && sx.st.st_size >= F_LENGTH(file)) {
 #ifdef SUPPORT_HARD_LINKS
-		if (F_IS_HLINKED(file))
+		if (!replacing_hlink && F_IS_HLINKED(file))
 			handle_skipped_hlink(file, itemizing, code, f_out);
 #endif
 		goto cleanup;
@@ -2581,7 +2585,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 	  pretend_missing:
 		/* pretend the file didn't exist */
 #ifdef SUPPORT_HARD_LINKS
-		if (preserve_hard_links && F_HLINK_NOT_LAST(file)) {
+		if (!replacing_hlink && preserve_hard_links && F_HLINK_NOT_LAST(file)) {
 			file->flags |= FLAG_HLINK_WAIT;
 			cur_flist->in_progress++;
 			goto cleanup;
@@ -2810,21 +2814,34 @@ static void handle_skipped_hlink(struct file_struct *file, int itemizing,
 {
 	char fbuf[MAXPATHLEN];
 	int new_ndx;
-	struct file_list *save_flist = cur_flist;
+	struct file_list *save_flist = cur_flist, *next_flist;
+	BOOL pin_saved = inc_recurse && save_flist != NULL;
 
-	/* Continue with the member selected to replace a skipped transfer. */
-	if ((new_ndx = skip_hard_link(file, &cur_flist)) < 0)
+	if ((new_ndx = skip_hard_link(file, &next_flist, False)) < 0)
 		return;
 
-	file = cur_flist->files[new_ndx - cur_flist->ndx_start];
-	if (file->flags & FLAG_HLINK_WAIT) {
-		file->flags &= ~FLAG_HLINK_WAIT;
-		cur_flist->in_progress--; /* undo prior increment */
-	}
-	f_name(file, fbuf);
-	recv_generator(fbuf, file, new_ndx, itemizing, code, f_out);
+	/* Generating a replacement can drain completions for other lists. */
+	if (pin_saved)
+		save_flist->in_progress++;
+	do {
+		cur_flist = next_flist;
+		file = cur_flist->files[new_ndx - cur_flist->ndx_start];
+		if (file->flags & FLAG_HLINK_WAIT) {
+			file->flags &= ~FLAG_HLINK_WAIT;
+			cur_flist->in_progress--;
+		}
+		f_name(file, fbuf);
+		recv_generator(fbuf, file, new_ndx, itemizing, code, f_out, True);
+
+		/* If nothing will complete this member, keep walking the chain. */
+		if (file->flags & (FLAG_FILE_SENT | FLAG_HLINK_DONE))
+			break;
+		new_ndx = skip_hard_link(file, &next_flist, True);
+	} while (new_ndx >= 0);
 
 	cur_flist = save_flist;
+	if (pin_saved)
+		save_flist->in_progress--;
 }
 #endif
 
@@ -2935,7 +2952,7 @@ void check_for_finished_files(int itemizing, enum logcode code, int check_redo)
 				strlcpy(fbuf, solo_file, sizeof fbuf);
 			else
 				f_name(file, fbuf);
-			recv_generator(fbuf, file, ndx, itemizing, code, sock_f_out);
+			recv_generator(fbuf, file, ndx, itemizing, code, sock_f_out, False);
 			cur_flist->to_redo--;
 
 			cur_flist = flist;
@@ -3094,7 +3111,7 @@ void generate_files(int f_out, const char *local_name)
 			else
 				f_name(fp, fbuf);
 			ndx = cur_flist->ndx_start - 1;
-			recv_generator(fbuf, fp, ndx, itemizing, code, f_out);
+			recv_generator(fbuf, fp, ndx, itemizing, code, f_out, False);
 			if (delete_during && dry_run < 2 && !list_only
 			 && !(fp->flags & FLAG_MISSING_DIR)) {
 				if (fp->flags & FLAG_CONTENT_DIR) {
@@ -3124,7 +3141,7 @@ void generate_files(int f_out, const char *local_name)
 				strlcpy(fbuf, solo_file, sizeof fbuf);
 			else
 				f_name(file, fbuf);
-			recv_generator(fbuf, file, ndx, itemizing, code, f_out);
+			recv_generator(fbuf, file, ndx, itemizing, code, f_out, False);
 
 			check_for_finished_files(itemizing, code, 0);
 
