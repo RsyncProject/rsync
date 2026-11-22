@@ -17,11 +17,6 @@
 
 #include <sys/stat.h>
 
-#if defined(__linux__) && defined(HAVE_OPENAT2)
-#include <sys/syscall.h>
-#include <linux/openat2.h>
-#endif
-
 int dry_run = 0;
 int am_root = 0;
 int am_sender = 0;
@@ -35,42 +30,18 @@ short info_levels[COUNT_INFO], debug_levels[COUNT_DEBUG];
 
 static int errs = 0;
 
-/* Probe the running kernel for the RESOLVE_BENEATH-equivalent confinement
- * that secure_relative_open() prefers over the per-component O_NOFOLLOW
- * walk.  Returns 1 if either openat2(RESOLVE_BENEATH) on Linux 5.6+ or
- * openat(O_RESOLVE_BENEATH) on FreeBSD 13+ / macOS 15+ is honoured by
- * the running kernel, 0 otherwise.  The probe opens "." (a directory
- * the helper has just chdir'd into) so it can't fail for any reason
- * other than the kernel rejecting the requested confinement flag. */
-static int kernel_resolve_beneath_supported(void)
+
+/* Does do_chmod_at()'s leaf handling refuse to follow a symlink at the final
+ * component? Yes wherever AT_SYMLINK_NOFOLLOW exists; otherwise the wrapper
+ * falls back to a following fchmodat() (documented limitation). Mirrors the
+ * #ifdef ladder in do_fchmodat_nofollow. */
+static int leaf_chmod_nofollow_supported(void)
 {
-#if (defined(__linux__) && defined(HAVE_OPENAT2)) || defined(O_RESOLVE_BENEATH)
-	int fd;
-#endif
-#if defined(__linux__) && defined(HAVE_OPENAT2)
-	if (openat2_usable()) {
-		struct open_how how;
-		memset(&how, 0, sizeof how);
-		how.flags = O_RDONLY | O_DIRECTORY;
-		how.resolve = RESOLVE_BENEATH | RESOLVE_NO_MAGICLINKS;
-		fd = syscall(SYS_openat2, AT_FDCWD, ".", &how, sizeof how);
-		if (fd >= 0) {
-			close(fd);
-			return 1;
-		}
-		/* ENOSYS = kernel < 5.6 or openat2 seccomp-blocked.  Fall through to the O_RESOLVE_BENEATH
-		 * probe in case we're a Linux build running on a kernel that
-		 * gained O_RESOLVE_BENEATH via some out-of-tree backport. */
-	}
-#endif
-#ifdef O_RESOLVE_BENEATH
-	fd = openat(AT_FDCWD, ".", O_RDONLY | O_DIRECTORY | O_RESOLVE_BENEATH);
-	if (fd >= 0) {
-		close(fd);
-		return 1;
-	}
-#endif
+#if defined AT_SYMLINK_NOFOLLOW
+	return 1;
+#else
 	return 0;
+#endif
 }
 
 static void check(const char *label, int actual_rc, int expect_ok,
@@ -78,7 +49,9 @@ static void check(const char *label, int actual_rc, int expect_ok,
 {
 	struct stat st;
 	int got_ok = (actual_rc == 0);
-	if (got_ok != expect_ok) {
+	/* expect_ok < 0: rc is platform-dependent, don't assert it (leaf-symlink
+	 * scenario); only the target-mode check below is portable. */
+	if (expect_ok >= 0 && got_ok != expect_ok) {
 		fprintf(stderr, "FAIL [%s]: rc=%d errno=%d (%s), expected %s\n",
 			label, actual_rc, errno, strerror(errno),
 			expect_ok ? "success" : "rejection");
@@ -130,35 +103,18 @@ int main(int argc, char **argv)
 	 * files to mode 0600 so we have a clean baseline to compare.
 	 */
 
-	/* Scenario A: legitimate parent dir-symlink.
+	/* Scenario A: legitimate parent dir-symlink within the tree.
 	 *
-	 * On platforms whose kernel offers RESOLVE_BENEATH-equivalent
-	 * confinement (Linux 5.6+ openat2, FreeBSD 13+ / macOS 15+
-	 * O_RESOLVE_BENEATH), the within-tree symlink is followed and
-	 * the chmod must succeed.
-	 *
-	 * On platforms that fall back to the per-component O_NOFOLLOW
-	 * walk (OpenBSD, NetBSD, Solaris, older Cygwin, HPE NonStop,
-	 * and pre-5.6 Linux), every symlink is rejected -- including
-	 * this legitimate one.  That's a real platform limitation (the
-	 * same one that causes the #715 regression there) and the
-	 * expected outcome is rejection.
-	 *
-	 * Detect at runtime and expect accordingly.  The other three
-	 * scenarios behave identically on both code paths and need no
-	 * adjustment. */
-	int kernel_has_rb = kernel_resolve_beneath_supported();
-	fprintf(stderr, "INFO: kernel RESOLVE_BENEATH-equivalent confinement: %s\n",
-		kernel_has_rb ? "available" : "not available (per-component fallback)");
-
+	 * The within-tree symlink is followed and the chmod must succeed on
+	 * every platform: the kernel RESOLVE_BENEATH paths (Linux 5.6+ openat2,
+	 * FreeBSD 13+ / macOS 15+ O_RESOLVE_BENEATH) and, since the #715/-K
+	 * fallback fix, the per-component O_NOFOLLOW walk too (OpenBSD, NetBSD,
+	 * Solaris, older Cygwin, HPE NonStop, pre-5.6 Linux) -- which now follows
+	 * an in-tree directory symlink whose target is relative and ".."-free.
+	 * Escapes are still rejected on both paths (Scenario B). */
 	int rc = do_chmod_at("inside_link/sentinel", 0640);
-	if (kernel_has_rb) {
-		check("A: legit dir-symlink within tree (kernel confined)",
-		      rc, 1, "realdir/sentinel", 0640);
-	} else {
-		check("A: legit dir-symlink within tree (per-component fallback rejects)",
-		      rc, 0, "realdir/sentinel", 0600);
-	}
+	check("A: legit dir-symlink within tree (followed)",
+	      rc, 1, "realdir/sentinel", 0640);
 
 	/* Scenario B: parent symlink escapes the tree -- chmod must be
 	 * rejected and the outside file's mode must be unchanged. */
@@ -178,6 +134,21 @@ int main(int argc, char **argv)
 	rc = do_chmod_at("topfile", 0640);
 	check("D: top-level file, no parent component",
 	      rc, 1, "topfile", 0640);
+
+	/* Scenario E: the LEAF component is an escaping symlink -- the chmod-
+	 * specific TOCTOU, distinct from the parent races A/B. realdir is a real
+	 * directory, isolating the O_NOFOLLOW leaf guard. rc is platform-dependent
+	 * (refused on Linux, lchmod-the-symlink on *BSD/macOS), so assert only that
+	 * the outside target's mode is unchanged. */
+	if (leaf_chmod_nofollow_supported()) {
+		rc = do_chmod_at("realdir/leaflink", 0666);
+		check("E: leaf component is an escaping symlink (must not be followed)",
+		      rc, -1, "../trap/sentinel", 0600);
+	} else {
+		fprintf(stderr, "INFO: leaf-nofollow chmod unsupported here; "
+			"do_chmod_at follows a leaf symlink (documented limitation), "
+			"skipping scenario E\n");
+	}
 
 	if (errs)
 		fprintf(stderr, "%d failure(s)\n", errs);

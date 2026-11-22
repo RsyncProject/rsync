@@ -221,6 +221,8 @@ int ZEXPORT inflatePrime(z_streamp strm, int bits, int value)
     struct inflate_state FAR *state;
 
     if (strm == Z_NULL || strm->state == Z_NULL) return Z_STREAM_ERROR;
+    if (bits == 0)
+        return Z_OK;
     state = (struct inflate_state FAR *)strm->state;
     if (bits < 0) {
         state->hold = 0;
@@ -229,7 +231,7 @@ int ZEXPORT inflatePrime(z_streamp strm, int bits, int value)
     }
     if (bits > 16 || state->bits + bits > 32) return Z_STREAM_ERROR;
     value &= (1L << bits) - 1;
-    state->hold += value << state->bits;
+    state->hold += (unsigned long)value << state->bits;
     state->bits += bits;
     return Z_OK;
 }
@@ -594,7 +596,7 @@ int ZEXPORT inflate(z_streamp strm, int flush)
     unsigned bits;              /* bits in bit buffer */
     unsigned in, out;           /* save starting available input and output */
     unsigned copy;              /* number of stored or match bytes to copy */
-    unsigned char FAR *from;    /* where to copy match bytes from */
+    z_const unsigned char FAR *from;    /* where to copy match bytes from */
     code here;                  /* current decoding table entry */
     code last;                  /* parent table entry */
     unsigned len;               /* length to copy for repeats, bits to drop */
@@ -1417,7 +1419,7 @@ int ZEXPORT inflateSync(z_streamp strm)
  */
 int ZEXPORT inflateSyncPoint(z_streamp strm)
 {
-    struct inflate_state FAR *state;
+    z_const struct inflate_state FAR *state;
 
     if (strm == Z_NULL || strm->state == Z_NULL) return Z_STREAM_ERROR;
     state = (struct inflate_state FAR *)strm->state;
@@ -1426,7 +1428,7 @@ int ZEXPORT inflateSyncPoint(z_streamp strm)
 
 int ZEXPORT inflateCopy(z_streamp dest, z_streamp source)
 {
-    struct inflate_state FAR *state;
+    z_const struct inflate_state FAR *state;
     struct inflate_state FAR *copy;
     unsigned char FAR *window;
     unsigned wsize;

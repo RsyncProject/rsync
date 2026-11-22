@@ -1,0 +1,1157 @@
+import copy
+import io
+import json
+import os
+from pathlib import Path
+import runpy
+import subprocess
+import sys
+import tempfile
+import time
+import unittest
+from unittest.mock import Mock, call, patch
+import urllib.error
+import zipfile
+
+import interop_ci as ci
+import interop_enrol as enrol
+import interop_network as network
+from interop_policy import PORTS, QUARANTINE, ROLES, update_policy
+
+broker = runpy.run_path(str(Path(__file__).with_name('interop-broker.py')))
+
+
+def controller_run():
+    return dict(id=456, run_attempt=1, path='.github/workflows/interoperability.yml', head_branch='master',
+                event='workflow_run', head_sha='c' * 40, status='in_progress', repository=dict(id=266877886))
+
+
+class Network(unittest.TestCase):
+    def setUp(self):
+        self.directory = tempfile.TemporaryDirectory()
+        self.addCleanup(self.directory.cleanup)
+        self.root = Path(self.directory.name)
+        self.state = dict(run_id='123', run_attempt='2', source_sha='a' * 40)
+        self.event = dict(action='in_progress', repository=dict(id=266877886, owner=dict(id=166180282)),
+                          workflow=dict(path='.github/workflows/ci.yml'),
+                          workflow_run=dict(id=123, run_attempt=2, head_sha='b' * 40, name='CI', event='pull_request'))
+        (self.root / 'event.json').write_text(json.dumps(self.event))
+        self.env = dict(GITHUB_REPOSITORY_ID='266877886', GITHUB_EVENT_NAME='workflow_run',
+                        GITHUB_REF='refs/heads/master', GITHUB_RUN_ID='456', GITHUB_RUN_ATTEMPT='1',
+                        GITHUB_WORKFLOW_SHA='c' * 40, GITHUB_EVENT_PATH=str(self.root / 'event.json'), GH_TOKEN='fixture')
+        self.environment = patch.dict(os.environ, self.env)
+        self.environment.start()
+        self.addCleanup(self.environment.stop)
+        ci.bind(self.state)
+        self.addCleanup(setattr, ci, 'bound', None)
+        running = patch.dict(broker['main'].__globals__, check_ci=Mock())
+        running.start()
+        self.addCleanup(running.stop)
+        self.devices, self.nodes = [], {}
+        for index, role in enumerate(ROLES, 1):
+            address = '100.64.0.' + str(index)
+            self.devices.append(dict(nodeId='n' + str(index), id=str(index), hostname='ci-123-2-' + role,
+                                     addresses=[address], authorized=True, tags=[QUARANTINE]))
+            self.nodes[role] = dict(self.state, role=role, node_id='n' + str(index), address=address, key_id=role,
+                                    oidc_available=False, identity=dict(platform=role, source_sha=self.state['source_sha']))
+        broker['save'](self.root, 'keys', keys={role: role for role in ROLES})
+
+    def test_trusted_events_and_owner(self):
+        network.workflow_event()
+        for field, value in dict(GITHUB_EVENT_NAME='pull_request', GITHUB_REF='refs/pull/1/merge',
+                                 GITHUB_REPOSITORY_ID='1').items():
+            with self.subTest(field=field), patch.dict(os.environ, {field: value}), self.assertRaises(network.NetworkError):
+                network.workflow_event()
+
+    def test_artifact_names_keep_attempts_separate(self):
+        self.assertEqual(ci.artifact_name('enrolment'), 'interoperability-enrolment-attempt-2')
+        self.assertEqual(ci.artifact_name('ready', 'linux'), 'interoperability-ready-linux-attempt-2')
+        ci.bind(dict(self.state, run_attempt='3'))
+        self.assertEqual(ci.artifact_name('enrolment'), 'interoperability-enrolment-attempt-3')
+
+    def test_unselected_ci_has_no_network_side_effects(self):
+        output = self.root / 'output'
+        def absent():
+            raise ci.NotSelected('Not selected')
+        with patch.object(sys, 'argv', ['interop-broker.py', 'metadata', '--root', str(self.root)]), \
+                patch.dict(os.environ, GITHUB_OUTPUT=str(output)), \
+                patch.dict(broker['main'].__globals__, identity=absent,
+                           Tailnet=lambda: self.fail('Unselected CI obtained network authority')):
+            self.assertEqual(broker['main'](), 0)
+        self.assertEqual(output.read_text(), 'enabled=false\n')
+        self.assertFalse((self.root / 'context.json').exists())
+
+    def test_recovery_uses_workflow_path_not_the_run_title(self):
+        event = copy.deepcopy(self.event)
+        event.update(action='completed', workflow=dict(path='.github/workflows/interoperability.yml'))
+        event['workflow_run'].update(name='arbitrary title', event='workflow_run')
+        (self.root / 'event.json').write_text(json.dumps(event))
+        network.workflow_event()
+        event['workflow_run']['event'] = 'pull_request'
+        (self.root / 'event.json').write_text(json.dumps(event))
+        with self.assertRaisesRegex(network.NetworkError, 'Unsupported cleanup event'):
+            network.workflow_event()
+
+    def test_ci_identity_uses_the_merge_commit_and_accepts_forks(self):
+        ci.bound = None
+        ci.source.cache_clear()
+        self.addCleanup(ci.source.cache_clear)
+        run = dict(id=123, run_attempt=2, path='.github/workflows/ci.yml', name='CI', event='pull_request',
+                   repository=dict(id=266877886), head_repository=dict(id=999), head_sha='b' * 40,
+                   display_title='testsuite, ci: rework tests', created_at='2026-11-14T00:00:00Z',
+                   run_started_at='2026-11-14T00:05:00Z',
+                   pull_requests=[dict(number=1, base=dict(sha='c' * 40, repo=dict(id=266877886)),
+                                       head=dict(sha='d' * 40, repo=dict(id=999)))],
+                   referenced_workflows=[dict(path=ci.WORKFLOW + 'a' * 40, sha='a' * 40)])
+        request = dict(number=1, base=dict(sha='c' * 40, repo=dict(id=266877886)),
+                       head=dict(sha='d' * 40, repo=dict(id=999)))
+        def production(path, array=False):
+            if path == '/actions/runs/123':
+                return run
+            if path == '/pulls/1':
+                return request
+            if path == '/pulls/1/files?per_page=100&page=1':
+                self.assertTrue(array)
+                return [dict(status='modified', filename='receiver.c')]
+            self.fail('Unexpected API request: ' + path)
+        with patch.object(ci, 'api', side_effect=production):
+            self.assertEqual(ci.identity(), self.state)
+            self.assertEqual(ci.source().get('attempt_started_at'), '2026-11-14T00:05:00Z')
+        ci.source.cache_clear()
+        docs = dict(run, referenced_workflows=[])
+        def documentation(path, array=False):
+            if path == '/actions/runs/123':
+                return docs
+            if path == '/pulls/1':
+                return request
+            if path == '/pulls/1/files?per_page=100&page=1':
+                self.assertTrue(array)
+                return [dict(status='modified', filename='README.md')]
+            self.fail('Unexpected API request: ' + path)
+        with patch.object(ci, 'api', side_effect=documentation), \
+                patch.object(time, 'sleep', side_effect=AssertionError('Unselected CI waited')), \
+                self.assertRaises(ci.NotSelected):
+            ci.source()
+        ci.source.cache_clear()
+        without_reference = dict(run, event='push', pull_requests=[], referenced_workflows=[])
+        with patch.object(ci, 'api', return_value=without_reference), self.assertRaises(ci.NotSelected):
+            ci.source()
+        ci.source.cache_clear()
+        with patch.object(ci, 'api', return_value=dict(without_reference, display_title='')), self.assertRaises(network.NetworkError):
+            ci.source()
+        for started in (None, 'invalid'):
+            response = dict(run, event='push', run_started_at=started)
+            with self.subTest(started=started), patch.object(ci, 'api', return_value=response), \
+                    self.assertRaisesRegex(network.NetworkError, 'CI attempt has no valid start time'):
+                ci.source()
+
+    def test_controller_uses_trusted_change_selection(self):
+        run = dict(event='pull_request', pull_requests=[dict(
+            number=1, base=dict(sha='a' * 40, repo=dict(id=266877886)),
+            head=dict(sha='b' * 40, repo=dict(id=999)))])
+        request = dict(number=1, base=dict(sha='a' * 40, repo=dict(id=266877886)),
+                       head=dict(sha='b' * 40, repo=dict(id=999)))
+        def files(items, current=request):
+            def response(path, array=False):
+                if path == '/pulls/1':
+                    return current
+                if path == '/pulls/1/files?per_page=100&page=1':
+                    self.assertTrue(array)
+                    return items
+                self.fail('Unexpected API request: ' + path)
+            return response
+        with patch.object(ci, 'api', side_effect=files([dict(status='modified', filename='README.md')])):
+            self.assertFalse(ci.selected(run))
+        with patch.object(ci, 'api', side_effect=files([dict(status='modified', filename='receiver.c')])):
+            self.assertTrue(ci.selected(run))
+        renamed = [dict(status='renamed', filename='README.md', previous_filename='receiver.c')]
+        with patch.object(ci, 'api', side_effect=files(renamed)):
+            self.assertTrue(ci.selected(run))
+        stale = dict(request, head=dict(sha='c' * 40, repo=dict(id=999)))
+        with patch.object(ci, 'api', side_effect=files([], stale)):
+            self.assertTrue(ci.selected(run))
+        malformed = [dict(status='renamed', filename='README.md')]
+        with patch.object(ci, 'api', side_effect=files(malformed)):
+            self.assertTrue(ci.selected(run))
+
+    def test_api_preserves_the_expected_json_shape(self):
+        ci.api_cache.clear()
+        self.addCleanup(ci.api_cache.clear)
+        expected = [dict(status='modified', filename='README.md')]
+        with patch.object(ci, 'fetch', return_value=(json.dumps(expected).encode(), {})):
+            self.assertEqual(ci.api('/pulls/1/files', array=True), expected)
+        with patch.object(ci, 'fetch', return_value=(b'[]', {})), self.assertRaisesRegex(
+                network.NetworkError, 'JSON object'):
+            ci.api('/actions/runs/1')
+
+    def test_api_retries_transient_reads(self):
+        responses = [network.NetworkError('Read CI identity: connection failed', retryable=True),
+                     network.NetworkError('Read CI identity: HTTP 502', 502, retryable=True),
+                     (b'{"id": 123}', {})]
+        with patch.dict(ci.api_cache, clear=True), patch.object(ci, 'fetch', side_effect=responses) as fetch, \
+                patch.object(time, 'sleep') as sleep:
+            self.assertEqual(ci.api('/actions/runs/123'), {'id': 123})
+        self.assertEqual(fetch.call_count, 3)
+        self.assertEqual(sleep.call_args_list, [call(1), call(2)])
+
+    def test_api_exhausted_retries_do_not_use_cache(self):
+        path = '/actions/runs/123'
+        cached = {(path, False): ('v1', {'id': 123})}
+        unavailable = network.NetworkError('Read CI identity: HTTP 503', 503, retryable=True)
+        with patch.dict(ci.api_cache, cached, clear=True), \
+                patch.object(ci, 'fetch', side_effect=unavailable) as fetch, patch.object(time, 'sleep') as sleep:
+            with self.assertRaisesRegex(network.NetworkError, 'Read CI identity: HTTP 503'):
+                ci.api(path)
+            self.assertEqual(ci.api_cache, cached)
+        self.assertEqual(fetch.call_count, 3)
+        self.assertEqual(sleep.call_args_list, [call(1), call(2)])
+
+    def test_api_does_not_retry_permanent_errors(self):
+        for code in (401, 403, 404):
+            with self.subTest(code=code), patch.dict(ci.api_cache, clear=True), \
+                    patch.object(ci, 'fetch', side_effect=network.NetworkError('Denied', code)) as fetch, \
+                    patch.object(time, 'sleep') as sleep, self.assertRaises(network.NetworkError):
+                ci.api('/actions/runs/123')
+            fetch.assert_called_once()
+            sleep.assert_not_called()
+
+    def test_api_revalidates_cache_after_retry(self):
+        path = '/actions/runs/123'
+        record = {'id': 123}
+        responses = [network.NetworkError('Read CI identity: HTTP 502', 502, retryable=True),
+                     network.NetworkError('Not modified', 304)]
+        with patch.dict(ci.api_cache, {(path, False): ('v1', record)}, clear=True), \
+                patch.object(ci, 'fetch', side_effect=responses) as fetch, patch.object(time, 'sleep') as sleep:
+            self.assertEqual(ci.api(path), record)
+        sent = call(ci.API + path, 'fixture', headers={'If-None-Match': 'v1'}, operation='Read CI identity')
+        self.assertEqual(fetch.call_args_list, [sent, sent])
+        sleep.assert_called_once_with(1)
+
+    def test_controller_discovery_requires_trusted_code_and_exact_attempt(self):
+        origin = dict(self.state, head_sha='b' * 40, display_title='testsuite, ci: rework tests',
+                      attempt_started_at='2026-11-14T00:00:00Z')
+        metadata = dict(self.state, control_run_id='456', control_attempt='1', control_sha='c' * 40)
+        titles = ('Network controller', 'Network CI 123 attempt 2')
+        for title in titles:
+            run = dict(id=456, run_attempt=1, path='.github/workflows/interoperability.yml', head_branch='master',
+                       event='workflow_run', display_title=title, repository=dict(id=266877886),
+                       head_sha='c' * 40, status='in_progress', created_at='2026-11-14T00:00:01Z')
+            with self.subTest(title=title), patch.object(ci, 'source', return_value=origin), \
+                    patch.object(ci, 'api', side_effect=[dict(total_count=1, workflow_runs=[run]),
+                        dict(total_count=1, artifacts=[dict(name='interoperability-context-1', expired=False)])]), \
+                    patch.object(ci, 'download_records', return_value={None: (metadata, b'{}')}):
+                self.assertEqual(ci.controller(), dict(control_run_id='456', control_attempt='1', control_sha='c' * 40))
+        for field, value in dict(head_branch='untrusted', event='pull_request', repository=dict(id=1)).items():
+            with self.subTest(field=field), patch.object(ci, 'source', return_value=origin), \
+                    patch.object(ci, 'api', return_value=dict(
+                        total_count=1, workflow_runs=[dict(run, **{field: value})])), self.assertRaises(network.NetworkError):
+                ci.controller()
+
+    def test_first_controller_context_survives_a_later_duplicate(self):
+        origin = dict(self.state, head_sha='b' * 40, display_title='testsuite, ci: rework tests',
+                      attempt_started_at='2026-11-14T00:00:00Z')
+        run = dict(id=456, run_attempt=1, path='.github/workflows/interoperability.yml', head_branch='master',
+                   event='workflow_run', display_title='Network controller',
+                   repository=dict(id=266877886),
+                   head_sha='c' * 40, status='completed', conclusion='success',
+                   created_at='2026-11-14T00:00:01Z')
+        duplicate = dict(run, id=457, conclusion='failure')
+        metadata = dict(self.state, control_run_id='456', control_attempt='1', control_sha='c' * 40)
+        with patch.object(ci, 'source', return_value=origin), patch.object(ci, 'api', side_effect=[
+                dict(total_count=2, workflow_runs=[duplicate, run]),
+                dict(total_count=1, artifacts=[dict(name='interoperability-context-1', expired=False)])]), \
+                patch.object(ci, 'download_records', return_value={None: (metadata, b'{}')}):
+            self.assertEqual(ci.controller()['control_run_id'], '456')
+
+    def test_controller_context_reuses_artefact_listing(self):
+        origin = dict(self.state, attempt_started_at='2026-11-14T00:00:00Z')
+        controller = dict(id=456, run_attempt=1, path='.github/workflows/interoperability.yml', head_branch='master',
+                          event='workflow_run', display_title='Network controller', repository=dict(id=266877886),
+                          head_sha='c' * 40, status='in_progress', created_at='2026-11-14T00:00:01Z')
+        runs = dict(total_count=1, workflow_runs=[controller])
+        listing = dict(total_count=1, artifacts=[dict(id=900, name='interoperability-context-attempt-1', expired=False)])
+        context = dict(self.state, control_run_id='456', control_attempt='1', control_sha='c' * 40)
+        buffer = io.BytesIO()
+        with zipfile.ZipFile(buffer, 'w') as archive:
+            archive.writestr('context.json', json.dumps(context))
+
+        discovery = ci.API + '/actions/workflows/interoperability.yml/runs?'
+        artefacts = ci.API + '/actions/runs/456/artifacts?per_page=100'
+        download = ci.API + '/actions/artifacts/900/zip'
+        for delayed in (False, True):
+            requests = []
+
+            def fetch(url, *args, **kwargs):
+                requests.append(url)
+                if url.startswith(discovery):
+                    return json.dumps(runs).encode(), {}
+                if url == artefacts:
+                    return json.dumps(listing).encode(), {}
+                if url == download:
+                    if delayed and requests.count(download) == 1:
+                        raise network.NetworkError('Archive not ready', 404)
+                    return buffer.getvalue(), {}
+                self.fail('Unexpected API request: ' + url)
+
+            with self.subTest(delayed=delayed), patch.dict(ci.api_cache, clear=True), \
+                    patch.object(ci, 'source', return_value=origin), patch.object(ci, 'fetch', side_effect=fetch), \
+                    patch.object(network, 'fetch', side_effect=fetch), patch.object(time, 'sleep'):
+                self.assertEqual(ci.controller()['control_run_id'], '456')
+                expected = [artefacts, download, artefacts, download] if delayed else [artefacts, download]
+                self.assertTrue(requests[0].startswith(discovery))
+                self.assertEqual(requests[1:], expected)
+
+    def test_controller_listing_is_scoped_to_the_ci_attempt(self):
+        origin = dict(self.state, head_sha='b' * 40, display_title='current',
+                      created_at='2026-11-14T00:00:00Z', attempt_started_at='2026-11-14T00:00:20Z')
+        unrelated = [dict(id=500 + index, created_at='2026-11-14T00:00:30Z',
+                          display_title='other') for index in range(20)]
+        current = dict(id=456, run_attempt=1, path='.github/workflows/interoperability.yml',
+                       head_branch='master', event='workflow_run', display_title='Network controller',
+                       repository=dict(id=266877886), head_sha='c' * 40, status='in_progress',
+                       created_at='2026-11-14T00:00:21Z')
+        older = dict(current, id=455, created_at='2026-11-14T00:00:19Z')
+        artifact = dict(total_count=1, artifacts=[dict(name='interoperability-context-1', expired=False)])
+        metadata = dict(self.state, control_run_id='456', control_attempt='1', control_sha='c' * 40)
+        with patch.object(ci, 'source', return_value=origin), patch.object(ci, 'api', side_effect=[
+                dict(total_count=22, workflow_runs=unrelated),
+                dict(total_count=22, workflow_runs=[current, older]), artifact]) as api, \
+                patch.object(ci, 'download_records', return_value={None: (metadata, b'{}')}):
+            self.assertEqual(ci.controller()['control_run_id'], '456')
+        self.assertIn('per_page=20&page=1', api.call_args_list[0][0][0])
+        self.assertIn('per_page=20&page=2', api.call_args_list[1][0][0])
+        for request in api.call_args_list[:2]:
+            self.assertIn('created=%3E%3D2026-11-14T00%3A00%3A20Z', request[0][0])
+        self.assertEqual(api.call_args_list[2][0][0], '/actions/runs/456/artifacts?per_page=100')
+
+    def test_controller_title_collision_uses_the_context_identity(self):
+        origin = dict(self.state, head_sha='b' * 40, display_title='same title',
+                      attempt_started_at='2026-11-14T00:00:00Z')
+        run = dict(run_attempt=1, path='.github/workflows/interoperability.yml', head_branch='master',
+                   event='workflow_run', display_title='Network controller',
+                   repository=dict(id=266877886), head_sha='c' * 40, status='in_progress',
+                   created_at='2026-11-14T00:00:01Z')
+        stale, current = dict(run, id=455), dict(run, id=456)
+        stale_metadata = dict(self.state, run_id='122', control_run_id='455',
+                              control_attempt='1', control_sha='c' * 40)
+        current_metadata = dict(self.state, control_run_id='456', control_attempt='1', control_sha='c' * 40)
+        for name in ('interoperability-context-attempt-1', 'interoperability-context-1'):
+            artifact = dict(total_count=1, artifacts=[dict(name=name, expired=False)])
+            with self.subTest(name=name), patch.object(ci, 'source', return_value=origin), \
+                    patch.object(ci, 'api', side_effect=[
+                        dict(total_count=2, workflow_runs=[current, stale]), artifact, artifact]), \
+                    patch.object(ci, 'download_records', side_effect=[
+                        {None: (stale_metadata, b'{}')}, {None: (current_metadata, b'{}')}]) as download, \
+                    patch.object(time, 'sleep'):
+                self.assertEqual(ci.controller()['control_run_id'], '456')
+            self.assertEqual(download.call_args[0][:2], ('456', {name: None}))
+
+    def test_controller_listing_rejects_invalid_or_truncated_results(self):
+        origin = dict(self.state, head_sha='b' * 40, attempt_started_at='2026-11-14T00:00:00Z')
+        recent = dict(id=500, created_at='2026-11-14T00:00:30Z', display_title='other')
+        invalid = [dict(workflow_runs=[]), dict(total_count=1, workflow_runs=None),
+                   dict(total_count=21, workflow_runs=[recent] * 21),
+                   dict(total_count=1, workflow_runs=[dict(recent, created_at='invalid')])]
+        for value in invalid:
+            with self.subTest(listing=value), patch.object(ci, 'source', return_value=origin), \
+                    patch.object(ci, 'api', return_value=value), \
+                    self.assertRaisesRegex(network.NetworkError, 'Invalid controller run listing'):
+                ci.find_controller()
+        with patch.object(ci, 'source', return_value=origin), \
+                patch.object(ci, 'api', return_value=dict(total_count=101, workflow_runs=[recent] * 20)) as api, \
+                self.assertRaisesRegex(network.NetworkError, 'Controller run listing exceeds limit'):
+            ci.find_controller()
+        self.assertEqual(api.call_count, 5)
+
+    def test_duplicate_controller_never_issues_another_enrolment(self):
+        output = self.root / 'output'
+        with patch.object(sys, 'argv', ['interop-broker.py', 'metadata', '--root', str(self.root)]), \
+                patch.dict(os.environ, GITHUB_OUTPUT=str(output)), patch.dict(broker['main'].__globals__,
+                    find_controller=lambda **kwargs: dict(id=111),
+                    Tailnet=lambda: self.fail('Duplicate controller obtained network authority')):
+            self.assertEqual(broker['main'](), 0)
+        self.assertEqual(output.read_text(), 'enabled=false\n')
+        self.assertFalse((self.root / 'context.json').exists())
+
+    def test_controller_event_is_bound_to_repository_and_workflow(self):
+        for field in ('path', 'owner', 'repository'):
+            event = copy.deepcopy(self.event)
+            if field == 'path':
+                event['workflow']['path'] = '.github/workflows/other.yml'
+            elif field == 'owner':
+                event['repository']['owner']['id'] = 1
+            else:
+                event['repository']['id'] = 1
+            (self.root / 'event.json').write_text(json.dumps(event))
+            with self.subTest(field=field), self.assertRaises(network.NetworkError):
+                network.workflow_event()
+
+    def test_endpoints_cannot_request_oidc(self):
+        for key in ('ACTIONS_ID_TOKEN_REQUEST_URL', 'ACTIONS_ID_TOKEN_REQUEST_TOKEN'):
+            with self.subTest(key=key), patch.dict(os.environ, {key: 'fixture'}), self.assertRaises(network.NetworkError):
+                enrol.generate(self.root, 'linux', self.state)
+        self.assertFalse((self.root / 'enrol-private.pem').exists())
+
+    def test_enrolment_rejects_replay_and_tampering(self):
+        enrol.generate(self.root, 'linux', self.state)
+        public = json.loads((self.root / 'public-key.json').read_text())
+        record = enrol.seal(self.root, 'linux', public, 'key1', 'tskey-auth-fixture', self.state)
+        for field, value in dict(role='macos', run_attempt='1', source_sha='b' * 40,
+                                 public_key_sha256='0' * 64, encrypted_key='A' * 512).items():
+            with self.subTest(field=field), self.assertRaises(ValueError):
+                enrol.decrypt(self.root, 'linux', dict(record, **{field: value}), self.state)
+        self.assertFalse((self.root / 'enrol-key').exists())
+
+    def test_auth_key_scope(self):
+        with patch.object(network, 'exchange', return_value='fixture'), patch.object(network, 'fetch',
+                return_value=(b'{"id":"key1","key":"tskey-auth-fixture"}', {})) as fetch:
+            network.Tailnet().create_key('linux', self.state)
+        payload = json.loads(fetch.call_args[0][2])
+        self.assertEqual(payload['expirySeconds'], 900)
+        self.assertEqual(payload['description'], 'ci-123-2-linux')
+        self.assertEqual(payload['capabilities']['devices']['create'],
+                         dict(reusable=False, ephemeral=True, preauthorized=True, tags=[QUARANTINE]))
+
+    def test_readiness_is_unique_and_frozen_before_admission(self):
+        class API:
+            def devices(api):
+                return self.devices
+        with patch.dict(broker['prepare'].__globals__, records=lambda *args: self.nodes):
+            broker['prepare'](self.root, API())
+        lease = broker['load'](self.root, 'lease')
+        self.assertEqual(set(lease['nodes']), set(ROLES))
+        self.assertEqual(len(lease['grant']['src']), 7)
+        for field, value in dict(key_id='other', oidc_available=True, node_id='foreign').items():
+            nodes = copy.deepcopy(self.nodes)
+            nodes['linux'][field] = value
+            with self.subTest(field=field), patch.dict(broker['prepare'].__globals__, records=lambda *args: nodes), self.assertRaises(network.NetworkError):
+                broker['prepare'](self.root, API())
+
+    def test_cleanup_preserves_foreign_policy_and_devices(self):
+        own = dict(src=['100.64.0.1'], dst=['100.64.0.1'], ip=list(PORTS))
+        foreign = dict(src=['100.64.1.1'], dst=['100.64.1.1'], ip=list(PORTS))
+        class API:
+            policy = dict(acls=[], grants=[own, foreign])
+            deleted = []
+            def devices(api):
+                return [dict(id='new', nodeId='foreign', addresses=['100.64.0.1'])]
+            def change(api, transform):
+                api.policy = transform(api.policy)
+            def delete(api, key):
+                api.deleted.append(key)
+            def delete_key(api, key):
+                api.deleted.append(key)
+        api = API()
+        broker['cleanup'](api, dict(grant=own, devices=[dict(node_id='old', device_id='old')], keys={'linux': 'key1'}))
+        self.assertEqual(api.policy['grants'], [foreign])
+        self.assertEqual(api.deleted, ['key1'])
+
+    def test_cleanup_never_deletes_a_reassigned_device_id(self):
+        class API:
+            def devices(api):
+                return [dict(id='old', nodeId=actual)]
+            def change(api, transform):
+                transform(dict(acls=[], grants=[]))
+            def delete(api, key):
+                self.fail('Foreign device was deleted')
+            def delete_key(api, key):
+                pass
+        lease = dict(grant=dict(src=['100.64.0.1'], dst=['100.64.0.1'], ip=list(PORTS)),
+                     devices=[dict(node_id='own', device_id='old')], keys={})
+        for actual in ('foreign', None):
+            with self.subTest(actual=actual), self.assertRaisesRegex(network.NetworkError, 'identity changed'):
+                broker['cleanup'](API(), lease)
+
+    def test_cleanup_attempts_all_owned_resources_after_policy_failure(self):
+        calls = []
+        inventories = iter(([dict(id='1', nodeId='n1'), dict(id='2', nodeId='n2')], []))
+        class API:
+            def devices(api):
+                return next(inventories)
+            def change(api, transform):
+                raise network.NetworkError('Policy update failed')
+            def delete(api, key):
+                calls.append(key)
+                if key == '1':
+                    raise network.NetworkError('Device removal failed')
+            def delete_key(api, key):
+                calls.append(key)
+        lease = dict(grant={}, devices=[dict(node_id='n1', device_id='1'), dict(node_id='n2', device_id='2')], keys={'linux': 'key1'})
+        with self.assertRaises(network.NetworkError):
+            broker['cleanup'](API(), lease)
+        self.assertEqual(calls, ['1', '2', 'key1'])
+
+    def test_finish_without_enrolment_needs_no_network_cleanup(self):
+        (self.root / 'keys.json').unlink()
+        with patch.object(sys, 'argv', ['interop-broker.py', 'finish', '--root', str(self.root)]), \
+                patch.dict(broker['main'].__globals__, identity=lambda: self.state,
+                           Tailnet=lambda: self.fail('Empty cleanup obtained network authority')):
+            self.assertEqual(broker['main'](), 0)
+        result = json.loads((self.root / 'result.json').read_text())
+        self.assertEqual(result, dict(self.state, passed=False, cleaned=True, roles=[]))
+
+    def test_finish_reports_transfer_failure_after_proven_cleanup(self):
+        lease = dict(nodes={role: dict(node_id=role) for role in ROLES}, devices=[], keys={}, grant={})
+        broker['save'](self.root, 'lease', **lease)
+        cleanup = Mock()
+        with patch.object(sys, 'argv', ['interop-broker.py', 'finish', '--root', str(self.root)]), \
+                patch.dict(broker['main'].__globals__,
+                           records=Mock(side_effect=ci.PeerUnavailable('fixture failure')),
+                           cleanup=cleanup, Tailnet=Mock(return_value=object())), \
+                patch('sys.stderr', new_callable=io.StringIO):
+            self.assertEqual(broker['main'](), 0)
+        cleanup.assert_called_once()
+        result = json.loads((self.root / 'result.json').read_text())
+        self.assertEqual(result, dict(self.state, passed=False, cleaned=True, roles=list(ROLES)))
+
+    def test_interrupted_key_creation_is_not_empty_cleanup(self):
+        (self.root / 'keys.json').unlink()
+        def issue(role, state):
+            self.assertEqual(broker['load'](self.root, 'keys')['keys'], {})
+            raise network.NetworkError('Key response lost')
+        api = Mock()
+        api.policy.return_value = ({}, {})
+        api.create_key.side_effect = issue
+        recipients = {role: {'public_key': role} for role in ROLES}
+        with patch.dict(broker['main'].__globals__, identity=lambda: self.state, Tailnet=lambda: api,
+                        records=lambda *args, **kwargs: recipients, check_policy=lambda policy: None), \
+                patch('sys.stderr', new_callable=io.StringIO):
+            for phase in ('broker', 'finish'):
+                with patch.object(sys, 'argv', ['interop-broker.py', phase, '--root', str(self.root)]):
+                    self.assertEqual(broker['main'](), 1)
+        self.assertFalse((self.root / 'result.json').exists())
+
+    def test_failed_endpoints_disable_the_controller_before_authority(self):
+        output = self.root / 'output'
+        jobs = dict(total_count=1, jobs=[dict(name='Interoperability / FreeBSD', conclusion='failure')])
+        with patch.object(sys, 'argv', ['interop-broker.py', 'metadata', '--root', str(self.root)]), \
+                patch.dict(os.environ, GITHUB_OUTPUT=str(output)), \
+                patch.object(ci, 'api', side_effect=[dict(run_attempt=2, status='in_progress'), jobs]), \
+                patch.dict(broker['main'].__globals__, check_ci=ci.check_ci,
+                           Tailnet=lambda: self.fail('Failed cohort obtained network authority')):
+            self.assertEqual(broker['main'](), 0)
+        self.assertEqual(output.read_text(), 'enabled=false\n')
+        self.assertFalse((self.root / 'context.json').exists())
+
+    def test_startup_wait_precedes_network_authority(self):
+        authority = Mock(side_effect=AssertionError('Startup wait obtained network authority'))
+        recipients = Mock(side_effect=network.NetworkError('Readiness timed out'))
+        check = Mock()
+        with patch.object(sys, 'argv', ['interop-broker.py', 'broker', '--root', str(self.root)]), \
+                patch.dict(broker['main'].__globals__, Tailnet=authority, records=recipients, check_ci=check), \
+                patch('sys.stderr', new_callable=io.StringIO):
+            self.assertEqual(broker['main'](), 1)
+        recipients.assert_called_once_with('public', timeout=ci.STARTUP_TIMEOUT)
+        check.assert_not_called()
+        authority.assert_not_called()
+
+    def test_cancelled_startup_never_obtains_network_authority(self):
+        authority = Mock(side_effect=AssertionError('Cancelled startup obtained network authority'))
+        recipients = {role: dict(public_key=role) for role in ROLES}
+        check = Mock(side_effect=ci.NotSelected('CI finished during startup'))
+        with patch.object(sys, 'argv', ['interop-broker.py', 'broker', '--root', str(self.root)]), \
+                patch.dict(broker['main'].__globals__, Tailnet=authority, check_ci=check,
+                           records=Mock(return_value=recipients)), \
+                patch('sys.stderr', new_callable=io.StringIO):
+            self.assertEqual(broker['main'](), 1)
+        authority.assert_not_called()
+
+    def test_cancelled_key_issuance_is_cleaned_before_delivery(self):
+        api = Mock()
+        api.policy.return_value = ({}, {})
+        api.create_key.return_value = ('key1', 'tskey-auth-fixture')
+        check = Mock(side_effect=[None, None, ci.NotSelected('CI finished')])
+        recipients = {role: {'public_key': role} for role in ROLES}
+        with patch.dict(broker['main'].__globals__, Tailnet=lambda: api, check_ci=check,
+                        records=lambda *args, **kwargs: recipients, check_policy=lambda policy: None,
+                        seal=lambda *args: {'fixture': True}), patch('sys.stderr', new_callable=io.StringIO):
+            with patch.object(sys, 'argv', ['interop-broker.py', 'broker', '--root', str(self.root)]):
+                self.assertEqual(broker['main'](), 1)
+            with patch.object(sys, 'argv', ['interop-broker.py', 'finish', '--root', str(self.root)]):
+                self.assertEqual(broker['main'](), 0)
+        api.create_key.assert_called_once()
+        api.delete_key.assert_called_once_with('key1')
+        self.assertFalse((self.root / 'enrolment.json').exists())
+        self.assertEqual(json.loads((self.root / 'result.json').read_text()),
+                         dict(self.state, passed=False, cleaned=True, roles=[]))
+
+    def test_delivered_enrolment_without_a_lease_requires_reconciliation(self):
+        broker['save'](self.root, 'keys', keys={'linux': 'key1'}, pending=None)
+        (self.root / 'enrolment.json').write_text('{}')
+        api = Mock()
+        with patch.object(sys, 'argv', ['interop-broker.py', 'finish', '--root', str(self.root)]), \
+                patch.dict(broker['main'].__globals__, Tailnet=lambda: api), \
+                patch('sys.stderr', new_callable=io.StringIO) as errors:
+            self.assertEqual(broker['main'](), 1)
+        api.delete_key.assert_called_once_with('key1')
+        self.assertIn('devices need reconciliation', errors.getvalue())
+        self.assertFalse((self.root / 'result.json').exists())
+
+    def test_resource_lifecycle_through_admission_and_cleanup(self):
+        owner = self
+        class API:
+            policy_value = dict(acls=[], grants=[])
+            registered = []
+            keys = set()
+            def policy(api):
+                return api.policy_value, {}
+            def create_key(api, role, state):
+                api.keys.add(role)
+                return role, 'tskey-auth-fixture'
+            def devices(api):
+                return api.registered
+            def change(api, transform):
+                api.policy_value = transform(api.policy_value)
+                return {}
+            def delete(api, device_id):
+                api.registered = [node for node in api.registered if node['id'] != device_id]
+            def delete_key(api, key_id):
+                api.keys.remove(key_id)
+        api = API()
+        def records(kind, **kwargs):
+            if kind == 'public':
+                return {role: dict(public_key=role) for role in ROLES}
+            if kind == 'ready':
+                api.registered = copy.deepcopy(owner.devices)
+                return owner.nodes
+            if kind == 'quarantine':
+                return {role: dict(node_id=node['node_id'], passed=True) for role, node in owner.nodes.items()}
+            self.fail('Unexpected lifecycle barrier: ' + kind)
+        with patch.dict(os.environ, GITHUB_OUTPUT=str(self.root / 'output')), \
+                patch.dict(broker['main'].__globals__, Tailnet=lambda: api, records=records,
+                           source=lambda: dict(self.state, head_sha='b' * 40), find_controller=lambda **kwargs: None,
+                           seal=lambda *args: dict(encrypted=True)):
+            for phase in ('metadata', 'broker', 'prepare', 'admit', 'revoke', 'finish'):
+                with patch.object(sys, 'argv', ['interop-broker.py', phase, '--root', str(self.root)]):
+                    self.assertEqual(broker['main'](), 0, phase)
+                if phase == 'admit':
+                    self.assertEqual(len(api.policy_value['grants']), 1)
+                    self.assertEqual(len(api.registered), len(ROLES))
+            self.assertTrue((self.root / 'enrolment.json').exists())
+        self.assertEqual(api.policy_value['grants'], [])
+        self.assertEqual(api.registered, [])
+        self.assertEqual(api.keys, set())
+        self.assertEqual(json.loads((self.root / 'result.json').read_text()),
+                         dict(self.state, passed=False, cleaned=True, roles=list(ROLES)))
+
+    def test_key_cleanup_attempts_every_recorded_key(self):
+        broker['save'](self.root, 'keys', keys={'linux': 'key1', 'freebsd': 'key2'}, pending=None)
+        api = Mock()
+        api.delete_key.side_effect = [network.NetworkError('Revocation failed'), None]
+        with patch.object(sys, 'argv', ['interop-broker.py', 'finish', '--root', str(self.root)]), \
+                patch.dict(broker['main'].__globals__, Tailnet=lambda: api), \
+                patch('sys.stderr', new_callable=io.StringIO):
+            self.assertEqual(broker['main'](), 1)
+        self.assertEqual(api.delete_key.call_count, 2)
+        self.assertFalse((self.root / 'result.json').exists())
+
+    def test_verify_without_tailnet(self):
+        broker['save'](self.root, 'lease', nodes=self.nodes)
+        verify = Mock()
+        read = Mock(return_value=self.nodes)
+        check = Mock()
+        authority = Mock(side_effect=AssertionError('Read-only verification requested authority'))
+        with patch.object(sys, 'argv', ['interop-broker.py', 'verify', '--root', str(self.root)]), \
+                patch.dict(broker['main'].__globals__, records=read, verify_cases=verify, check_ci=check, Tailnet=authority):
+            self.assertEqual(broker['main'](), 0)
+        read.assert_called_once_with('result', timeout=1800)
+        verify.assert_called_once_with(self.nodes, self.state['source_sha'])
+        check.assert_not_called()
+        authority.assert_not_called()
+        self.assertTrue(json.loads((self.root / 'verified.json').read_text())['passed'])
+
+    def test_verify_rejects_an_untrusted_workflow(self):
+        broker['save'](self.root, 'lease', nodes=self.nodes)
+        read = Mock(side_effect=AssertionError('Untrusted workflow read transfer receipts'))
+        with patch.object(sys, 'argv', ['interop-broker.py', 'verify', '--root', str(self.root)]), \
+                patch.dict(os.environ, GITHUB_REF='refs/heads/other'), \
+                patch.dict(broker['main'].__globals__, records=read,
+                           Tailnet=lambda: self.fail('Untrusted workflow requested authority')), \
+                patch('sys.stderr', new_callable=io.StringIO) as errors:
+            self.assertEqual(broker['main'](), 1)
+        self.assertIn('Unexpected CI context', errors.getvalue())
+        self.assertFalse((self.root / 'verified.json').exists())
+
+    def test_first_liveness_check_does_not_assume_runner_uptime(self):
+        def downloading(*args, **kwargs):
+            kwargs['progress']()
+            self.fail('Failed endpoint was ignored on the first poll')
+        jobs = dict(total_count=1, jobs=[dict(name='Interoperability / FreeBSD', conclusion='failure')])
+        with patch.object(ci, 'api', side_effect=[dict(run_attempt=2, status='in_progress'), jobs]), \
+                patch.object(ci, 'download_records', side_effect=downloading), \
+                patch.object(time, 'monotonic', return_value=1), \
+                self.assertRaisesRegex(ci.PeerUnavailable, 'FreeBSD'):
+            ci.records('public')
+
+    def test_stopped_controller_ends_waits_but_result_remains_readable(self):
+        def downloading(*args, **kwargs):
+            kwargs['progress']()
+            return {None: (self.state, b'{}')}
+        control = dict(control_run_id='456', control_attempt='1', control_sha='c' * 40)
+        responses = [dict(run_attempt=2, status='in_progress'), dict(total_count=0, jobs=[]),
+                     dict(controller_run(), status='completed')]
+        with patch.object(ci, 'api', side_effect=responses), patch.object(time, 'monotonic', return_value=1), \
+                patch.object(ci, 'download_records', side_effect=downloading), \
+                self.assertRaisesRegex(ci.PeerUnavailable, 'controller has stopped'):
+            ci.records('enrolment', (None,), control)
+        with patch.object(ci, 'api', side_effect=responses[:2]), patch.object(time, 'monotonic', return_value=1), \
+                patch.object(ci, 'download_records', side_effect=downloading):
+            self.assertEqual(ci.records('result', (None,), control), {None: self.state})
+
+    def test_controller_pin_requires_live_attempt_and_revision(self):
+        def downloading(*args, **kwargs):
+            kwargs['progress']()
+            self.fail('Different controller reached artifact download')
+
+        control = dict(control_run_id='456', control_attempt='1', control_sha='c' * 40)
+        current = [dict(run_attempt=2, status='in_progress'), dict(total_count=0, jobs=[])]
+        for change in (dict(run_attempt=2), dict(head_sha='d' * 40), dict(head_branch='untrusted')):
+            with self.subTest(change=change), \
+                    patch.object(ci, 'api', side_effect=current + [dict(controller_run(), **change)]), \
+                    patch.object(ci, 'download_records', side_effect=downloading), \
+                    self.assertRaisesRegex(network.NetworkError, 'Controller'):
+                ci.records('topology', (None,), control)
+
+    def test_recovery_handles_completed_and_unstarted_controllers(self):
+        run = dict(id=456, run_attempt=1, path='.github/workflows/interoperability.yml', head_branch='master',
+                   event='workflow_run', head_sha='c' * 40, repository=dict(id=266877886),
+                   status='completed', conclusion='failure')
+        completed = dict(name='Admission and cleanup', run_id=456, run_attempt=1, status='completed',
+                         steps=[dict(name='Verify revocation and remove devices', conclusion='success')])
+        variants = [dict(total_count=1, jobs=[completed]), dict(total_count=0, jobs=[])]
+        for listing in variants:
+            responses = [(json.dumps(run).encode(), {}), (json.dumps(listing).encode(), {})]
+            with self.subTest(listing=listing), \
+                    patch.dict(os.environ, INTEROP_RECOVER_RUN='456', INTEROP_RECOVER_ATTEMPT='1'), \
+                    patch.object(network, 'fetch', side_effect=responses), \
+                    patch.dict(broker['recover'].__globals__,
+                               download_records=lambda *args, **kwargs: self.fail('Clean controller requested a lease'),
+                               Tailnet=lambda: self.fail('Clean controller obtained network authority')):
+                broker['recover'](self.root)
+
+    def test_recovery_skips_only_explicitly_unattempted_key_issuance(self):
+        run = dict(id=456, run_attempt=1, path='.github/workflows/interoperability.yml', head_branch='master',
+                   event='workflow_run', head_sha='c' * 40, repository=dict(id=266877886),
+                   status='completed', conclusion='failure')
+        step = dict(name='Issue single-use enrolment keys', status='completed', conclusion='skipped')
+        job = dict(name='Admission and cleanup', run_id=456, run_attempt=1, status='completed', steps=[step])
+        variants = [(job, True), (dict(job, run_id=999), False), (dict(job, run_attempt=2), False),
+                    (dict(job, name='other'), False), (dict(job, status='in_progress'), False),
+                    (dict(job, steps=[]), False), (dict(job, steps=[step, step]), False),
+                    (dict(job, steps=[dict(step, status='in_progress')]), False)]
+        variants += [(dict(job, steps=[dict(step, conclusion=value)]), False)
+                     for value in ('success', 'failure', 'cancelled', None)]
+        for candidate, skipped in variants:
+            responses = [(json.dumps(run).encode(), {}),
+                         (json.dumps(dict(total_count=1, jobs=[candidate])).encode(), {})]
+            responses.append((b'{"total_count":0,"artifacts":[]}', {}))
+            with self.subTest(job=candidate), \
+                    patch.dict(os.environ, INTEROP_RECOVER_RUN='456', INTEROP_RECOVER_ATTEMPT='1'), \
+                    patch.object(network, 'fetch', side_effect=responses), \
+                    patch.dict(broker['recover'].__globals__,
+                               download_records=Mock(side_effect=network.NetworkError('lease required')),
+                               Tailnet=lambda: self.fail('Unverified recovery obtained network authority')):
+                if skipped:
+                    broker['recover'](self.root)
+                else:
+                    with self.assertRaisesRegex(network.NetworkError, 'lease required'):
+                        broker['recover'](self.root)
+
+    def test_recovery_verifies_exact_bytes_before_any_mutation(self):
+        run = dict(id=456, run_attempt=1, path='.github/workflows/interoperability.yml',
+                   head_branch='master', event='workflow_run', head_sha='c' * 40, repository=dict(id=266877886),
+                   status='completed', conclusion='failure')
+        lease = dict(self.state, control_run_id='456', control_attempt='1', control_sha='c' * 40)
+        raw = json.dumps(lease, indent=4).encode()
+        env = dict(INTEROP_RECOVER_RUN='456', INTEROP_RECOVER_ATTEMPT='1',
+                   ACTIONS_ID_TOKEN_REQUEST_TOKEN='fixture-not-forwarded')
+        def verified(argv, **kwargs):
+            self.assertEqual(Path(argv[3]).read_bytes(), raw)
+            self.assertNotIn('ACTIONS_ID_TOKEN_REQUEST_TOKEN', kwargs['env'])
+            return subprocess.CompletedProcess(argv, 1)
+        for name in ('interoperability-lease-attempt-1', 'interoperability-lease-1'):
+            artifacts = [dict(name=name, expired=False)]
+            responses = [(json.dumps(run).encode(), {}),
+                         (json.dumps({'total_count': 1, 'jobs': [dict(
+                             name='Admission and cleanup', run_id=456, run_attempt=1,
+                             status='completed', steps=[])]}).encode(), {}),
+                         (json.dumps(dict(total_count=1, artifacts=artifacts)).encode(), {})]
+            download = Mock(return_value={None: (lease, raw)})
+            with self.subTest(name=name), patch.dict(os.environ, env), \
+                    patch.object(network, 'fetch', side_effect=responses), \
+                    patch.dict(broker['recover'].__globals__, download_records=download,
+                               cleanup=lambda *args: self.fail('Mutation preceded attestation')), \
+                    patch.object(subprocess, 'run', side_effect=verified):
+                with self.assertRaisesRegex(network.NetworkError, 'attested'):
+                    broker['recover'](self.root)
+            download.assert_called_once_with('456', {name: None}, timeout=60, initial_listing=artifacts)
+
+    def test_cancelled_or_superseded_ci_aborts_rendezvous(self):
+        for current in (dict(run_attempt=3), dict(run_attempt=2, conclusion='cancelled'),
+                        dict(run_attempt=2, status='completed')):
+            def downloading(*args, **kwargs):
+                kwargs['progress']()
+                self.fail('Failed CI did not abort')
+            with self.subTest(current=current), patch.object(ci, 'api', return_value=current), \
+                    patch.object(ci, 'download_records', side_effect=downloading), patch.object(time, 'monotonic', return_value=100):
+                with self.assertRaises(network.NetworkError) as caught:
+                    ci.records('ready')
+                self.assertNotIsInstance(caught.exception, ci.PeerUnavailable)
+
+    def test_failed_peer_blocks_rendezvous(self):
+        def downloading(*args, **kwargs):
+            kwargs['progress']()
+            self.fail('Missing peer did not block the phase')
+        for conclusion in ('failure', 'cancelled', 'timed_out', 'action_required'):
+            jobs = dict(total_count=1, jobs=[dict(name='Interoperability / NetBSD', conclusion=conclusion)])
+            with self.subTest(conclusion=conclusion), patch.object(ci, 'api', side_effect=[dict(run_attempt=2), jobs]), \
+                    patch.object(ci, 'download_records', side_effect=downloading), patch.object(time, 'monotonic', return_value=100), \
+                    self.assertRaisesRegex(ci.PeerUnavailable, 'NetBSD'):
+                ci.records('ready')
+
+    def test_failed_controller_blocks_its_dependants(self):
+        for conclusion in ('failure', 'cancelled', 'timed_out'):
+            with self.subTest(conclusion=conclusion), patch.object(ci, 'find_controller', return_value=dict(conclusion=conclusion)), \
+                    self.assertRaisesRegex(ci.PeerUnavailable, 'Network controller failed'):
+                ci.controller()
+
+    def test_invalid_recovery_lease_never_reaches_cleanup(self):
+        run = dict(id=456, run_attempt=1, path='.github/workflows/interoperability.yml', head_branch='master',
+                   event='workflow_run', head_sha='c' * 40, repository=dict(id=266877886),
+                   status='completed', conclusion='failure')
+        lease = dict(self.state, control_run_id='456', control_attempt='2', control_sha='c' * 40)
+        responses = [(json.dumps(run).encode(), {}),
+                     (json.dumps({'total_count': 1, 'jobs': [dict(
+                         name='Admission and cleanup', run_id=456, run_attempt=1,
+                         status='completed', steps=[])]}).encode(), {})]
+        responses.append((b'{"total_count":0,"artifacts":[]}', {}))
+        with patch.dict(os.environ, INTEROP_RECOVER_RUN='456', INTEROP_RECOVER_ATTEMPT='1'), \
+                patch.object(network, 'fetch', side_effect=responses), \
+                patch.dict(broker['recover'].__globals__, download_records=lambda *args, **kwargs: {None: (lease, json.dumps(lease).encode())},
+                           cleanup=lambda *args: self.fail('Stale lease reached cleanup')), \
+                patch.object(subprocess, 'run', return_value=subprocess.CompletedProcess([], 0)):
+            with self.assertRaisesRegex(network.NetworkError, 'attested'):
+                broker['recover'](self.root)
+
+    def test_artifact_archive_retry_and_duplicates(self):
+        record = dict(self.state, role='linux')
+        buffer = io.BytesIO()
+        with zipfile.ZipFile(buffer, 'w') as archive:
+            archive.writestr('ready.json', json.dumps(record))
+        item = dict(name='ready', id=1, expired=False, archive_download_url='https://attacker.invalid')
+        listing = json.dumps(dict(artifacts=[item], total_count=1)).encode()
+        responses = [(listing, {'ETag': 'v1'}), network.NetworkError('Connection failed', retryable=True),
+                     network.NetworkError('Not modified', 304),
+                     network.NetworkError('Service unavailable', 503, retryable=True),
+                     network.NetworkError('Not modified', 304), network.NetworkError('Not ready', 404),
+                     network.NetworkError('Not modified', 304), (buffer.getvalue(), {})]
+        with patch.object(network, 'fetch', side_effect=responses) as fetch, \
+                patch.object(time, 'sleep') as sleep:
+            value = network.download_records('123', {'ready': 'linux'})
+        self.assertEqual(value['linux'][0], record)
+        self.assertEqual(fetch.call_args_list[2][1]['headers'], {'If-None-Match': 'v1'})
+        self.assertEqual(fetch.call_args[0][0], 'https://api.github.com/repos/RsyncProject/rsync/actions/artifacts/1/zip')
+        self.assertEqual(sleep.call_count, 3)
+        for code in (None, 401, 403, 422):
+            with self.subTest(code=code), patch.object(network, 'fetch', side_effect=[(listing, {}), network.NetworkError('Failed', code)]), patch.object(time, 'sleep') as sleep:
+                with self.assertRaises(network.NetworkError):
+                    network.download_records('123', {'ready': 'linux'})
+                sleep.assert_not_called()
+        duplicate = json.dumps(dict(artifacts=[item, dict(item, id=2)], total_count=2)).encode()
+        with patch.object(network, 'fetch', return_value=(duplicate, {})), self.assertRaisesRegex(network.NetworkError, 'Duplicate'):
+            network.download_records('123', {'ready': 'linux'})
+
+    def test_artifact_listing_retries_connection_failures(self):
+        record = dict(self.state, role='linux')
+        buffer = io.BytesIO()
+        with zipfile.ZipFile(buffer, 'w') as archive:
+            archive.writestr('ready.json', json.dumps(record))
+        item = dict(name='ready', id=1, expired=False)
+        listing = json.dumps(dict(artifacts=[item], total_count=1)).encode()
+        responses = [network.NetworkError('Connection failed', retryable=True),
+                     (listing, {}), (buffer.getvalue(), {})]
+        with patch.object(network, 'fetch', side_effect=responses), patch.object(time, 'sleep') as sleep:
+            value = network.download_records('123', {'ready': 'linux'})
+        self.assertEqual(value['linux'][0], record)
+        sleep.assert_called_once_with(5)
+
+    def test_archive_retry_keeps_successful_downloads(self):
+        def archive(artifact_id):
+            buffer = io.BytesIO()
+            with zipfile.ZipFile(buffer, 'w') as archive:
+                archive.writestr('record.json', json.dumps(dict(artifact_id=artifact_id)))
+            return buffer.getvalue(), {}
+
+        for replacement in (False, True):
+            listings, downloads = [], []
+
+            def fetch(url, *args, **kwargs):
+                if '/runs/123/artifacts?' in url:
+                    first = 3 if listings and replacement else 1
+                    listings.append(first)
+                    entries = [dict(id=first, name='one', expired=False), dict(id=2, name='two', expired=False)]
+                    return json.dumps(dict(artifacts=entries, total_count=2)).encode(), {}
+                artifact_id = int(url.split('/')[-2])
+                downloads.append(artifact_id)
+                if artifact_id == 2 and downloads.count(2) == 1:
+                    raise network.NetworkError('Archive not ready', 404)
+                return archive(artifact_id)
+
+            with self.subTest(replacement=replacement), patch.object(network, 'fetch', side_effect=fetch), \
+                    patch.object(time, 'sleep'):
+                result = network.download_records('123', {'one': 'linux', 'two': 'freebsd'})
+                self.assertEqual(listings, [1, 3] if replacement else [1, 1])
+                self.assertEqual(downloads, [1, 2, 3, 2] if replacement else [1, 2, 2])
+                self.assertEqual(result['linux'][0]['artifact_id'], 3 if replacement else 1)
+                self.assertEqual(result['freebsd'][0]['artifact_id'], 2)
+
+    def test_redacted_http_errors(self):
+        class Opener:
+            def open(self, *args, **kwargs):
+                raise urllib.error.HTTPError('https://example.test/private-token', 403, 'private body', {}, io.BytesIO(b'private body'))
+        with patch.object(network.urllib.request, 'build_opener', return_value=Opener()):
+            with self.assertRaises(network.NetworkError) as caught:
+                network.fetch('https://example.test', 'fixture-bearer')
+        self.assertEqual(str(caught.exception), 'Network request: HTTP 403')
+        self.assertEqual(caught.exception.code, 403)
+        self.assertFalse(caught.exception.retryable)
+        with patch.object(network.urllib.request, 'build_opener', return_value=Opener()):
+            with self.assertRaisesRegex(network.NetworkError, 'Worker acl access probe: HTTP 403'):
+                network.fetch('https://example.test', 'fixture-bearer', operation='Worker acl access probe')
+
+    def test_github_rate_limit_diagnostics(self):
+        github = 'https://api.github.com/example'
+        cases = (
+            (github, 403, {}, ''),
+            (github, 403, {'X-RateLimit-Remaining': '0'}, ' (GitHub API rate limit exhausted)'),
+            (github, 403, {'Retry-After': '60'}, ' (GitHub API throttled the request)'),
+            (github, 429, {}, ' (GitHub API throttled the request)'),
+            ('https://example.test', 403, {'X-RateLimit-Remaining': '0'}, ''),
+        )
+        for url, code, headers, hint in cases:
+            error = urllib.error.HTTPError(url, code, 'private detail', headers, io.BytesIO(b'private body'))
+            opener = Mock()
+            opener.open.side_effect = error
+            with self.subTest(url=url, code=code, headers=headers), \
+                    patch.object(network.urllib.request, 'build_opener', return_value=opener):
+                with self.assertRaises(network.NetworkError) as caught:
+                    network.fetch(url, 'fixture-bearer', operation='Read CI identity')
+                self.assertEqual(str(caught.exception), f'Read CI identity: HTTP {code}' + hint)
+                self.assertFalse(caught.exception.retryable)
+
+    def test_connection_errors_are_retryable(self):
+        class Opener:
+            def open(self, *args, **kwargs):
+                raise urllib.error.URLError('fixture connection failure')
+        with patch.object(network.urllib.request, 'build_opener', return_value=Opener()), \
+                self.assertRaises(network.NetworkError) as caught:
+            network.fetch('https://example.test', 'fixture-bearer')
+        self.assertTrue(caught.exception.retryable)
+        self.assertEqual(str(caught.exception), 'Network request: connection failed')
+
+    def test_transient_http_errors_are_retryable(self):
+        class Opener:
+            def __init__(self, code):
+                self.code = code
+            def open(self, request, **kwargs):
+                raise urllib.error.HTTPError(request.full_url, self.code, 'fixture', {}, io.BytesIO())
+        for code in network.RETRYABLE_HTTP:
+            with self.subTest(code=code), \
+                    patch.object(network.urllib.request, 'build_opener', return_value=Opener(code)), \
+                    self.assertRaises(network.NetworkError) as caught:
+                network.fetch('https://example.test')
+            self.assertEqual(caught.exception.code, code)
+            self.assertTrue(caught.exception.retryable)
+
+    def test_artifact_redirect_drops_authorisation(self):
+        requests = []
+        class Response:
+            headers = {}
+            def __enter__(self):
+                return self
+            def __exit__(self, *args):
+                pass
+            def read(self, size):
+                return b'{}'
+        class Opener:
+            def open(self, request, **kwargs):
+                requests.append(request)
+                if len(requests) == 1:
+                    raise urllib.error.HTTPError(request.full_url, 302, 'redirect',
+                                                 {'Location': 'https://fixture.blob.core.windows.net/result?fixture=signed'}, io.BytesIO())
+                return Response()
+        with patch.object(network.urllib.request, 'build_opener', return_value=Opener()):
+            network.fetch('https://api.github.com/example', 'fixture-token', allowed_redirect=True)
+        self.assertEqual(requests[0].get_header('Authorization'), 'Bearer fixture-token')
+        self.assertIsNone(requests[1].get_header('Authorization'))
+
+    def test_cas_preserves_other_cohort(self):
+        own = dict(src=['100.64.0.1'], dst=['100.64.0.1'], ip=list(PORTS))
+        foreign = dict(src=['100.64.1.1'], dst=['100.64.1.1'], ip=list(PORTS))
+        initial, concurrent = dict(acls=[], grants=[]), dict(acls=[], grants=[foreign])
+        responses = [(json.dumps(initial).encode(), {'ETag': 'v1'}), network.NetworkError('HTTP 412', 412),
+                     (json.dumps(concurrent).encode(), {'ETag': 'v2'}), (b'{}', {'ETag': 'v3'})]
+        with patch.object(network, 'exchange', return_value='fixture'), patch.object(network, 'fetch', side_effect=responses) as fetch:
+            from interop_policy import update_policy
+            version = network.Tailnet().change(lambda policy: update_policy(policy, own))
+        self.assertEqual(version, dict(before='v2', after='v3'))
+        final = fetch.call_args_list[-1]
+        self.assertEqual(json.loads(final[0][2])['grants'], [foreign, own])
+        self.assertEqual(final[0][3]['If-Match'], 'v2')
+        self.assertTrue(all(call[0][0] == 'https://api.tailscale.com/api/v2/tailnet/-/acl' for call in fetch.call_args_list))
+        with patch.object(network, 'exchange', return_value='fixture'), patch.object(network, 'fetch', return_value=(b'{}', {})):
+            with self.assertRaises(network.NetworkError):
+                network.Tailnet().change(lambda value: value)
+
+
+class Startup(unittest.TestCase):
+    def setUp(self):
+        self.state = dict(run_id='123', run_attempt='2', source_sha='a' * 40)
+        ci.bind(self.state)
+        self.addCleanup(setattr, ci, 'bound', None)
+        self.now = 0
+        self.starts = [0, 0, 0, 1200, 1500, 1900, 2050]
+        self.ready_at = 2200
+        self.current = dict(run_attempt=2, status='in_progress')
+        self.controller = controller_run()
+        self.control = dict(control_run_id='456', control_attempt='1', control_sha='c' * 40)
+        self.record = self.state
+        self.mutate_jobs = lambda jobs: jobs
+        self.transient = False
+        self.churn = False
+
+    def jobs(self):
+        return self.mutate_jobs([
+            dict(id=index + 1, name='Interoperability / ' + role, run_id=123, run_attempt=2,
+                 status='in_progress' if self.now >= start else 'queued', conclusion=None,
+                 started_at='2026-11-17T00:00:00Z' if self.now >= start else None)
+            for index, (role, start) in enumerate(zip(ROLES, self.starts))])
+
+    def api(self, path):
+        if path == '/actions/runs/123':
+            return self.current
+        if path == '/actions/runs/456':
+            return self.controller
+        if path == '/actions/runs/123/attempts/2/jobs?per_page=100':
+            jobs = self.jobs()
+            return dict(total_count=len(jobs), jobs=jobs)
+        self.fail('Unexpected API request: ' + path)
+
+    def wait(self, kind):
+        roles = (None,) if kind == 'enrolment' else ROLES
+        names = {ci.artifact_name(kind, role): index + 1 for index, role in enumerate(roles)}
+        def fetch(url, *args, **kwargs):
+            if '/artifacts?' in url:
+                if self.transient:
+                    raise network.NetworkError('Connection failed', retryable=True)
+                items = [dict(id=number, name=name, expired=False) for name, number in names.items()]
+                if self.now < self.ready_at:
+                    items = [dict(id=int(self.now) + 100, name='unrelated', expired=False)] if self.churn else []
+                return json.dumps(dict(total_count=len(items), artifacts=items)).encode(), {}
+            buffer = io.BytesIO()
+            with zipfile.ZipFile(buffer, 'w') as archive:
+                archive.writestr('record.json', json.dumps(self.record))
+            return buffer.getvalue(), {}
+        def sleep(seconds):
+            self.now += seconds
+        with patch.object(ci, 'api', side_effect=self.api), \
+                patch.object(network, 'fetch', side_effect=fetch), \
+                patch.dict(os.environ, GH_TOKEN='fixture'), \
+                patch.object(time, 'monotonic', side_effect=lambda: self.now), \
+                patch.object(time, 'sleep', side_effect=sleep):
+            return ci.records(kind, roles, self.control if kind == 'enrolment' else None, ci.STARTUP_TIMEOUT)
+
+    def test_late_job_starts_renew_both_startup_waits(self):
+        for kind in ('public', 'enrolment'):
+            with self.subTest(kind=kind):
+                self.now = 0
+                records = self.wait(kind)
+                self.assertEqual(len(records), 1 if kind == 'enrolment' else len(ROLES))
+                self.assertGreaterEqual(self.now, self.ready_at)
+
+    def test_queued_jobs_cannot_extend_the_startup_wait(self):
+        self.starts = [10000] * len(ROLES)
+        self.mutate_jobs = lambda jobs: [dict(job, started_at='2026-11-17T00:00:00Z') for job in jobs]
+        for kind in ('public', 'enrolment'):
+            with self.subTest(kind=kind):
+                self.now = 0
+                with self.assertRaisesRegex(network.NetworkError, 'Timed out'):
+                    self.wait(kind)
+                self.assertEqual(self.now, ci.STARTUP_TIMEOUT)
+
+    def test_each_job_start_renews_only_once(self):
+        self.starts = [1700] * len(ROLES)
+        self.ready_at = 10000
+        with self.assertRaisesRegex(network.NetworkError, 'Timed out'):
+            self.wait('public')
+        self.assertGreater(self.now, ci.STARTUP_TIMEOUT)
+        self.assertLessEqual(self.now, ci.STARTUP_TIMEOUT * 2)
+
+    def test_retries_and_unrelated_artifacts_cannot_renew_startup(self):
+        self.starts = [0] * len(ROLES)
+        for transient, churn in ((True, False), (False, True)):
+            with self.subTest(transient=transient, churn=churn):
+                self.now, self.transient, self.churn = 0, transient, churn
+                with self.assertRaisesRegex(network.NetworkError, 'Timed out'):
+                    self.wait('public')
+                self.assertEqual(self.now, ci.STARTUP_TIMEOUT)
+
+    def test_transfer_deadlines_do_not_follow_job_starts(self):
+        with self.assertRaisesRegex(network.NetworkError, 'Timed out'):
+            self.wait('ready')
+        self.assertEqual(self.now, ci.STARTUP_TIMEOUT)
+
+    def test_delayed_readiness_still_rejects_stale_records(self):
+        self.record = dict(self.state, run_attempt='1')
+        with self.assertRaisesRegex(network.NetworkError, 'different CI run, attempt or revision'):
+            self.wait('public')
+
+    def test_startup_preserves_liveness_checks(self):
+        variants = [(dict(run_attempt=3), self.controller, None, ci.NotSelected),
+                    (dict(run_attempt=2, status='completed'), self.controller, None, ci.NotSelected),
+                    (dict(run_attempt=2, conclusion='cancelled'), self.controller, None, ci.NotSelected),
+                    (self.current, dict(self.controller, status='completed'), None, ci.PeerUnavailable),
+                    (self.current, self.controller, 'failure', ci.PeerUnavailable)]
+        for current, controller, conclusion, error in variants:
+            with self.subTest(current=current, controller=controller, conclusion=conclusion):
+                self.now, self.current, self.controller = 0, current, controller
+                self.mutate_jobs = lambda jobs: [dict(job, conclusion=conclusion) for job in jobs]
+                with self.assertRaises(error):
+                    self.wait('enrolment')
+                self.assertEqual(self.now, 0)
+
+    def test_startup_rejects_ambiguous_job_progress(self):
+        variants = [lambda jobs: jobs + [jobs[0]],
+                    lambda jobs: jobs + [dict(jobs[0], id=99, name='Interoperability / extra')],
+                    lambda jobs: [dict(job, run_id=999) for job in jobs],
+                    lambda jobs: [dict(job, run_attempt=1) for job in jobs],
+                    lambda jobs: [dict(job, id=True) for job in jobs],
+                    lambda jobs: [dict(job, id=1) for job in jobs],
+                    lambda jobs: [dict(job, started_at='invalid') for job in jobs]]
+        self.starts = [0] * len(ROLES)
+        for mutate in variants:
+            with self.subTest(mutate=mutate):
+                self.now, self.mutate_jobs = 0, mutate
+                with self.assertRaisesRegex(network.NetworkError, 'endpoint job'):
+                    self.wait('public')
+                self.assertEqual(self.now, 0)
+
+    def test_changed_job_identity_is_not_new_progress(self):
+        self.starts = [0] * len(ROLES)
+        self.mutate_jobs = lambda jobs: [dict(job, id=job['id'] + int(self.now)) for job in jobs]
+        with self.assertRaisesRegex(network.NetworkError, 'endpoint job'):
+            self.wait('public')
+        self.assertEqual(self.now, 30)
+
+    def test_result_and_other_jobs_cannot_renew_startup(self):
+        self.starts = [0] * len(ROLES)
+        self.mutate_jobs = lambda jobs: jobs + [
+            dict(jobs[0], id=100 + int(self.now), name=name)
+            for name in ('Interoperability / Result', 'Other / endpoint')]
+        with self.assertRaisesRegex(network.NetworkError, 'Timed out'):
+            self.wait('public')
+        self.assertEqual(self.now, ci.STARTUP_TIMEOUT)
+
+
+if __name__ == '__main__':
+    unittest.main()

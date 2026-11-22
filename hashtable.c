@@ -19,7 +19,7 @@
 
 #include "rsync.h"
 
-#define HASH_LOAD_LIMIT(size) ((size)*3/4)
+#define HASH_LOAD_LIMIT(size) ((size)/4*3)	/* /4 first: never overflows int */
 
 struct hashtable *hashtable_create(int size, int key64)
 {
@@ -28,15 +28,25 @@ struct hashtable *hashtable_create(int size, int key64)
 	int node_size = key64 ? sizeof (struct ht_int64_node)
 			      : sizeof (struct ht_int32_node);
 
-	/* Pick a power of 2 that can hold the requested size. */
-	if (size & (size-1) || size < 16) {
+	/* Pick a power of 2 that can hold the requested size.  Test size < 16 first
+	 * so a negative/zero req short-circuits before the size-1 (INT_MIN is UB). */
+	if (size < 16 || (size & (size-1))) {
 		size = 16;
-		while (size < req)
+		while (size < req) {
+			if (size > INT_MAX/2) {	/* the next doubling would overflow int */
+				rprintf(FERROR, "[%s] hashtable_create: requested size %d is too large\n",
+					who_am_i(), req);
+				exit_cleanup(RERR_MALLOC);
+			}
 			size *= 2;
+		}
 	}
 
 	tbl = new(struct hashtable);
-	tbl->nodes = new_array0(char, size * node_size);
+	/* Pass size and node_size as SEPARATE factors so my_alloc's overflow /
+	 * --max-alloc guard sees both; computing size*node_size as int would wrap to
+	 * a tiny count and under-allocate (heap overflow on later node access). */
+	tbl->nodes = my_alloc(do_calloc, size, node_size, __FILE__, __LINE__);
 	tbl->size = size;
 	tbl->entries = 0;
 	tbl->node_size = node_size;
@@ -90,10 +100,15 @@ void *hashtable_find(struct hashtable *tbl, int64 key, void *data_when_new)
 
 	if (data_when_new && tbl->entries > HASH_LOAD_LIMIT(tbl->size)) {
 		void *old_nodes = tbl->nodes;
-		int size = tbl->size * 2;
-		int i;
+		int size, i;
 
-		tbl->nodes = new_array0(char, size * tbl->node_size);
+		if (tbl->size > INT_MAX/2) {	/* doubling would overflow int */
+			rprintf(FERROR, "[%s] hashtable grow: size overflow\n", who_am_i());
+			exit_cleanup(RERR_MALLOC);
+		}
+		size = tbl->size * 2;
+		/* Separate factors so my_alloc's guard sees both (see hashtable_create). */
+		tbl->nodes = my_alloc(do_calloc, size, tbl->node_size, __FILE__, __LINE__);
 		tbl->size = size;
 		tbl->entries = 0;
 
