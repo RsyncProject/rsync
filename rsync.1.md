@@ -2125,6 +2125,9 @@ sign) if you want the local shell to expand it.
     itself.
 
     The receiver must support this option. Older senders can still be used.
+    Combining this option with `--relative --no-implied-dirs` requires
+    protocol 30 or higher because older senders omit the implied parents
+    from the file list.
 
 0.  `--ignore-existing`
 

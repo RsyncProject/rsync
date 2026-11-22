@@ -5,14 +5,15 @@ from harness.daemon import start_test_daemon
 from harness.daemon_config import write_daemon_conf
 from harness.filesystem import assert_same
 from harness.results import test_fail
-from harness.rsync import rsh_cmd, rsync_path_arg, run_rsync
+from harness.rsync import forced_protocol, rsh_cmd, rsync_path_arg, run_rsync
 
 
 DIRECTORIES_ONLY = '--ignore-non-existing-directory'
 
 
 @requires(features={'daemon', 'remote-shell'}, transports={'pipe', 'tcp'},
-          mutates={'environment', 'filesystem', 'process', 'socket'}, tags={'transfer'})
+          min_peer='4.0.0', mutates={'environment', 'filesystem', 'process', 'socket'},
+          tags={'transfer'})
 def test(context: TestContext):
     source = context.source
     for directory in ('present/new-child', 'absent', 'blocked'):
@@ -62,10 +63,21 @@ def test(context: TestContext):
         transfer(label, DIRECTORIES_ONLY, *options, f'{source}/', f'{target}/')
         check(target, deleted=label.startswith('delete-'), existing=label == 'existing')
 
+    protocol = forced_protocol()
+    relative_operands = (f'{source}/./present/update', f'{source}/./absent/item',
+                         f'{source}/./blocked/item')
     for label, extra in (('relative', []), ('no-implied-dirs', ['--no-implied-dirs'])):
         target = destination(label)
-        transfer(label, DIRECTORIES_ONLY, '--relative', *extra, f'{source}/./present/update',
-                 f'{source}/./absent/item', f'{source}/./blocked/item', f'{target}/')
+        args = (DIRECTORIES_ONLY, '--relative', *extra, *relative_operands, f'{target}/')
+        if extra and protocol is not None and protocol < 30:
+            result = run_rsync('-rt', *args, capture_output=True, check=False)
+            if result.returncode != 2 or 'requires protocol 30 or higher' not in result.stderr:
+                test_fail(f'{label}: expected a protocol refusal, got {result.returncode}: {result.stderr}')
+            if (target / 'present' / 'update').read_text() != 'old\n':
+                test_fail(f'{label}: updated a file despite the protocol refusal')
+            check_missing(target)
+            continue
+        transfer(label, *args)
         assert_same(source / 'present' / 'update', target / 'present' / 'update', label=label)
         check_missing(target)
 
