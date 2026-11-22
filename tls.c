@@ -49,6 +49,9 @@ int list_only = 0;
 int link_times = 0;
 int link_owner = 0;
 int nsec_times = 0;
+int safe_symlinks = 0;
+int copy_links = 0;
+int copy_unsafe_links = 0;
 
 #ifdef SUPPORT_XATTRS
 
@@ -124,7 +127,7 @@ static void storetime(char *dest, size_t destsize, time_t t, int nsecs)
 {
 	if (t) {
 		int len;
-		struct tm *mt = gmtime(&t);
+		struct tm tmp, *mt = gmtime_r(&t, &tmp);
 
 		len = snprintf(dest, destsize,
 			" %04d-%02d-%02d %02d:%02d:%02d",
@@ -227,7 +230,7 @@ static void list_file(const char *fname)
 	       mtimebuf, atimebuf, crtimebuf, fname, linkbuf);
 }
 
-static struct poptOption long_options[] = {
+static const struct poptOption long_options[] = {
   /* longName, shortName, argInfo, argPtr, value, descrip, argDesc */
   {"atimes",          'U', POPT_ARG_NONE,   &display_atimes, 0, 0, 0},
 #ifdef SUPPORT_CRTIMES

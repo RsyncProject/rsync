@@ -1,0 +1,36 @@
+#!/usr/bin/env python3
+
+import os
+
+from harness.comparison import check_perms
+from harness.environment import FROMDIR, TODIR
+from harness.rsync import run_rsync
+from harness import metadata
+
+metadata(transports={'pipe'})
+
+FROMDIR.mkdir(parents=True, exist_ok=True)
+(FROMDIR / '1').write_text("#!/bin/sh\necho 'Program One!'\n")
+(FROMDIR / '2').write_text("#!/bin/sh\necho 'Program Two!'\n")
+
+os.chmod(FROMDIR / '1', 0o700)
+os.chmod(FROMDIR / '2', 0o600)
+
+run_rsync('-rvv', f'{FROMDIR}/', f'{TODIR}/')
+
+check_perms(TODIR / '1', 'rwx------')
+check_perms(TODIR / '2', 'rw-------')
+
+os.chmod(FROMDIR / '1', 0o600)
+os.chmod(FROMDIR / '2', 0o601)
+os.chmod(TODIR / '2', 0o604)
+
+run_rsync('-rvv', f'{FROMDIR}/', f'{TODIR}/')
+
+check_perms(TODIR / '1', 'rwx------')
+check_perms(TODIR / '2', 'rw----r--')
+
+run_rsync('-rvvE', f'{FROMDIR}/', f'{TODIR}/')
+
+check_perms(TODIR / '1', 'rw-------')
+check_perms(TODIR / '2', 'rwx---r-x')
