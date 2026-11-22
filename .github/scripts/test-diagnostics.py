@@ -28,6 +28,26 @@ class Diagnostics(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, 'No CI helper tests'):
                 diagnostics['check_helpers'](Path(directory))
 
+    def test_shellcheck_discovers_tracked_scripts_and_propagates_failure(self):
+        with tempfile.TemporaryDirectory(prefix='rsync-diagnostics-') as directory:
+            root = Path(directory)
+            files = {'--shell helper': '#! /bin/sh -e\n',
+                     'backup.txt': '#!/usr/bin/env -S bash -e\n',
+                     'template.sh.in': '# shellcheck shell=sh\n',
+                     'example.md': 'Example:\n#!/bin/sh\n',
+                     'other': '#!/usr/bin/env python3\n',
+                     'untracked.sh': '#!/bin/sh\n'}
+            for name, contents in files.items():
+                (root / name).write_text(contents)
+            tracked = b'--shell helper\0backup.txt\0template.sh.in\0example.md\0other\0'
+            process = diagnostics['subprocess']
+            with patch.object(process, 'check_output', return_value=tracked) as list_files, \
+                 patch.object(process, 'call', return_value=17) as lint, redirect_stdout(StringIO()):
+                self.assertEqual(diagnostics['check_shell_scripts'](root), 17)
+            list_files.assert_called_once_with(['git', 'ls-files', '-z'], cwd=root)
+            lint.assert_called_once_with(['shellcheck', '--', '--shell helper', 'backup.txt',
+                                          'template.sh.in'], cwd=root)
+
     def test_logged_failure(self):
         with tempfile.TemporaryDirectory(prefix='rsync-diagnostics-') as directory:
             log = Path(directory) / 'run.log'

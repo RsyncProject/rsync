@@ -146,6 +146,8 @@ def select(paths):
             enable(selected, *OUTPUTS)
         elif path in ARCHIVE_DOCUMENTS:
             enable(selected, 'archive', 'diagnostics')
+        elif path == 'rsync-web/backup.txt':
+            enable(selected, 'diagnostics')
         elif no_tests(path):
             continue
         elif path.startswith('testsuite/'):

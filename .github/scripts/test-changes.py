@@ -37,6 +37,9 @@ class Changes(unittest.TestCase):
     def test_editorconfig_selects_no_test_family(self):
         self.assertEqual(self.enabled(['.editorconfig']), set())
 
+    def test_website_backup_script_selects_diagnostics(self):
+        self.assertEqual(self.enabled(['rsync-web/backup.txt']), {'diagnostics'})
+
     def test_production_paths_select_the_full_matrix(self):
         for path in ('receiver.c', 'Makefile.in', 'packaging/release.py',
                      'README.c', 'support/README.md', 'lib/new.c', 'wildtest.txt',

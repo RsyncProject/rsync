@@ -67,6 +67,25 @@ if '-verify_hostname' in captured:
 if not {'-servername', 'localhost', '-CAfile'} <= set(captured):
     test_fail(f'hostname opt-out removed SNI or chain verification: {captured}')
 
+fake_gnutls = executable(base / 'gnutls-cli', '#!/bin/sh\nprintf "%s\\n" "$@"\n')
+gnutls_env = {name: value for name, value in os.environ.items()
+              if not name.startswith('RSYNC_SSL_')}
+gnutls_env.update(RSYNC_SSL_TYPE='gnutls', RSYNC_SSL_GNUTLS=str(fake_gnutls),
+                  RSYNC_SSL_CA_CERT=str(base / 'ca cert.pem'),
+                  RSYNC_SSL_CERT=str(base / 'client cert.pem'),
+                  RSYNC_SSL_KEY=str(base / 'client key.pem'), RSYNC_PORT='8874')
+result = invoke(SRCDIR / 'rsync-ssl', helper, gnutls_env)
+expected = ['--logfile=/dev/null', f'--x509certfile={gnutls_env["RSYNC_SSL_CERT"]}',
+            f'--x509keyfile={gnutls_env["RSYNC_SSL_KEY"]}',
+            f'--x509cafile={gnutls_env["RSYNC_SSL_CA_CERT"]}', '--port=8874', 'localhost']
+if result.returncode or result.stdout.splitlines() != expected:
+    test_fail(f'GnuTLS did not receive the certificate paths and endpoint as separate arguments:\n{result.stdout}')
+
+gnutls_env.pop('RSYNC_SSL_CA_CERT')
+result = invoke(SRCDIR / 'rsync-ssl', helper, gnutls_env)
+if result.returncode != 1 or 'gnutls-cli requires RSYNC_SSL_CA_CERT' not in result.stdout:
+    test_fail(f'GnuTLS without a CA was not refused:\n{result.stdout}')
+
 stunnel_dir = base / 'stunnel'
 stunnel_dir.mkdir()
 stunnel_config = stunnel_dir / 'config'
