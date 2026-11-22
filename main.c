@@ -45,6 +45,7 @@ extern int am_daemon;
 extern int inc_recurse;
 extern int blocking_io;
 extern int always_checksum;
+extern int time_only;
 extern int remove_source_files;
 extern int output_needs_newline;
 extern int called_from_signal_handler;
@@ -1554,6 +1555,10 @@ static int start_client(int argc, char *argv[])
 	if (local_server) {
 		old_style_args = 2;
 		trust_sender_args = trust_sender_filter = 1;
+	}
+	if (time_only && am_sender && !local_server) {
+		rprintf(FERROR, "--time-only requires a local receiver or a remote source\n");
+		exit_cleanup(RERR_SYNTAX);
 	}
 
 	if (!rsync_port && remote_argc && !**remote_argv) /* Turn an empty arg into a dot dir. */
