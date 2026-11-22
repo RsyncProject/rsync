@@ -718,7 +718,21 @@ void send_files(int f_in, int f_out)
 		} else {
 			fd = do_open_checklinks(fname);
 		}
-		if (fd == -1) {
+		/* A file may have become a directory after the file-list scan.
+		 * The direct sender-root open shares this post-open type check. */
+		if (fd >= 0 && do_fstat(fd, &st) != 0) {
+			io_error |= IOERR_GENERAL;
+			rsyserr(FERROR_XFER, errno, "fstat failed");
+			free_sums(s);
+			close(fd);
+			exit_cleanup(RERR_FILEIO);
+		}
+		if (fd >= 0 && S_ISDIR(st.st_mode)) {
+			close(fd);
+			fd = -1;
+			errno = EISDIR;
+		}
+		if (fd < 0) {
 			if (errno == ENOENT) {
 				enum logcode c = am_daemon && protocol_version < 28 ? FERROR : FWARNING;
 				io_error |= IOERR_VANISHED;
@@ -734,15 +748,6 @@ void send_files(int f_in, int f_out)
 			if (protocol_version >= 30)
 				send_msg_int(MSG_NO_SEND, ndx);
 			continue;
-		}
-
-		/* map the local file */
-		if (do_fstat(fd, &st) != 0) {
-			io_error |= IOERR_GENERAL;
-			rsyserr(FERROR_XFER, errno, "fstat failed");
-			free_sums(s);
-			close(fd);
-			exit_cleanup(RERR_FILEIO);
 		}
 
 		if (IS_DEVICE(st.st_mode)) {

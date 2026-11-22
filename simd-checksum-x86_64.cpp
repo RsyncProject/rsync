@@ -550,7 +550,8 @@ int main() {
     benchmark("SSE2", get_checksum1_sse2_32, (schar*)buf, BLOCK_LEN);
     benchmark("SSSE3", get_checksum1_ssse3_32, (schar*)buf, BLOCK_LEN);
 #ifdef USE_ROLL_ASM
-    benchmark("AVX2-ASM", get_checksum1_avx2_asm, (schar*)buf, BLOCK_LEN);
+    if (roll_asm_have_avx2())
+	benchmark("AVX2-ASM", get_checksum1_avx2_asm, (schar*)buf, BLOCK_LEN);
 #else
     benchmark("AVX2", get_checksum1_avx2_64, (schar*)buf, BLOCK_LEN);
 #endif
