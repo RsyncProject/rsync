@@ -1,5 +1,5 @@
 name: Network controller
-run-name: Network controller
+run-name: Network CI ${{ github.event.workflow_run.id }} attempt ${{ github.event.workflow_run.run_attempt }}
 
 on:
   workflow_run:
@@ -37,12 +37,10 @@ jobs:
         run: python3 -B -S .github/scripts/interop-broker.py metadata --root "$RUNNER_TEMP/interoperability"
       - name: Upload controller context
         if: ${{ steps.source.outputs.enabled == 'true' }}
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        uses: ./.github/actions/interop-upload
         with:
           name: interoperability-context-attempt-${{ github.run_attempt }}
           path: ${{ runner.temp }}/interoperability/context.json
-          if-no-files-found: error
-          retention-days: 7
       - name: Issue single-use enrolment keys
         id: keys
         continue-on-error: true
@@ -50,12 +48,10 @@ jobs:
         run: python3 -B -S .github/scripts/interop-broker.py broker --root "$RUNNER_TEMP/interoperability"
       - name: Upload encrypted enrolment
         if: ${{ steps.keys.outcome == 'success' }}
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        uses: ./.github/actions/interop-upload
         with:
           name: interoperability-enrolment-attempt-${{ steps.source.outputs.attempt }}
           path: ${{ runner.temp }}/interoperability/enrolment.json
-          if-no-files-found: error
-          retention-days: 7
 
       - name: Validate endpoint membership
         id: membership
@@ -71,20 +67,16 @@ jobs:
           create-storage-record: false
       - name: Upload admission lease
         if: ${{ always() && steps.lease.outcome == 'success' }}
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        uses: ./.github/actions/interop-upload
         with:
           name: interoperability-lease-attempt-${{ github.run_attempt }}
           path: ${{ runner.temp }}/interoperability/lease.json
-          if-no-files-found: error
-          retention-days: 7
       - name: Upload topology
         if: ${{ steps.lease.outcome == 'success' }}
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        uses: ./.github/actions/interop-upload
         with:
           name: interoperability-topology-attempt-${{ steps.source.outputs.attempt }}
           path: ${{ runner.temp }}/interoperability/topology.json
-          if-no-files-found: error
-          retention-days: 7
       - name: Admit the seven endpoints
         id: admission
         continue-on-error: true
@@ -92,12 +84,10 @@ jobs:
         run: python3 -B -S .github/scripts/interop-broker.py admit --root "$RUNNER_TEMP/interoperability"
       - name: Upload admission
         if: ${{ steps.admission.outcome == 'success' }}
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        uses: ./.github/actions/interop-upload
         with:
           name: interoperability-admission-attempt-${{ steps.source.outputs.attempt }}
           path: ${{ runner.temp }}/interoperability/admission.json
-          if-no-files-found: error
-          retention-days: 7
       - name: Verify directed transfer results
         continue-on-error: true
         if: ${{ steps.admission.outcome == 'success' }}
@@ -110,12 +100,10 @@ jobs:
       - name: Upload revocation
         continue-on-error: true
         if: ${{ always() && steps.lease.outcome == 'success' && steps.revoke.outcome == 'success' }}
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        uses: ./.github/actions/interop-upload
         with:
           name: interoperability-revocation-attempt-${{ steps.source.outputs.attempt }}
           path: ${{ runner.temp }}/interoperability/revocation.json
-          if-no-files-found: error
-          retention-days: 7
       - name: Verify revocation and remove devices
         id: cleanup
         if: ${{ always() && steps.source.outputs.enabled == 'true' }}
@@ -123,9 +111,7 @@ jobs:
       - name: Upload cleanup result
         continue-on-error: true
         if: ${{ always() && steps.cleanup.outcome == 'success' }}
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        uses: ./.github/actions/interop-upload
         with:
           name: interoperability-result-attempt-${{ steps.source.outputs.attempt }}
           path: ${{ runner.temp }}/interoperability/result.json
-          if-no-files-found: error
-          retention-days: 7

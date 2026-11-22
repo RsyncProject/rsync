@@ -144,6 +144,35 @@ static char const *rerr_name(int code)
 static void filtered_fwrite(FILE *f, const char *in_buf, size_t in_len,
 			    enum output_filter filter, char end_char);
 static void append_log_record(const char *buf, size_t len);
+static void logit(int priority, const char *buf, size_t len);
+
+static void exit_log_write_error(FILE *stream, int error)
+{
+	static int reporting;
+	const char *name = stream == stdout ? "stdout" : stream == stderr ? "stderr" : "log file";
+	char message[512];
+	int len;
+
+	/* The diagnostic can fail too. Never fall back to stdout. */
+	if (reporting)
+		exit_cleanup(RERR_MESSAGEIO);
+	reporting = 1;
+	len = snprintf(message, sizeof message, RSYNC_NAME ": [%s] write to %s failed: %s (%d)\n",
+		       who_am_i(), name, strerror(error), error);
+	if (len > 0 && (size_t)len < sizeof message) {
+		if (logfile_fp && stream != logfile_fp && !ferror(logfile_fp))
+			logit(LOG_ERR, message, (size_t)len);
+		else if (stream != stderr && !am_server && !am_daemon)
+			fputs(message, stderr);
+	}
+	exit_cleanup(RERR_MESSAGEIO);
+}
+
+static void flush_log_stream(FILE *stream)
+{
+	if (fflush(stream) == EOF)
+		exit_log_write_error(stream, errno);
+}
 
 static void logit(int priority, const char *buf, size_t len)
 {
@@ -166,9 +195,10 @@ static void logit(int priority, const char *buf, size_t len)
 		append_log_record(buf, len);
 		return;
 	}
-	fprintf(logfile_fp, "%s [%d] ", timestring(time(NULL)), (int)getpid());
+	if (fprintf(logfile_fp, "%s [%d] ", timestring(time(NULL)), (int)getpid()) < 0)
+		exit_log_write_error(logfile_fp, errno);
 	filtered_fwrite(logfile_fp, buf, len, logfile_filter, '\n');
-	fflush(logfile_fp);
+	flush_log_stream(logfile_fp);
 }
 
 static void syslog_init()
@@ -403,8 +433,10 @@ struct filter_output {
 
 static void flush_filter_output(struct filter_output *out)
 {
-	if (!out->stream || (out->used && fwrite(out->data, 1, out->used, out->stream) != out->used))
+	if (!out->stream)
 		exit_cleanup(RERR_MESSAGEIO);
+	if (out->used && fwrite(out->data, 1, out->used, out->stream) != out->used)
+		exit_log_write_error(out->stream, errno);
 	out->used = 0;
 }
 
@@ -471,6 +503,7 @@ static void append_log_record(const char *buf, size_t len)
 			      timestring(time(NULL)), (int)getpid());
 	size_t capacity;
 	ssize_t written;
+	int write_error;
 
 	if (prefix < 0 || (size_t)prefix >= sizeof local
 	 || len > (SIZE_MAX / 2 - (size_t)prefix - 1) / LOG_ESCAPE_LEN)
@@ -493,10 +526,11 @@ static void append_log_record(const char *buf, size_t len)
 	do {
 		written = write(fileno(logfile_fp), out.data, out.used);
 	} while (written < 0 && errno == EINTR);
+	write_error = written < 0 ? errno : EIO;
 	if (out.data != local)
 		free(out.data);
 	if (written < 0 || (size_t)written != out.used)
-		exit_cleanup(RERR_MESSAGEIO);
+		exit_log_write_error(logfile_fp, write_error);
 }
 
 /* this is the underlying (unformatted) rsync debugging function. Call
@@ -602,7 +636,8 @@ void rwrite(enum logcode code, const char *buf, int len, int is_utf8)
 	}
 
 	if (output_needs_newline) {
-		fputc('\n', f);
+		if (fputc('\n', f) == EOF)
+			exit_log_write_error(f, errno);
 		output_needs_newline = 0;
 	}
 
@@ -625,7 +660,7 @@ void rwrite(enum logcode code, const char *buf, int len, int is_utf8)
 				filtered_fwrite(f, convbuf, outbuf.len, FILTER_CONSOLE_LOCALE, trailing);
 				if (trailing) {
 					trailing_NL = '\0';
-					fflush(f);
+					flush_log_stream(f);
 				}
 				outbuf.len = 0;
 			}
@@ -633,14 +668,16 @@ void rwrite(enum logcode code, const char *buf, int len, int is_utf8)
 			 * the next character. Check that the buffer is non-empty for the
 			 * sake of robustness. */
 			if ((ierrno == EILSEQ || ierrno == EINVAL) && inbuf.len) {
-				fprintf(f, "\\#%03o", CVAL(inbuf.buf, inbuf.pos++));
+				if (fprintf(f, "\\#%03o", CVAL(inbuf.buf, inbuf.pos++)) < 0)
+					exit_log_write_error(f, errno);
 				inbuf.len--;
 			}
 		}
 
 		if (trailing_NL) {
-			fputc(trailing_NL, f);
-			fflush(f);
+			if (fputc(trailing_NL, f) == EOF)
+				exit_log_write_error(f, errno);
+			flush_log_stream(f);
 		}
 	} else
 #endif
@@ -649,7 +686,7 @@ void rwrite(enum logcode code, const char *buf, int len, int is_utf8)
 				allow_8bit_chars ? FILTER_CONSOLE_LOCALE : FILTER_PRINTABLE,
 				trailing_NL);
 		if (trailing_NL)
-			fflush(f);
+			flush_log_stream(f);
 	}
 }
 
@@ -660,8 +697,9 @@ void rput_progress(void)
 
 	if (quiet)
 		return;
-	if (fputc('\r', f) == EOF || fflush(f) == EOF)
-		exit_cleanup(RERR_MESSAGEIO);
+	if (fputc('\r', f) == EOF)
+		exit_log_write_error(f, errno);
+	flush_log_stream(f);
 }
 
 /* This is the rsync debugging function. Call it with FINFO, FERROR_*,
@@ -753,7 +791,7 @@ void rflush(enum logcode code)
 	else
 		f = stderr;
 
-	fflush(f);
+	flush_log_stream(f);
 }
 
 void remember_initial_stats(void)

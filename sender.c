@@ -820,6 +820,7 @@ void send_files(int f_in, int f_out)
 		/* Flag that we actually sent this entry. */
 		file->flags |= FLAG_FILE_SENT;
 	}
+	finish_progress();
 	if (make_backups < 0)
 		make_backups = -make_backups;
 

@@ -2723,7 +2723,7 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 	if (files_from) {
 		char *h, *p;
 		int q = 0;
-		if (argc > 2 || (!am_daemon && !am_server && argc == 1)) {
+		if (argc > 2) {
 			usage(FERROR);
 			exit_cleanup(RERR_SYNTAX);
 		}

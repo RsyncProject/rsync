@@ -145,6 +145,19 @@ class Network(unittest.TestCase):
                     self.assertRaisesRegex(network.NetworkError, 'CI attempt has no valid start time'):
                 ci.source()
 
+    def test_ci_creation_time_cannot_change_during_workflow_selection(self):
+        ci.source.cache_clear()
+        self.addCleanup(ci.source.cache_clear)
+        run = dict(id=123, run_attempt=2, path='.github/workflows/ci.yml', name='CI', event='push',
+                   repository=dict(id=266877886), head_sha='b' * 40, display_title='build',
+                   created_at='2026-11-14T00:00:00Z', run_started_at='2026-11-14T00:05:00Z',
+                   referenced_workflows=[], status='in_progress')
+        changed = dict(run, created_at='2026-11-14T00:01:00Z',
+                       referenced_workflows=[dict(path=ci.WORKFLOW + 'a' * 40, sha='a' * 40)])
+        with patch.object(ci, 'api', side_effect=[run, changed]), patch.object(time, 'sleep'), \
+                self.assertRaisesRegex(network.NetworkError, 'creation time changed'):
+            ci.source()
+
     def test_controller_uses_trusted_change_selection(self):
         run = dict(event='pull_request', pull_requests=[dict(
             number=1, base=dict(sha='a' * 40, repo=dict(id=266877886)),
@@ -229,7 +242,7 @@ class Network(unittest.TestCase):
 
     def test_controller_discovery_requires_trusted_code_and_exact_attempt(self):
         origin = dict(self.state, head_sha='b' * 40, display_title='testsuite, ci: rework tests',
-                      attempt_started_at='2026-11-14T00:00:00Z')
+                      created_at='2026-11-14T00:00:00Z', attempt_started_at='2026-11-14T00:00:00Z')
         metadata = dict(self.state, control_run_id='456', control_attempt='1', control_sha='c' * 40)
         titles = ('Network controller', 'Network CI 123 attempt 2')
         for title in titles:
@@ -249,7 +262,7 @@ class Network(unittest.TestCase):
 
     def test_first_controller_context_survives_a_later_duplicate(self):
         origin = dict(self.state, head_sha='b' * 40, display_title='testsuite, ci: rework tests',
-                      attempt_started_at='2026-11-14T00:00:00Z')
+                      created_at='2026-11-14T00:00:00Z', attempt_started_at='2026-11-14T00:00:00Z')
         run = dict(id=456, run_attempt=1, path='.github/workflows/interoperability.yml', head_branch='master',
                    event='workflow_run', display_title='Network controller',
                    repository=dict(id=266877886),
@@ -264,7 +277,8 @@ class Network(unittest.TestCase):
             self.assertEqual(ci.controller()['control_run_id'], '456')
 
     def test_controller_context_reuses_artefact_listing(self):
-        origin = dict(self.state, attempt_started_at='2026-11-14T00:00:00Z')
+        origin = dict(self.state, created_at='2026-11-14T00:00:00Z',
+                      attempt_started_at='2026-11-14T00:00:00Z')
         controller = dict(id=456, run_attempt=1, path='.github/workflows/interoperability.yml', head_branch='master',
                           event='workflow_run', display_title='Network controller', repository=dict(id=266877886),
                           head_sha='c' * 40, status='in_progress', created_at='2026-11-14T00:00:01Z')
@@ -301,32 +315,153 @@ class Network(unittest.TestCase):
                 self.assertTrue(requests[0].startswith(discovery))
                 self.assertEqual(requests[1:], expected)
 
-    def test_controller_listing_is_scoped_to_the_ci_attempt(self):
+    def test_controller_created_before_attempt_start_avoids_other_artefacts(self):
+        origin = dict(self.state, created_at='2026-11-14T00:00:00Z',
+                      attempt_started_at='2026-11-14T00:00:20Z')
+        target = dict(id=456, run_attempt=1, path='.github/workflows/interoperability.yml',
+                      head_branch='master', event='workflow_run',
+                      display_title='Network CI 123 attempt 2', repository=dict(id=266877886),
+                      head_sha='c' * 40, status='in_progress', created_at='2026-11-14T00:00:10Z')
+        unrelated = [dict(target, id=400 + index, display_title='Network controller',
+                          created_at='2026-11-14T00:00:05Z') for index in range(20)]
+        context = dict(self.state, control_run_id='456', control_attempt='1', control_sha='c' * 40)
+
+        def response(path):
+            if path.startswith('/actions/workflows/interoperability.yml/runs?'):
+                self.assertIn('created=%3E%3D2026-11-14T00%3A00%3A00Z', path)
+                self.assertIn('per_page=40', path)
+                return dict(total_count=21, workflow_runs=[target, *unrelated])
+            if path == '/actions/runs/456/artifacts?per_page=100':
+                return dict(total_count=1, artifacts=[dict(
+                    name='interoperability-context-attempt-1', expired=False)])
+            self.fail('Unrelated controller artefact read: ' + path)
+
+        with patch.object(ci, 'source', return_value=origin), patch.object(ci, 'api', side_effect=response) as api, \
+                patch.object(ci, 'download_records', return_value={None: (context, b'{}')}):
+            self.assertEqual(ci.controller()['control_run_id'], '456')
+        self.assertEqual(api.call_count, 2)
+
+    def test_late_rerun_does_not_scan_from_original_ci_creation(self):
+        origin = dict(self.state, created_at='2026-11-01T00:00:00Z',
+                      attempt_started_at='2026-11-14T00:05:00Z')
+        target = dict(id=456, run_attempt=1, path='.github/workflows/interoperability.yml',
+                      head_branch='master', event='workflow_run', display_title='Network CI 123 attempt 2',
+                      repository=dict(id=266877886), head_sha='c' * 40, status='in_progress',
+                      created_at='2026-11-14T00:04:00Z')
+        context = dict(self.state, control_run_id='456', control_attempt='1', control_sha='c' * 40)
+
+        def response(path):
+            if path.startswith('/actions/workflows/interoperability.yml/runs?'):
+                self.assertIn('created=%3E%3D2026-11-13T22%3A50%3A00Z', path)
+                return dict(total_count=1, workflow_runs=[target])
+            if path == '/actions/runs/456/artifacts?per_page=100':
+                return dict(total_count=1, artifacts=[dict(
+                    name='interoperability-context-attempt-1', expired=False)])
+            self.fail('Unexpected API request: ' + path)
+
+        with patch.object(ci, 'source', return_value=origin), patch.object(ci, 'api', side_effect=response) as api, \
+                patch.object(ci, 'download_records', return_value={None: (context, b'{}')}):
+            self.assertEqual(ci.controller()['control_run_id'], '456')
+        self.assertEqual(api.call_count, 2)
+
+    def test_late_rerun_excludes_stale_controller_runs(self):
+        origin = dict(self.state, created_at='2026-11-01T00:00:00Z',
+                      attempt_started_at='2026-11-14T00:05:00Z')
+        stale = dict(id=456, run_attempt=1, path='.github/workflows/interoperability.yml',
+                     head_branch='master', event='workflow_run', display_title='Network CI 123 attempt 2',
+                     repository=dict(id=266877886), head_sha='c' * 40, status='in_progress',
+                     created_at='2026-11-13T22:49:59Z')
+        with patch.object(ci, 'source', return_value=origin), \
+                patch.object(ci, 'api', return_value=dict(total_count=1, workflow_runs=[stale])) as api:
+            self.assertIsNone(ci.find_controller())
+        api.assert_called_once()
+
+    def test_exact_controller_without_context_does_not_use_legacy_run(self):
+        origin = dict(self.state, created_at='2026-11-14T00:00:00Z',
+                      attempt_started_at='2026-11-14T00:00:20Z')
+        exact = dict(id=456, run_attempt=1, path='.github/workflows/interoperability.yml',
+                     head_branch='master', event='workflow_run', display_title='Network CI 123 attempt 2',
+                     repository=dict(id=266877886), head_sha='c' * 40, status='in_progress',
+                     created_at='2026-11-14T00:00:10Z')
+        legacy = dict(exact, id=455, display_title='Network controller')
+
+        def response(path):
+            if path.startswith('/actions/workflows/interoperability.yml/runs?'):
+                return dict(total_count=2, workflow_runs=[exact, legacy])
+            if path == '/actions/runs/456/artifacts?per_page=100':
+                return dict(total_count=0, artifacts=[])
+            self.fail('Unrelated controller artefact read: ' + path)
+
+        with patch.object(ci, 'source', return_value=origin), \
+                patch.object(ci, 'api', side_effect=response) as api:
+            self.assertIsNone(ci.find_controller())
+        self.assertEqual(api.call_count, 2)
+
+    def test_full_controller_listing_does_not_request_an_empty_page(self):
+        origin = dict(self.state, created_at='2026-11-14T00:00:00Z',
+                      attempt_started_at='2026-11-14T00:00:20Z')
+        unrelated = [dict(id=500 + index, created_at='2026-11-14T00:00:30Z',
+                          display_title='other') for index in range(40)]
+        with patch.object(ci, 'source', return_value=origin), \
+                patch.object(ci, 'api', return_value=dict(total_count=40, workflow_runs=unrelated)) as api:
+            self.assertIsNone(ci.find_controller())
+        api.assert_called_once()
+
+    def test_controller_discovery_backs_off_without_extending_startup(self):
+        controller = dict(controller_run(), conclusion=None)
+        with patch.object(ci, 'find_controller', side_effect=[None, None, None, None, None, controller]), \
+                patch.object(time, 'monotonic', side_effect=[0, 0, 5, 15, 35, 75, 135]), \
+                patch.object(time, 'sleep') as sleep:
+            self.assertEqual(ci.controller()['control_run_id'], '456')
+        self.assertEqual(sleep.call_args_list, [call(5), call(10), call(20), call(40), call(60)])
+
+    def test_controller_discovery_stops_at_the_original_deadline(self):
+        with patch.object(ci, 'find_controller', return_value=None) as find, \
+                patch.object(time, 'monotonic', side_effect=[0, ci.STARTUP_TIMEOUT - 2, ci.STARTUP_TIMEOUT]), \
+                patch.object(time, 'sleep') as sleep, \
+                self.assertRaisesRegex(network.NetworkError, 'Trusted controller did not start'):
+            ci.controller()
+        find.assert_called_once_with()
+        sleep.assert_called_once_with(2)
+
+    def test_controller_discovery_bounds_long_queue_polling(self):
+        now = [0]
+        def sleep(seconds):
+            now[0] += seconds
+        with patch.object(ci, 'find_controller', return_value=None) as find, \
+                patch.object(time, 'monotonic', side_effect=lambda: now[0]), \
+                patch.object(time, 'sleep', side_effect=sleep), \
+                self.assertRaisesRegex(network.NetworkError, 'Trusted controller did not start'):
+            ci.controller()
+        self.assertEqual(now[0], ci.STARTUP_TIMEOUT)
+        self.assertEqual(find.call_count, 33)
+
+    def test_controller_listing_is_scoped_to_ci_creation(self):
         origin = dict(self.state, head_sha='b' * 40, display_title='current',
                       created_at='2026-11-14T00:00:00Z', attempt_started_at='2026-11-14T00:00:20Z')
         unrelated = [dict(id=500 + index, created_at='2026-11-14T00:00:30Z',
-                          display_title='other') for index in range(20)]
+                          display_title='other') for index in range(40)]
         current = dict(id=456, run_attempt=1, path='.github/workflows/interoperability.yml',
-                       head_branch='master', event='workflow_run', display_title='Network controller',
+                       head_branch='master', event='workflow_run', display_title='Network CI 123 attempt 2',
                        repository=dict(id=266877886), head_sha='c' * 40, status='in_progress',
                        created_at='2026-11-14T00:00:21Z')
-        older = dict(current, id=455, created_at='2026-11-14T00:00:19Z')
+        older = dict(current, id=455, display_title='Network controller', created_at='2026-11-14T00:00:19Z')
         artifact = dict(total_count=1, artifacts=[dict(name='interoperability-context-1', expired=False)])
         metadata = dict(self.state, control_run_id='456', control_attempt='1', control_sha='c' * 40)
         with patch.object(ci, 'source', return_value=origin), patch.object(ci, 'api', side_effect=[
-                dict(total_count=22, workflow_runs=unrelated),
-                dict(total_count=22, workflow_runs=[current, older]), artifact]) as api, \
+                dict(total_count=42, workflow_runs=unrelated),
+                dict(total_count=42, workflow_runs=[current, older]), artifact]) as api, \
                 patch.object(ci, 'download_records', return_value={None: (metadata, b'{}')}):
             self.assertEqual(ci.controller()['control_run_id'], '456')
-        self.assertIn('per_page=20&page=1', api.call_args_list[0][0][0])
-        self.assertIn('per_page=20&page=2', api.call_args_list[1][0][0])
+        self.assertIn('per_page=40&page=1', api.call_args_list[0][0][0])
+        self.assertIn('per_page=40&page=2', api.call_args_list[1][0][0])
         for request in api.call_args_list[:2]:
-            self.assertIn('created=%3E%3D2026-11-14T00%3A00%3A20Z', request[0][0])
+            self.assertIn('created=%3E%3D2026-11-14T00%3A00%3A00Z', request[0][0])
         self.assertEqual(api.call_args_list[2][0][0], '/actions/runs/456/artifacts?per_page=100')
 
     def test_controller_title_collision_uses_the_context_identity(self):
         origin = dict(self.state, head_sha='b' * 40, display_title='same title',
-                      attempt_started_at='2026-11-14T00:00:00Z')
+                      created_at='2026-11-14T00:00:00Z', attempt_started_at='2026-11-14T00:00:00Z')
         run = dict(run_attempt=1, path='.github/workflows/interoperability.yml', head_branch='master',
                    event='workflow_run', display_title='Network controller',
                    repository=dict(id=266877886), head_sha='c' * 40, status='in_progress',
@@ -347,10 +482,12 @@ class Network(unittest.TestCase):
             self.assertEqual(download.call_args[0][:2], ('456', {name: None}))
 
     def test_controller_listing_rejects_invalid_or_truncated_results(self):
-        origin = dict(self.state, head_sha='b' * 40, attempt_started_at='2026-11-14T00:00:00Z')
+        origin = dict(self.state, head_sha='b' * 40, created_at='2026-11-14T00:00:00Z',
+                      attempt_started_at='2026-11-14T00:00:00Z')
         recent = dict(id=500, created_at='2026-11-14T00:00:30Z', display_title='other')
         invalid = [dict(workflow_runs=[]), dict(total_count=1, workflow_runs=None),
-                   dict(total_count=21, workflow_runs=[recent] * 21),
+                   dict(total_count=41, workflow_runs=[recent] * 41),
+                   dict(total_count=1, workflow_runs=[recent] * 2),
                    dict(total_count=1, workflow_runs=[dict(recent, created_at='invalid')])]
         for value in invalid:
             with self.subTest(listing=value), patch.object(ci, 'source', return_value=origin), \
@@ -358,7 +495,7 @@ class Network(unittest.TestCase):
                     self.assertRaisesRegex(network.NetworkError, 'Invalid controller run listing'):
                 ci.find_controller()
         with patch.object(ci, 'source', return_value=origin), \
-                patch.object(ci, 'api', return_value=dict(total_count=101, workflow_runs=[recent] * 20)) as api, \
+                patch.object(ci, 'api', return_value=dict(total_count=201, workflow_runs=[recent] * 40)) as api, \
                 self.assertRaisesRegex(network.NetworkError, 'Controller run listing exceeds limit'):
             ci.find_controller()
         self.assertEqual(api.call_count, 5)
@@ -574,6 +711,21 @@ class Network(unittest.TestCase):
         self.assertFalse((self.root / 'enrolment.json').exists())
         self.assertEqual(json.loads((self.root / 'result.json').read_text()),
                          dict(self.state, passed=False, cleaned=True, roles=[]))
+
+    def test_cancelled_parent_after_admission_still_cleans(self):
+        broker['save'](self.root, 'lease', grant={}, devices=[], keys={}, nodes={})
+        api = Mock()
+        cleanup = Mock()
+        cancelled = Mock(side_effect=ci.NotSelected('CI was cancelled'))
+        with patch.object(sys, 'argv', ['interop-broker.py', 'finish', '--root', str(self.root)]), \
+                patch.dict(broker['main'].__globals__, Tailnet=lambda: api, cleanup=cleanup,
+                           check_ci=cancelled):
+            self.assertEqual(broker['main'](), 0)
+        cancelled.assert_not_called()
+        cleanup.assert_called_once()
+        self.assertIs(cleanup.call_args[0][0], api)
+        self.assertEqual(json.loads((self.root / 'result.json').read_text()),
+                         dict(self.state, passed=False, cleaned=True, roles=list(ROLES)))
 
     def test_delivered_enrolment_without_a_lease_requires_reconciliation(self):
         broker['save'](self.root, 'keys', keys={'linux': 'key1'}, pending=None)
@@ -859,6 +1011,12 @@ class Network(unittest.TestCase):
                 sleep.assert_not_called()
         duplicate = json.dumps(dict(artifacts=[item, dict(item, id=2)], total_count=2)).encode()
         with patch.object(network, 'fetch', return_value=(duplicate, {})), self.assertRaisesRegex(network.NetworkError, 'Duplicate'):
+            network.download_records('123', {'ready': 'linux'})
+        oversized = io.BytesIO()
+        with zipfile.ZipFile(oversized, 'w') as archive:
+            archive.writestr('ready.json', b'x' * (network.MAX_RECORD_BYTES + 1))
+        with patch.object(network, 'fetch', side_effect=[(listing, {}), (oversized.getvalue(), {})]), \
+                self.assertRaisesRegex(network.NetworkError, 'Invalid rendezvous artifact'):
             network.download_records('123', {'ready': 'linux'})
 
     def test_artifact_listing_retries_connection_failures(self):

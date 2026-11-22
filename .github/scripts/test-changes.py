@@ -1,6 +1,7 @@
 import json
 import os
 from pathlib import Path
+import re
 import runpy
 import subprocess
 import tempfile
@@ -11,6 +12,7 @@ from unittest.mock import patch
 changes = runpy.run_path(str(Path(__file__).with_name('changes.py')))
 select = changes['select']
 families = changes['FAMILIES']
+full_selection = {*families, 'versions', 'asan', 'coverage', 'clang'}
 
 
 class Changes(unittest.TestCase):
@@ -26,7 +28,7 @@ class Changes(unittest.TestCase):
                 self.assertEqual(self.enabled(paths), set())
 
     def test_generated_document_inputs_select_build_qualification(self):
-        self.assertEqual(self.enabled(['rsync.1.md']), {*families, 'asan', 'coverage', 'clang'})
+        self.assertEqual(self.enabled(['rsync.1.md']), full_selection)
         for path in ('rsync-ssl.1.md', 'rsyncd.conf.5.md', 'support/rrsync.1.md',
                      'rsync.1', 'rsync.1.html'):
             with self.subTest(path=path):
@@ -40,7 +42,7 @@ class Changes(unittest.TestCase):
                      'README.c', 'support/README.md', 'lib/new.c', 'wildtest.txt',
                      'rsync-web/bin/upload', 'rsync-web/rsync_wrapper.pl'):
             with self.subTest(path=path):
-                self.assertEqual(self.enabled([path]), {*families, 'asan', 'coverage', 'clang'})
+                self.assertEqual(self.enabled([path]), full_selection)
 
     def test_unclassified_paths_fail_regardless_of_other_changes(self):
         for path in ('new-file', 'new-document.md', 'liberty/file.c',
@@ -69,24 +71,79 @@ class Changes(unittest.TestCase):
     def test_ci_files_select_their_owner(self):
         cases = {
             '.github/workflows/linux.yml': {'linux', 'diagnostics'},
-            '.github/workflows/ci.yml': {*families, 'asan', 'coverage', 'clang'},
-            '.github/workflows/diagnostics.yml': {'diagnostics', 'asan', 'coverage', 'clang'},
+            '.github/workflows/ci.yml': full_selection,
+            '.github/workflows/diagnostics.yml': {'diagnostics', 'versions', 'asan', 'coverage', 'clang'},
+            '.github/workflows/versions.yml': {'diagnostics', 'versions'},
+            '.github/scripts/versions.py': {'diagnostics', 'versions'},
             '.github/workflows/interoperability.yml': {'interoperability', 'diagnostics'},
             '.github/scripts/android-emulator.py': {'android', 'diagnostics'},
             '.github/scripts/test-archive.py': {'archive', 'diagnostics'},
             '.github/scripts/guest.py': {'linux', 'bsd', 'other', 'diagnostics'},
             '.github/scripts/diagnostics.py': {'diagnostics', 'valgrind', 'asan', 'coverage', 'clang'},
             '.github/scripts/test-diagnostics.py': {'diagnostics'},
-            '.github/scripts/check-results.py': {*families, 'asan', 'coverage', 'clang'},
+            '.github/scripts/check-results.py': full_selection,
             '.github/scripts/test-results.py': {'diagnostics'},
-            '.github/scripts/changes.py': {*families, 'asan', 'coverage', 'clang'},
+            '.github/scripts/changes.py': full_selection,
             '.github/scripts/test-changes.py': {'diagnostics'},
             '.github/scripts/check-platform.py': {'linux', 'macos', 'other', 'diagnostics'},
             '.github/actions/interoperability/action.yml': {'interoperability', 'diagnostics'},
+            '.github/actions/interop-upload/action.yml': {'interoperability', 'diagnostics'},
         }
         for path, expected in cases.items():
             with self.subTest(path=path):
                 self.assertEqual(self.enabled([path]), expected)
+
+    def test_master_pushes_share_only_their_own_concurrency_group(self):
+        workflow = (Path(__file__).resolve().parents[1] / 'workflows/ci.yml').read_text()
+        self.assertIn("group: ${{ github.workflow }}-${{ github.event_name == 'push' && 'master' "
+                      "|| github.event.pull_request.number || github.run_id }}", workflow)
+        self.assertIn('cancel-in-progress: true', workflow)
+
+    def test_staged_families_keep_selection_after_prerequisite_failure(self):
+        workflow = (Path(__file__).resolve().parents[1] / 'workflows/ci.yml').read_text()
+        for family, prerequisite in (('android', 'macos'), ('archive', 'macos')):
+            with self.subTest(family=family):
+                match = re.search(r'^  ' + family + r':\n(.*?)(?=^  [a-z][a-z0-9_]*:\n|\Z)',
+                                  workflow, re.M | re.S)
+                self.assertIsNotNone(match)
+                block = match.group(1)
+                self.assertIn('needs: [changes, ' + prerequisite + ']', block)
+                condition = next(line.strip() for line in block.splitlines() if line.strip().startswith('if: '))
+                prefix, suffix = 'if: ${{ !cancelled() && ', ' }}'
+                self.assertTrue(condition.startswith(prefix) and condition.endswith(suffix))
+                selection = condition[len(prefix):-len(suffix)]
+                self.assertIn('needs.changes.outputs.' + family + " == 'true'", selection)
+                expected = 'CI_EXPECT_' + family.upper() + ': ${{ ' + selection + ' }}'
+                self.assertIn(expected, [line.strip() for line in workflow.splitlines()])
+
+    def test_archived_peers_run_within_diagnostics(self):
+        workflows = Path(__file__).resolve().parents[1] / 'workflows'
+        ci = (workflows / 'ci.yml').read_text()
+        diagnostics = (workflows / 'diagnostics.yml').read_text()
+        self.assertNotIn('versions', families)
+        self.assertNotIn('./.github/workflows/versions.yml', ci)
+        self.assertIn('CI_VERSIONS_SELECTED: *versions_selected', ci)
+        self.assertIn("github.event.schedule == '52 8 * * 1'", ci)
+        _, job, workflow = diagnostics.partition('\n  versions:\n')
+        self.assertTrue(job)
+        self.assertIn('needs: [lint, python_37, asan, coverage, clang_21]', workflow)
+        self.assertIn('if: ${{ !cancelled() && inputs.versions }}', workflow)
+        self.assertEqual(workflow.count('run: make check-progs'), 1)
+        self.assertNotIn('matrix.role', workflow)
+        self.assertEqual(workflow.count("!cancelled() && steps.build.outcome == 'success'"), 2)
+        for role in ('primary', 'secondary'):
+            with self.subTest(role=role):
+                self.assertIn('versions.py --role ' + role + ' --output test-results/version-mix/' + role,
+                              workflow)
+                self.assertIn('name: version-mix-' + role + '-receipts', workflow)
+                self.assertIn('path: test-results/version-mix/' + role, workflow)
+
+    def test_valgrind_stays_parallel_for_fast_feedback(self):
+        ci = (Path(__file__).resolve().parents[1] / 'workflows/ci.yml').read_text()
+        valgrind = (Path(__file__).resolve().parents[1] / 'workflows/valgrind.yml').read_text()
+        self.assertIn('  valgrind:\n    name: Valgrind\n    needs: changes\n', ci)
+        self.assertIn('CI_EXPECT_VALGRIND: *valgrind_selected', ci)
+        self.assertEqual(valgrind.count('            privilege:'), 4)
 
     def test_multiple_paths_union_their_owners(self):
         self.assertEqual(self.enabled(['README.md', '.github/scripts/android.py',
@@ -135,7 +192,7 @@ class Changes(unittest.TestCase):
         with patch.object(changes['subprocess'], 'run', return_value=result) as run:
             paths = changes['changed_paths'](event, 'push')
         self.assertEqual(run.call_args[0][0], ['git', 'ls-tree', '--name-only', '-r', '-z', 'b' * 40])
-        self.assertEqual(self.enabled(paths), {*families, 'asan', 'coverage', 'clang'})
+        self.assertEqual(self.enabled(paths), full_selection)
 
     def test_unclassified_push_does_not_write_partial_outputs(self):
         with tempfile.TemporaryDirectory() as directory:
