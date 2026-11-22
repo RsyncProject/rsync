@@ -13,6 +13,14 @@
 - Keep the checked root of a single absolute alternate destination open
   across directories in ordinary non-daemon transfers. Reuse checked parents
   for rechecks and delta reads.
+## Bug fixes
+
+- Fixed `-X` transfers of user xattrs on NetBSD by using the native BSD
+  extended attribute interface. Retain the requested modification time when
+  writing fake-super metadata. Refuse to grow an existing xattr on NetBSD
+  because FFS can corrupt other attributes during that operation.
+- Fixed silent loss of xattrs on Cygwin when the name list did not fit the
+  initial buffer.
 
 ## 3.5 maintenance line
 

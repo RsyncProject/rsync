@@ -15,7 +15,7 @@ ARCHIVE_DOCUMENTS = {
     'rsyncd.conf.5', 'rsyncd.conf.5.html', 'rrsync.1', 'rrsync.1.html',
 }
 NO_TEST_FILES = {
-    'COPYING', 'INSTALL.md', 'NEWS.md', 'README.md', 'SECURITY.md', 'TODO',
+    '.editorconfig', 'COPYING', 'INSTALL.md', 'NEWS.md', 'README.md', 'SECURITY.md', 'TODO',
     'csprotocol.txt', 'tech_report.tex', '.github/INTEROPERABILITY.md',
     'old_versions/README.md', 'testsuite/README.md', '.github/FUNDING.yml', 'rsync-web/.gitignore',
     'rsync-web/rsync-and-debian/.cvsignore',

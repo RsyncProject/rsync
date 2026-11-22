@@ -78,8 +78,13 @@ Replace "@BINDIR@/rsync" with the path to where you have rsync installed on
 your system.  You will then need to send inetd a HUP signal to tell it to
 reread its config file.
 
-Note that you should **not** send the rsync daemon a HUP signal to force it to
-reread the `rsyncd.conf` file. The file is re-read on each client connection.
+A standalone rsync daemon reads global settings at startup and opens the
+configuration again for each client connection. Keep the file readable for
+as long as the daemon is running. A pipe, such as a pipe-backed process
+substitution, cannot supply a fresh configuration for each connection.
+Do not send the rsync daemon a HUP signal to reload this file. Changes to
+listener settings such as the port require a restart. A daemon started by
+inetd or a remote shell reads the configuration for its single connection.
 
 ## GLOBAL PARAMETERS
 
@@ -1230,12 +1235,12 @@ in the values of parameters.  See that section for details.
 
     Specifies a directory that rsync should use for temporary files created
     during the transfer of updated files. If that directory is on a different
-    partition, after transfer file is being copied instead of unlinked. 
+    partition, after transfer file is being copied instead of unlinked.
 
     This parameter equals with `--temp-dir` option, so please consult rsync
-    manpage for further information. 
+    manpage for further information.
 
-    
+
 ## CONFIG DIRECTIVES
 
 There are currently two config directives available that allow a config file to

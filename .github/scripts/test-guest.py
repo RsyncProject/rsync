@@ -1,5 +1,6 @@
 from contextlib import redirect_stderr, redirect_stdout
 from io import StringIO
+import json
 from pathlib import Path
 import runpy
 import sys
@@ -10,6 +11,7 @@ from unittest.mock import patch
 
 
 guest = runpy.run_path(str(Path(__file__).with_name('guest.py')))
+check_features = runpy.run_path(str(Path(__file__).resolve().parents[2] / 'testsuite/tools/check-features.py'))
 
 
 class Guest(unittest.TestCase):
@@ -71,6 +73,28 @@ class Guest(unittest.TestCase):
                     configure = next(command for command, _ in calls if command[0] == './configure')
                     self.assertIn('--disable-zstd', configure)
                     self.assertIn('--disable-idn', configure)
+                if platform == 'netbsd':
+                    self.assertIn('--enable-xattr-support', configure)
+                    features = next(command for command, _ in calls if 'testsuite/tools/check-features.py' in command)
+                    self.assertEqual(features[4:], ['xattrs'])
+                if platform == 'openbsd':
+                    features = next(command for command, _ in calls if 'testsuite/tools/check-features.py' in command)
+                    self.assertEqual(features[-2:], ['--unsupported', 'xattrs'])
+
+    def test_feature_must_be_explicitly_unsupported(self):
+        argv = ['check-features.py', 'rsync', 'iconv', '--unsupported', 'xattrs']
+        for claimed in ({'xattrs': False}, {'xattrs': True}, {}, {'xattrs': 0}):
+            with self.subTest(claimed=claimed):
+                version = {'capabilities': {'iconv': True, **claimed}, 'checksum_list': [], 'compress_list': []}
+                with patch.object(sys, 'argv', argv), patch('subprocess.check_output', return_value=json.dumps(version)), \
+                     redirect_stderr(StringIO()) as errors, redirect_stdout(StringIO()):
+                    if claimed.get('xattrs') is False:
+                        check_features['main']()
+                    else:
+                        with self.assertRaises(SystemExit) as failure:
+                            check_features['main']()
+                        self.assertEqual(failure.exception.code, 1)
+                        self.assertIn('Capabilities not explicitly unsupported: xattrs', errors.getvalue())
 
     def test_failed_pass_does_not_hide_remaining_results(self):
         result, status, calls, _ = self.run_guest('netbsd', lambda command: 'testsuite/tools/check.py' in command)

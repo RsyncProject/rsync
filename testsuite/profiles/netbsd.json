@@ -21,7 +21,6 @@
     "search_only": "no race-safe search-only directory descriptors",
     "setpriv": "no setpriv launcher",
     "simd": "no SIMD test build",
-    "xattr_runtime": "no user xattr fixture",
-    "xattr_wire": "no xattr wire fixture"
+    "xattr_wire": "xattr wire fixture is not qualified on NetBSD"
   }
 }

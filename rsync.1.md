@@ -1674,6 +1674,10 @@ sign) if you want the local shell to expand it.
     This option causes rsync to update the destination extended attributes to
     be the same as the source ones.
 
+    On NetBSD rsync refuses to grow an existing extended attribute because
+    growing a value on NetBSD FFS can damage other attributes on the same
+    file. This also applies to attributes used by [`--fake-super`](#opt).
+
     For systems that support extended-attribute namespaces, a copy being done
     by a super-user copies all namespaces except system.\*.  A normal user only
     copies the user.\* namespace.  To be able to backup and restore non-user
@@ -3118,12 +3122,12 @@ sign) if you want the local shell to expand it.
 
 0.  `--compress-threads=NUM`, `--zt=NUM`
 
-    Set the number of threads to spawn when compressing data. Setting this 
-    option to 1 or more will instruct the compression library to spawn 1 or 
-    more threads for compression. Ideally, increasing the number of threads 
+    Set the number of threads to spawn when compressing data. Setting this
+    option to 1 or more will instruct the compression library to spawn 1 or
+    more threads for compression. Ideally, increasing the number of threads
     will increase transfer speed if the transfer is CPU bound on the sender.
-    
-    This option does not affect decompression. 
+
+    This option does not affect decompression.
 
     Compression algorithms that allow threading:
 
@@ -4242,6 +4246,10 @@ The options allowed when starting an rsync daemon are as follows:
     /etc/rsyncd.conf unless the daemon is running over a remote shell program
     and the remote user is not the super-user; in that case the default is
     rsyncd.conf in the current directory (typically $HOME).
+
+    A standalone daemon opens its configuration at startup and again for
+    each client connection. Use a file that remains readable rather than a
+    pipe or pipe-backed process substitution.
 
 0.  `--dparam=OVERRIDE`, `-M`
 
