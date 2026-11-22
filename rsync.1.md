@@ -2664,6 +2664,9 @@ sign) if you want the local shell to expand it.
       options are parsed (e.g. [`-a`](#opt) works the same before or after
       `--files-from`, as does `--no-R` and all other options).
 
+    With one source argument and no destination, rsync lists the selected
+    source entries instead of copying them.
+
     Listing individual files with `--files-from` does not make unlisted
     siblings eligible for deletion.  The [`--delete`](#opt) option only removes
     entries from directories whose complete contents are being synchronised,
