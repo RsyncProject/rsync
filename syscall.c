@@ -427,6 +427,20 @@ static int ona_open_absolute_root(char *remaining, char *abspath, size_t abspath
 }
 #endif
 
+#if defined AT_FDCWD && defined O_NOFOLLOW && defined O_DIRECTORY
+static int open_operator_leaf(int dfd, const char *name, int flags, mode_t mode)
+{
+	int fd = openat(dfd, name, flags | O_NOFOLLOW, mode);
+
+	/* macOS can report ENOENT if another opener won a non-exclusive
+	 * create. Try the existing entry without another create or lookup
+	 * of the parent path. */
+	if (fd < 0 && errno == ENOENT && (flags & O_CREAT) && !(flags & O_EXCL))
+		fd = openat(dfd, name, (flags & ~O_CREAT) | O_NOFOLLOW, mode);
+	return fd;
+}
+#endif
+
 /* Open an operator-supplied path, refusing to traverse any symlink (parent or
  * leaf) not owned by uid 0 or our euid.  A trusted-owned symlink (e.g. root's
  * /var/log -> /data/log) is still followed; an untrusted one fails ELOOP.
@@ -574,7 +588,7 @@ static int ona_open(const char *path, int flags, mode_t mode, char *out_abs, siz
 					saved_errno = ELOOP;
 					goto out;
 				}
-				retfd = openat(dfd, comp, flags | O_NOFOLLOW, mode);
+				retfd = open_operator_leaf(dfd, comp, flags, mode);
 				saved_errno = errno;
 				goto out;
 			}
@@ -707,7 +721,7 @@ static int ona_open(const char *path, int flags, mode_t mode, char *out_abs, siz
 				saved_errno = ELOOP;
 				goto out;
 			}
-			retfd = openat(dfd, comp, flags | O_NOFOLLOW, mode);
+			retfd = open_operator_leaf(dfd, comp, flags, mode);
 			saved_errno = errno;
 			/* Resolved leaf dir (O_DIRECTORY): hand its path back so
 			 * owner_walk_parent can filter-check the operation's leaf. */
