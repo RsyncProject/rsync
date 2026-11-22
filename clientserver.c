@@ -1442,14 +1442,25 @@ static int proxy_peer_allowed(int fd)
 	return 1;
 }
 
+static char *default_daemon_config(void)
+{
+	if (am_daemon < 0 && am_root <= 0)
+		return RSYNCD_USERCONF;
+
+#ifdef RSYNCD_DISTCONF
+	STRUCT_STAT st;
+
+	/* Even a dangling override takes precedence over the vendor file. */
+	if (do_lstat(RSYNCD_SYSCONF, &st) < 0 && errno == ENOENT)
+		return RSYNCD_DISTCONF;
+#endif
+	return RSYNCD_SYSCONF;
+}
+
 static int load_config(int globals_only)
 {
-	if (!config_file) {
-		if (am_daemon < 0 && am_root <= 0)
-			config_file = RSYNCD_USERCONF;
-		else
-			config_file = RSYNCD_SYSCONF;
-	}
+	if (!config_file)
+		config_file = default_daemon_config();
 	return lp_load(config_file, globals_only);
 }
 
