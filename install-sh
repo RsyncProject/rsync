@@ -195,7 +195,8 @@ else
 	then
 		dstfile=$(basename "$dst")
 	else
-		dstfile=$(basename "$dst" "$transformbasename" | sed "$transformarg")"$transformbasename"
+		# The -t value can contain multiple sed arguments.
+		dstfile=$(basename "$dst" "$transformbasename" | sed $transformarg)"$transformbasename"
 	fi
 
 # don't allow the sed command to completely eliminate the filename
