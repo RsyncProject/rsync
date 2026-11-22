@@ -120,8 +120,8 @@ case $# in
 esac
 
 # Split fields of configuration type
-# shellcheck disable=SC2162
 saved_IFS=$IFS
+# shellcheck disable=SC2162
 IFS="-" read field1 field2 field3 field4 <<EOF
 $1
 EOF
@@ -936,8 +936,8 @@ case $basic_machine in
 		;;
 
 	*-*)
-		# shellcheck disable=SC2162
 		saved_IFS=$IFS
+		# shellcheck disable=SC2162
 		IFS="-" read cpu vendor <<EOF
 $basic_machine
 EOF
@@ -1306,7 +1306,7 @@ esac
 
 # Decode manufacturer-specific aliases for certain operating systems.
 
-if test x$basic_os != x
+if test "x$basic_os" != x
 then
 
 # First recognize some ad-hoc cases, or perhaps split kernel-os, or else just
@@ -1325,8 +1325,8 @@ case $basic_os in
 		os=`echo "$basic_os" | sed -e 's|nto-qnx|qnx|'`
 		;;
 	*-*)
-		# shellcheck disable=SC2162
 		saved_IFS=$IFS
+		# shellcheck disable=SC2162
 		IFS="-" read kernel os <<EOF
 $basic_os
 EOF

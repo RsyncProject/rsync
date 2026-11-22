@@ -78,21 +78,20 @@ function rsync_ssl_helper {
 	    ;;
     esac
 
+    local -a gnutls_opts=(--logfile=/dev/null)
     if [[ -z "$RSYNC_SSL_CERT" ]]; then
 	certopt=""
-	gnutls_cert_opt=""
 	socat_cert_opt=""
     else
 	certopt="-cert$optsep$RSYNC_SSL_CERT"
-	gnutls_cert_opt="--x509certfile=$RSYNC_SSL_CERT"
+	gnutls_opts+=("--x509certfile=$RSYNC_SSL_CERT")
 	socat_cert_opt=",cert=$RSYNC_SSL_CERT"
     fi
 
     if [[ -z "$RSYNC_SSL_KEY" ]]; then
-	gnutls_key_opt=""
 	socat_key_opt=""
     else
-	gnutls_key_opt="--x509keyfile=$RSYNC_SSL_KEY"
+	gnutls_opts+=("--x509keyfile=$RSYNC_SSL_KEY")
 	socat_key_opt=",key=$RSYNC_SSL_KEY"
     fi
 
@@ -105,7 +104,6 @@ function rsync_ssl_helper {
 	# gnutls-cli has no reliable "use the system trust store AND make
 	# verification fatal" switch across versions, so the gnutls path
 	# refuses below unless RSYNC_SSL_ALLOW_INSECURE_GNUTLS is set.
-	gnutls_opts=""
 	# socat:
 	socat_opts="verify=1"
 	# stunnel:
@@ -119,7 +117,7 @@ function rsync_ssl_helper {
 	# openssl:
 	openssl_ca_opts=(-verify 1)
 	# gnutls:
-	gnutls_opts="--insecure"
+	gnutls_opts+=(--insecure)
 	# socat:
 	socat_opts="verify=0"
 	# stunnel:
@@ -130,7 +128,7 @@ function rsync_ssl_helper {
 	# openssl:
 	openssl_ca_opts=(-CAfile "$RSYNC_SSL_CA_CERT" -verify_return_error -verify 4)
 	# gnutls:
-	gnutls_opts="--x509cafile=$RSYNC_SSL_CA_CERT"
+	gnutls_opts+=("--x509cafile=$RSYNC_SSL_CA_CERT")
 	# socat:
 	socat_opts="cafile=$RSYNC_SSL_CA_CERT,verify=1"
 	# stunnel:
@@ -182,7 +180,7 @@ function rsync_ssl_helper {
     if [[ $RSYNC_SSL_TYPE == openssl ]]; then
 	run_openssl "$hostname" "$port" "${openssl_ca_opts[@]}"
     elif [[ $RSYNC_SSL_TYPE == gnutls ]]; then
-	exec "$RSYNC_SSL_GNUTLS" --logfile=/dev/null $gnutls_cert_opt $gnutls_key_opt $gnutls_opts $hostname:$port
+	exec "$RSYNC_SSL_GNUTLS" "${gnutls_opts[@]}" "--port=$port" "$hostname"
     elif [[ $RSYNC_SSL_TYPE == socat ]]; then
 	exec "$RSYNC_SSL_SOCAT" - "OPENSSL:$hostname:$port,commonname=$hostname$socat_sni_opt,$socat_opts$socat_cert_opt$socat_key_opt"
     else

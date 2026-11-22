@@ -17,6 +17,13 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'testsuite'))
 from harness.check_recipe import check_command
 
 
+SHELL_NAMES = r'(?:ash|bash|dash|ksh|mksh|sh|zsh)'
+SHELL_FILENAME = re.compile(rf'\.{SHELL_NAMES}(?:\.in)?\Z')
+SHELL_SHEBANG = re.compile(
+    rf'^#![ \t]*(?:[^ \t\r\n]*/)?(?:env[ \t]+(?:-S[ \t]+)?)?{SHELL_NAMES}(?:[ \t\r\n]|$)')
+SHEBANG_BYTES = 256
+
+
 def check_helpers(directory):
     suites = sorted(directory.glob('test-*.py'))
     if not suites:
@@ -27,6 +34,26 @@ def check_helpers(directory):
         if status:
             return status if status > 0 else 128 - status
     return 0
+
+
+def check_shell_scripts(directory):
+    paths = subprocess.check_output(['git', 'ls-files', '-z'], cwd=directory).split(b'\0')
+    scripts = []
+    for name in filter(None, paths):
+        relative = os.fsdecode(name)
+        path = directory / relative
+        if path.is_symlink() or not path.is_file():
+            continue
+        if not SHELL_FILENAME.search(path.name):
+            with path.open('rb') as stream:
+                shebang = stream.readline(SHEBANG_BYTES).decode('ascii', errors='replace')
+            if not SHELL_SHEBANG.match(shebang):
+                continue
+        scripts.append(relative)
+    if not scripts:
+        raise ValueError('No tracked shell scripts found')
+    print(f'Checking {len(scripts)} tracked shell scripts', flush=True)
+    return subprocess.call(['shellcheck', '--', *scripts], cwd=directory)
 
 
 def logged(command, path):
@@ -96,6 +123,7 @@ def main():
     sub = parser.add_subparsers(dest='task', required=True)
     sub.add_parser('install-actionlint')
     sub.add_parser('check-helpers')
+    sub.add_parser('check-shell-scripts')
     coverage = sub.add_parser('coverage')
     coverage.add_argument('transport', choices=['pipe', 'tcp'])
     sub.add_parser('coverage-summary')
@@ -113,6 +141,8 @@ def main():
         return 0
     if args.task == 'check-helpers':
         return check_helpers(Path(__file__).resolve().parent)
+    if args.task == 'check-shell-scripts':
+        return check_shell_scripts(Path(__file__).resolve().parents[2])
     if args.task == 'coverage':
         target = 'coverage' if args.transport == 'pipe' else 'coverage-tcp'
         return logged(['make', target], Path(f'cov-{args.transport}.log'))

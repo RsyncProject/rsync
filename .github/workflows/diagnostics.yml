@@ -90,6 +90,10 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      - name: Check shell scripts
+        run: |
+          shellcheck --version
+          python3 -B -S .github/scripts/diagnostics.py check-shell-scripts
       - name: Install actionlint
         run: python3 -S .github/scripts/diagnostics.py install-actionlint
       - name: Version
