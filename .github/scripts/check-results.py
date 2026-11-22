@@ -3,7 +3,7 @@ import os
 import sys
 
 
-def check(data, expected, selections, scheduled=False):
+def check(data, expected, selections, *, versions_selected, scheduled=False):
     def require(condition, message):
         if not condition:
             raise ValueError(message)
@@ -17,7 +17,7 @@ def check(data, expected, selections, scheduled=False):
     require(expected and all(value in ('true', 'false') for value in expected.values()),
             'Invalid job selection')
     require(isinstance(selections, dict)
-            and set(selections) == set(expected) | {'asan', 'coverage', 'clang'}
+            and set(selections) == set(expected) | {'versions', 'asan', 'coverage', 'clang'}
             and all(value in ('true', 'false') for value in selections.values()),
             'Invalid change selection')
     selected_families = {name: selections[name] for name in expected}
@@ -26,6 +26,10 @@ def check(data, expected, selections, scheduled=False):
                 'Scheduled run did not select every check')
     else:
         require(selected_families == expected, 'Job selection differs from changed paths')
+        require(versions_selected == selections['versions'], 'Archived-peer selection differs from changed paths')
+    require(versions_selected in ('true', 'false'), 'Invalid archived-peer selection')
+    require(versions_selected != 'true' or expected.get('diagnostics') == 'true',
+            'Archived peers require Diagnostics')
     messages = []
     for family in expected:
         group = data[family]
@@ -44,6 +48,9 @@ def check(data, expected, selections, scheduled=False):
         require(isinstance(inputs, dict) and all(type(value) is bool for value in inputs.values()),
                 f'{family}: invalid job selections')
         require(inputs.keys() <= jobs.keys(), f'{family}: unknown job selection')
+        if family == 'diagnostics':
+            require(inputs.get('versions') is (versions_selected == 'true'),
+                    'diagnostics/versions: missing or inconsistent selection')
         require(any(inputs.get(name) is not False for name in jobs), f'{family}: no jobs selected')
         for name, job in jobs.items():
             require(isinstance(job, dict), f'{family}/{name}: invalid job result')
@@ -62,7 +69,8 @@ def main():
                     if name.startswith('CI_EXPECT_')}
         messages = check(json.loads(os.environ['CI_RESULTS']), expected,
                          json.loads(os.environ['CI_SELECTIONS']),
-                         os.environ.get('GITHUB_EVENT_NAME') == 'schedule')
+                         versions_selected=os.environ['CI_VERSIONS_SELECTED'],
+                         scheduled=os.environ.get('GITHUB_EVENT_NAME') == 'schedule')
     except (KeyError, TypeError, ValueError) as error:
         print(f'CI result check failed: {error}', file=sys.stderr)
         return 1

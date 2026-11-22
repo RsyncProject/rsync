@@ -1467,7 +1467,14 @@ The /etc/rsyncd.secrets file would look something like this:
 
 ## FILES
 
-/etc/rsyncd.conf or rsyncd.conf
+The system daemon normally reads `/etc/rsyncd.conf`. A build configured with
+`--with-rsyncd-distconf=PATH` uses the vendor file at PATH only if the system
+configuration file is absent. With no path argument the vendor file is
+`/usr/etc/rsyncd.conf`. The fallback is disabled by default.
+
+An explicit `--config` does not fall back. An unprivileged daemon started
+through a remote shell still uses `rsyncd.conf` in the working directory by
+default.
 
 ## SEE ALSO
 

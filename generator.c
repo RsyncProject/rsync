@@ -35,6 +35,7 @@ extern int am_daemon;
 extern int inc_recurse;
 extern int relative_paths;
 extern int implied_dirs;
+extern int copy_links;
 extern int keep_dirlinks;
 extern int write_devices;
 extern int preserve_acls;
@@ -101,6 +102,7 @@ extern dev_t filesystem_dev;
 extern mode_t orig_umask;
 extern uid_t our_uid;
 extern char *tmpdir;
+extern char *confine_root;
 extern char *basis_dir[MAX_BASIS_DIRS+1];
 extern struct file_list *cur_flist, *first_flist, *dir_flist;
 extern filter_rule_list filter_list, daemon_filter_list;
@@ -951,26 +953,68 @@ static struct file_struct *find_fuzzy(struct file_struct *file, struct file_list
 	return lowest_fp;
 }
 
-/* Copy a file found in our --copy-dest handling. */
-static int copy_altdest_file(const char *src, const char *dest, struct file_struct *file)
+#if defined AT_FDCWD && defined O_NOFOLLOW && defined O_DIRECTORY
+static int open_checked_basis_file(int dfd, const char *path, const STRUCT_STAT *expected)
+{
+	const char *leaf = strrchr(path, '/') + 1;
+	STRUCT_STAT st;
+	int fd = do_open_atfd(dfd, leaf, O_RDONLY | O_NOFOLLOW | O_NONBLOCK, 0);
+	int e;
+
+	if (fd < 0)
+		return -1;
+	if (do_fstat(fd, &st) < 0)
+		e = errno;
+	else if (!S_ISREG(st.st_mode) || st.st_dev != expected->st_dev
+	      || st.st_ino != expected->st_ino)
+		e = EAGAIN;
+	else
+		return fd;
+	close(fd);
+	errno = e;
+	return -1;
+}
+#endif
+
+/* Copy a selected alternate basis. A failed hard link may still hold its
+ * checked source parent, so the copy need not reopen the full pathname. */
+static int copy_altdest_file(const char *src, const char *dest, struct file_struct *file,
+			     int basis_fd, const STRUCT_STAT *basis_st)
 {
 	char buf[MAXPATHLEN];
 	const char *copy_to, *partialptr;
 	int save_preserve_xattrs = preserve_xattrs;
-	int ok, fd_w;
+	int ok, fd_w, fd_r = -1;
 
+#if defined AT_FDCWD && defined O_NOFOLLOW && defined O_DIRECTORY
+	/* A relative basis uses the transfer-path policy when copied. */
+	if (basis_fd >= 0 && *src == '/') {
+		fd_r = open_checked_basis_file(basis_fd, src, basis_st);
+		if (fd_r < 0)
+			return -1;
+	}
+#else
+	(void)basis_fd; (void)basis_st;
+#endif
 	if (inplace) {
 		/* Let copy_file open the destination in place. */
 		fd_w = -1;
 		copy_to = dest;
 	} else {
 		fd_w = open_tmpfile(buf, dest, file);
-		if (fd_w < 0)
+		if (fd_w < 0) {
+			int e = errno;
+			if (fd_r >= 0)
+				close(fd_r);
+			errno = e;
 			return -1;
+		}
 		copy_to = buf;
 	}
 	cleanup_set(copy_to, NULL, NULL, -1, -1);
-	if (copy_file(src, copy_to, fd_w, file->mode) < 0) {
+	ok = fd_r >= 0 ? copy_file_from_fd(src, fd_r, copy_to, fd_w, file->mode)
+		       : copy_file(src, copy_to, fd_w, file->mode);
+	if (ok < 0) {
 		if (INFO_GTE(COPY, 1)) {
 			rsyserr(FINFO, errno, "copy_file %s => %s",
 				full_fname(src), copy_to);
@@ -990,14 +1034,21 @@ static int copy_altdest_file(const char *src, const char *dest, struct file_stru
 	return ok ? 0 : -1;
 }
 
-/* Stat an alternate-basis candidate (basis_dir[j]/fname) for a daemon /./
- * inner-module chroot through the secure resolver, so a --compare/copy/link-dest
- * basis can't reach outside the inner module via a symlinked parent (the kernel
- * chroot confines only the outer path).  secure_relative_open() refuses a parent
- * that escapes beneath the module root.  Plain link_stat() everywhere else --
- * the non-chroot daemon sanitizes basis paths already, and a local receiver must
- * still follow an operator's --link-dest=../backup. */
-static int basis_link_stat(const char *path, STRUCT_STAT *stp)
+struct basis_parent {
+	int fd;
+	int owned;
+};
+
+static void release_basis_parent(struct basis_parent *parent)
+{
+	if (parent->owned && parent->fd >= 0)
+		close(parent->fd);
+	parent->fd = -1;
+}
+
+/* Stat a basis candidate under the receiver's basis policy. A non-null parent
+ * receives the checked parent after a successful non-daemon lookup. */
+static int basis_link_stat(const char *path, STRUCT_STAT *stp, struct basis_parent *parent)
 {
 	extern int am_chrooted;
 	extern unsigned int module_dirlen;
@@ -1016,13 +1067,21 @@ static int basis_link_stat(const char *path, STRUCT_STAT *stp)
 	 * the plain path (a lower-severity, non-root basis lookup). */
 	if (!am_daemon && am_root >= 0 && !symlink_optout_allowed()) {
 		const char *leaf;
-		int dfd = owner_walk_parent(path, &leaf);
+		int owned = 1;
+		int dfd = parent && !basis_dir[1] ? cached_basis_parent_fd(basis_dir[0], path, &leaf, &owned)
+						: owner_walk_parent(path, &leaf);
 		int r, e;
 		if (dfd < 0)
 			return -1;
 		r = link_stat_at(dfd, leaf, stp, 0);
+		if (r == 0 && parent) {
+			parent->fd = dfd;
+			parent->owned = owned;
+			return 0;
+		}
 		e = errno;
-		close(dfd);
+		if (owned)
+			close(dfd);
 		errno = e;
 		return r;
 	}
@@ -1080,6 +1139,8 @@ static int basis_link_stat(const char *path, STRUCT_STAT *stp)
 		}
 #endif
 	}
+#else
+	(void)parent;
 #endif
 	if (am_daemon && am_chrooted && module_dirlen && path[0] != '/' && !symlink_optout_allowed()) {
 		const char *slash = strrchr(path, '/');
@@ -1102,6 +1163,111 @@ static int basis_link_stat(const char *path, STRUCT_STAT *stp)
 	return link_stat(path, stp, 0);
 }
 
+static int can_reuse_basis_parent(void)
+{
+#if defined SUPPORT_HARD_LINKS && defined HAVE_LINKAT && defined AT_FDCWD \
+ && defined O_NOFOLLOW && defined O_DIRECTORY
+	/* Only reuse a parent when stat and link use the same policy, and
+	 * neither the quick check nor the attribute check reopens the name. */
+	return alt_dest_type == LINK_DEST && !am_daemon && am_root >= 0
+	    && !confine_root && !dry_run && !copy_links && always_checksum <= 0
+	    && !preserve_acls && !preserve_xattrs && !crtimes_ndx
+	    && secure_relpath_active();
+#else
+	return 0;
+#endif
+}
+
+static int basis_dir_stat(const char *path, STRUCT_STAT *stp)
+{
+	struct basis_parent parent = { .fd = -1 };
+	int result = basis_link_stat(path, stp, can_reuse_basis_parent() ? &parent : NULL);
+	int e = errno;
+	release_basis_parent(&parent);
+	errno = e;
+	return result;
+}
+
+enum regular_basis_match {
+	BASIS_NOT_FOUND,
+	BASIS_CONTENT_DIFFERS,
+	BASIS_ATTRS_DIFFER,
+	BASIS_MATCHES
+};
+
+static enum regular_basis_match match_regular_basis(const char *path, struct file_struct *file,
+						    stat_x *sxp, struct basis_parent *parent)
+{
+	if (basis_link_stat(path, &sxp->st, parent) < 0 || !S_ISREG(sxp->st.st_mode))
+		return BASIS_NOT_FOUND;
+	if (!quick_check_ok(FT_REG, path, file, &sxp->st))
+		return BASIS_CONTENT_DIFFERS;
+	return unchanged_attrs(path, file, sxp) ? BASIS_MATCHES : BASIS_ATTRS_DIFFER;
+}
+
+#ifdef SUPPORT_HARD_LINKS
+static void complete_basis_link(struct file_struct *file, char *fname, const char *basis, stat_x *sxp,
+				int ndx, int itemizing, enum logcode code, int basis_ndx)
+{
+	if (atimes_ndx)
+		set_file_attrs(fname, file, sxp, NULL, 0);
+	if (preserve_hard_links && F_IS_HLINKED(file))
+		finish_hard_link(file, fname, ndx, &sxp->st, itemizing, code, basis_ndx);
+	if (!maybe_ATTRS_REPORT && (INFO_GTE(NAME, 2) || stdout_format_has_i > 1))
+		itemize(basis, file, ndx, 1, sxp, ITEM_LOCAL_CHANGE | ITEM_XNAME_FOLLOWS, 0, "");
+	if (INFO_GTE(NAME, 2) && maybe_ATTRS_REPORT)
+		rprintf(FCLIENT, "%s is uptodate\n", fname);
+}
+#endif
+
+enum fresh_link_result {
+	FRESH_LINK_FALLBACK,
+	FRESH_LINK_NO_BASIS,
+	FRESH_LINK_CONTENT_DIFFERS,
+	FRESH_LINK_ATTRS_DIFFER,
+	FRESH_LINK_DONE
+};
+
+#ifdef SUPPORT_HARD_LINKS
+/* Successful linkat proves the destination was absent without a stat. Do
+ * not replace an entry or reopen a pathname on this speculative path. */
+static enum fresh_link_result try_fresh_basis_link(struct file_struct *file, char *fname,
+						   int ndx, int itemizing, enum logcode code)
+{
+	struct basis_parent parent = { .fd = -1 };
+	enum fresh_link_result result = FRESH_LINK_FALLBACK;
+	enum regular_basis_match match;
+	char basis[MAXPATHLEN];
+	const char *leaf;
+	stat_x sx = {0};
+	int dfd = held_plain_dfd_for(fname, file);
+
+	if (dfd < 0 || pathjoin(basis, sizeof basis, basis_dir[0], fname) >= sizeof basis)
+		return result;
+	init_stat_x(&sx);
+	match = match_regular_basis(basis, file, &sx, &parent);
+	if (match == BASIS_NOT_FOUND)
+		result = FRESH_LINK_NO_BASIS;
+	else if (match == BASIS_CONTENT_DIFFERS)
+		result = FRESH_LINK_CONTENT_DIFFERS;
+	else if (match == BASIS_ATTRS_DIFFER)
+		result = FRESH_LINK_ATTRS_DIFFER;
+	if (match == BASIS_MATCHES && parent.fd >= 0) {
+		leaf = strrchr(fname, '/');
+		leaf = leaf ? leaf + 1 : fname;
+		if (do_link_atfd(parent.fd, leaf, dfd, leaf, 0) == 0) {
+			file->flags |= FLAG_HLINK_DONE;
+			release_basis_parent(&parent);
+			complete_basis_link(file, fname, basis, &sx, ndx, itemizing, code, 0);
+			result = FRESH_LINK_DONE;
+		}
+	}
+	release_basis_parent(&parent);
+	free_stat_x(&sx);
+	return result;
+}
+#endif
+
 /* This is only called for regular files.  We return -2 if we've finished
  * handling the file, -1 if no dest-linking occurred, or a non-negative
  * value if we found an alternate basis file.  If we're called with the
@@ -1110,84 +1276,81 @@ static int basis_link_stat(const char *path, STRUCT_STAT *stp)
  * are only -2 & -1 (both as above). */
 static int try_dests_reg(struct file_struct *file, char *fname, int ndx,
 			 char *cmpbuf, stat_x *sxp, int find_exact_for_existing,
-			 int itemizing, enum logcode code)
+			 int itemizing, enum logcode code, enum fresh_link_result fresh_link)
 {
 	STRUCT_STAT real_st = sxp->st;
 	int best_match = -1;
-	int match_level = 0;
+	enum regular_basis_match match_level = BASIS_NOT_FOUND;
 	int j = 0;
+	struct basis_parent parent = { .fd = -1 };
+	struct basis_parent *retain_parent = can_reuse_basis_parent() ? &parent : NULL;
 
 	do {
-		pathjoin(cmpbuf, MAXPATHLEN, basis_dir[j], fname);
-		if (basis_link_stat(cmpbuf, &sxp->st) < 0 || !S_ISREG(sxp->st.st_mode))
-			continue;
-		if (match_level == 0) {
-			best_match = j;
-			match_level = 1;
+		enum regular_basis_match match;
+
+		/* A non-exact probe already did this comparison. The selected
+		 * path still gets the usual recheck below. */
+		if (j == 0 && fresh_link == FRESH_LINK_CONTENT_DIFFERS)
+			match = BASIS_CONTENT_DIFFERS;
+		else if (j == 0 && fresh_link == FRESH_LINK_ATTRS_DIFFER)
+			match = BASIS_ATTRS_DIFFER;
+		else {
+			pathjoin(cmpbuf, MAXPATHLEN, basis_dir[j], fname);
+			match = match_regular_basis(cmpbuf, file, sxp, retain_parent);
 		}
-		if (!quick_check_ok(FT_REG, cmpbuf, file, &sxp->st))
-			continue;
-		if (match_level == 1) {
+		if (match > match_level) {
 			best_match = j;
-			match_level = 2;
+			match_level = match;
 		}
-		if (unchanged_attrs(cmpbuf, file, sxp)) {
-			best_match = j;
-			match_level = 3;
+		if (match == BASIS_MATCHES)
 			break;
-		}
-		free_stat_x(sxp);
+		if (match == BASIS_ATTRS_DIFFER)
+			free_stat_x(sxp);
+		release_basis_parent(&parent);
 	} while (basis_dir[++j] != NULL);
 
-	if (!match_level)
+	if (match_level == BASIS_NOT_FOUND)
 		goto got_nothing_for_ya;
 
 	if (j != best_match) {
+		struct basis_parent *recheck_parent;
+
 		j = best_match;
 		pathjoin(cmpbuf, MAXPATHLEN, basis_dir[j], fname);
-		if (basis_link_stat(cmpbuf, &sxp->st) < 0)
+		recheck_parent = !basis_dir[1] && *cmpbuf == '/' ? retain_parent : NULL;
+		if (basis_link_stat(cmpbuf, &sxp->st, recheck_parent) < 0)
 			goto got_nothing_for_ya;
 	}
 
-	if (match_level == 3 && alt_dest_type != COPY_DEST) {
+	if (match_level == BASIS_MATCHES && alt_dest_type != COPY_DEST) {
 		if (find_exact_for_existing) {
-			if (alt_dest_type == LINK_DEST && real_st.st_dev == sxp->st.st_dev && real_st.st_ino == sxp->st.st_ino)
+			if (alt_dest_type == LINK_DEST && real_st.st_dev == sxp->st.st_dev && real_st.st_ino == sxp->st.st_ino) {
+				release_basis_parent(&parent);
 				return -1;
+			}
 			if (do_unlink_at(fname) < 0 && errno != ENOENT)
 				goto got_nothing_for_ya;
 		}
 #ifdef SUPPORT_HARD_LINKS
 		if (alt_dest_type == LINK_DEST) {
-			/* For a NON-daemon receiver the basis dir is an operator path:
-			 * resolve the link source via the ownership walk so a foreign-owned
-			 * symlink raced in after the basis_link_stat() check is still
-			 * refused (matching basis_link_stat's !am_daemon gate).  A daemon
-			 * keeps its stronger module-anchored confinement (do_link_at's
-			 * secure_relpath_active path) -- the ownership walk would follow an
-			 * operator-owned symlink out of the module. */
-			int hlok, op = !am_daemon;
-			if (op)
+			/* The non-daemon link still uses operator-path resolution for
+			 * any parent not already held. Daemons keep their own policy. */
+			int hlok, saved_policy = operator_path_resolve;
+			int dest_parent_fd = parent.fd >= 0 && !find_exact_for_existing
+			    ? held_plain_dfd_for(fname, file) : -1;
+			if (!am_daemon)
 				operator_path_resolve = 1;
-			hlok = hard_link_one(file, fname, cmpbuf, 1);
-			if (op)
-				operator_path_resolve = 0;
+			hlok = hard_link_one(file, fname, cmpbuf, parent.fd, dest_parent_fd, 1);
+			operator_path_resolve = saved_policy;
 			if (!hlok)
 				goto try_a_copy;
-			if (atimes_ndx)
-				set_file_attrs(fname, file, sxp, NULL, 0);
-			if (preserve_hard_links && F_IS_HLINKED(file))
-				finish_hard_link(file, fname, ndx, &sxp->st, itemizing, code, j);
-			if (!maybe_ATTRS_REPORT && (INFO_GTE(NAME, 2) || stdout_format_has_i > 1)) {
-				itemize(cmpbuf, file, ndx, 1, sxp,
-					ITEM_LOCAL_CHANGE | ITEM_XNAME_FOLLOWS,
-					0, "");
-			}
-		} else
-#endif
-		{
-			if (itemizing)
-				itemize(cmpbuf, file, ndx, 0, sxp, 0, 0, NULL);
+			release_basis_parent(&parent);
+			complete_basis_link(file, fname, cmpbuf, sxp, ndx, itemizing, code, j);
+			return -2;
 		}
+#endif
+		if (itemizing)
+			itemize(cmpbuf, file, ndx, 0, sxp, 0, 0, NULL);
 		if (INFO_GTE(NAME, 2) && maybe_ATTRS_REPORT)
 			rprintf(FCLIENT, "%s is uptodate\n", fname);
 		return -2;
@@ -1196,18 +1359,17 @@ static int try_dests_reg(struct file_struct *file, char *fname, int ndx,
 	if (find_exact_for_existing)
 		goto got_nothing_for_ya;
 
-	if (match_level >= 2) {
+	if (match_level >= BASIS_ATTRS_DIFFER) {
+		int copied;
 #ifdef SUPPORT_HARD_LINKS
 	  try_a_copy: /* Copy the file locally. */
 #endif
-		/* NB: the copy-dest basis read is deliberately NOT routed through the
-		 * ownership walk: copy_altdest_file()->copy_file() also opens the dest
-		 * and copies xattrs through a held O_NOFOLLOW fd, and forcing
-		 * operator_path_resolve across that re-opens the copy_xattrs parent-
-		 * symlink race (copy-xattrs-symlink-race).  basis_link_stat() already
-		 * refuses a foreign-owned basis symlink, closing the static escape; the
-		 * post-stat race on an absolute copy-dest basis is a documented residual. */
-		if (!dry_run && copy_altdest_file(cmpbuf, fname, file) < 0) {
+		/* The held parent is for the source only. Keep the existing
+		 * destination replacement and receiver path policy unchanged. */
+		copied = dry_run ? 0 : copy_altdest_file(cmpbuf, fname, file,
+					find_exact_for_existing ? -1 : parent.fd, &sxp->st);
+		release_basis_parent(&parent);
+		if (copied < 0) {
 			if (find_exact_for_existing) /* Can get here via hard-link failure */
 				goto got_nothing_for_ya;
 			return -1;
@@ -1215,11 +1377,11 @@ static int try_dests_reg(struct file_struct *file, char *fname, int ndx,
 		if (itemizing)
 			itemize(cmpbuf, file, ndx, 0, sxp, ITEM_LOCAL_CHANGE, 0, NULL);
 		if (maybe_ATTRS_REPORT
-		 && ((!itemizing && INFO_GTE(NAME, 1) && match_level == 2)
-		  || (INFO_GTE(NAME, 2) && match_level == 3))) {
-			code = match_level == 3 ? FCLIENT : FINFO;
+		 && ((!itemizing && INFO_GTE(NAME, 1) && match_level == BASIS_ATTRS_DIFFER)
+		  || (INFO_GTE(NAME, 2) && match_level == BASIS_MATCHES))) {
+			code = match_level == BASIS_MATCHES ? FCLIENT : FINFO;
 			rprintf(code, "%s%s\n", fname,
-				match_level == 3 ? " is uptodate" : "");
+				match_level == BASIS_MATCHES ? " is uptodate" : "");
 		}
 #ifdef SUPPORT_HARD_LINKS
 		if (preserve_hard_links && F_IS_HLINKED(file))
@@ -1228,9 +1390,11 @@ static int try_dests_reg(struct file_struct *file, char *fname, int ndx,
 		return -2;
 	}
 
+	release_basis_parent(&parent);
 	return FNAMECMP_BASIS_DIR_LOW + j;
 
 got_nothing_for_ya:
+	release_basis_parent(&parent);
 	sxp->st = real_st;
 	return -1;
 }
@@ -1262,7 +1426,8 @@ static int try_dests_non(struct file_struct *file, char *fname, int ndx,
 
 	do {
 		pathjoin(cmpbuf, MAXPATHLEN, basis_dir[j], fname);
-		if (basis_link_stat(cmpbuf, &sxp->st) < 0)
+		if ((ftype == FT_DIR ? basis_dir_stat(cmpbuf, &sxp->st)
+		                     : basis_link_stat(cmpbuf, &sxp->st, NULL)) < 0)
 			continue;
 		if (ftype != get_file_type(sxp->st.st_mode))
 			continue;
@@ -1289,7 +1454,8 @@ static int try_dests_non(struct file_struct *file, char *fname, int ndx,
 	if (j != best_match) {
 		j = best_match;
 		pathjoin(cmpbuf, MAXPATHLEN, basis_dir[j], fname);
-		if (basis_link_stat(cmpbuf, &sxp->st) < 0)
+		if ((ftype == FT_DIR ? basis_dir_stat(cmpbuf, &sxp->st)
+		                     : basis_link_stat(cmpbuf, &sxp->st, NULL)) < 0)
 			return -1;
 	}
 
@@ -1446,6 +1612,35 @@ static int gen_entry_mkdir(char *fname, struct file_struct *file, mode_t mode)
 	}
 	return do_mkdir_at(fname, mode);
 }
+
+static BOOL create_incremental_dir(char *fname, struct file_struct *file)
+{
+	mode_t mode = am_root < 0 ? S_IRWXU : file->mode & S_IRWXU;
+
+	if (gen_entry_mkdir(fname, file, mode) < 0)
+		return False;
+	file->flags |= FLAG_DIR_CREATED;
+	return True;
+}
+
+static BOOL incremental_parent_created(void)
+{
+	int ndx = cur_flist->parent_ndx;
+	return ndx >= 0 && ndx < dir_flist->used
+	    && (dir_flist->files[ndx]->flags & FLAG_DIR_CREATED);
+}
+
+#ifdef SUPPORT_HARD_LINKS
+static BOOL can_try_fresh_basis_link(struct file_struct *file)
+{
+	return inc_recurse && basis_dir[0] && !basis_dir[1] && basis_dir[0][0] == '/'
+	    && preserve_perms && ignore_non_existing <= 0 && !solo_file
+	    && !remove_source_files && !read_batch && !write_batch
+	    && min_size < 0 && max_size < 0 && !F_IS_HLINKED(file)
+	    && (size_only > 0 || !ignore_times)
+	    && incremental_parent_created() && can_reuse_basis_parent();
+}
+#endif
 
 static int gen_entry_chmod(const char *fname, struct file_struct *file, mode_t mode)
 {
@@ -1644,7 +1839,7 @@ static int gen_entry_copy_xattrs(const char *src, const char *fname, struct file
 #endif
 
 static void recv_generator(char *fname, struct file_struct *file, int ndx,
-			   int itemizing, enum logcode code, int f_out)
+			   int itemizing, enum logcode code, int f_out, BOOL replacing_hlink)
 {
 	static const char *parent_dirname = "";
 	static struct file_struct *prior_dir_file = NULL;
@@ -1655,12 +1850,16 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 	static struct file_struct *skip_dir = NULL;
 	static struct file_list *fuzzy_dirlist[MAX_BASIS_DIRS+1];
 	static int need_fuzzy_dirlist = 0;
+#ifdef SUPPORT_HARD_LINKS
+	static int fresh_link_fallback_flist = -1;
+#endif
 	struct file_struct *fuzzy_file = NULL;
 	int fd = -1, f_copy = -1;
 	stat_x sx = {0}, real_sx = {0};
 	STRUCT_STAT partial_st;
 	struct file_struct *back_file = NULL;
 	int statret, real_ret, stat_errno;
+	enum fresh_link_result fresh_link = FRESH_LINK_FALLBACK;
 	char *fnamecmp, *partialptr, *backupptr = NULL;
 	char fnamecmpbuf[MAXPATHLEN];
 	uchar fnamecmp_type;
@@ -1669,6 +1868,10 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 	int is_dir = ftype != FT_DIR ? 0
 		   : inc_recurse && ndx != cur_flist->ndx_start - 1 ? -1
 		   : 1;
+
+#ifndef SUPPORT_HARD_LINKS
+	(void)replacing_hlink;
+#endif
 
 	if (DEBUG_GTE(GENR, 1))
 		rprintf(FINFO, "recv_generator(%s,%d)\n", fname, ndx);
@@ -1688,7 +1891,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 			if (is_dir)
 				file->flags |= FLAG_MISSING_DIR;
 #ifdef SUPPORT_HARD_LINKS
-			else if (F_IS_HLINKED(file))
+			else if (!replacing_hlink && F_IS_HLINKED(file))
 				handle_skipped_hlink(file, itemizing, code, f_out);
 #endif
 			return;
@@ -1702,7 +1905,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 			if (is_dir < 0)
 				return;
 #ifdef SUPPORT_HARD_LINKS
-			if (F_IS_HLINKED(file))
+			if (!replacing_hlink && F_IS_HLINKED(file))
 				handle_skipped_hlink(file, itemizing, code, f_out);
 #endif
 			rprintf(FERROR_XFER,
@@ -1787,6 +1990,29 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 		}
 		parent_dirname = dn;
 
+		/* Successful mkdir proves the child was absent. Only try it
+		 * first under a freshly created parent; existing entries go
+		 * through the usual stat and replacement checks. */
+		if (is_dir < 0 && preserve_mtimes && !omit_dir_times && !dry_run
+		 && ignore_non_existing <= 0 && am_root >= 0 && !am_daemon
+		 && !confine_root && secure_relpath_active()
+		 && (implied_dirs || !(file->flags & FLAG_IMPLIED_DIR))
+		 && strcmp(file->basename, ".") != 0
+		 && incremental_parent_created() && create_incremental_dir(fname, file))
+			goto cleanup;
+
+#ifdef SUPPORT_HARD_LINKS
+		if (ftype == FT_REG && fresh_link_fallback_flist != cur_flist->flist_num
+		 && can_try_fresh_basis_link(file)) {
+			fresh_link = try_fresh_basis_link(file, fname, ndx, itemizing, code);
+			if (fresh_link == FRESH_LINK_DONE)
+				goto cleanup;
+			/* Do not speculate on each file in a directory that
+			 * needs a fallback. */
+			if (fresh_link == FRESH_LINK_FALLBACK)
+				fresh_link_fallback_flist = cur_flist->flist_num;
+		}
+#endif
 		statret = gen_entry_stat(fname, file, &sx.st, keep_dirlinks && is_dir);
 		stat_errno = errno;
 	}
@@ -1813,7 +2039,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 			file->flags |= FLAG_MISSING_DIR;
 		}
 #ifdef SUPPORT_HARD_LINKS
-		else if (F_IS_HLINKED(file))
+		else if (!replacing_hlink && F_IS_HLINKED(file))
 			handle_skipped_hlink(file, itemizing, code, f_out);
 #endif
 		if (INFO_GTE(SKIP, 1)) {
@@ -1849,7 +2075,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 			rprintf(FINFO, "%s exists%s\n", fname, suf);
 		}
 #ifdef SUPPORT_HARD_LINKS
-		if (F_IS_HLINKED(file))
+		if (!replacing_hlink && F_IS_HLINKED(file))
 			handle_skipped_hlink(file, itemizing, code, f_out);
 #endif
 		goto cleanup;
@@ -1879,8 +2105,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 			 && (stype == FT_DIR
 			  || delete_item(fname, sx.st.st_mode, del_opts | DEL_FOR_DIR) != 0))
 				goto cleanup; /* Any errors get reported later. */
-			if (gen_entry_mkdir(fname, file, (file->mode|added_perms) & 0700) == 0)
-				file->flags |= FLAG_DIR_CREATED;
+			create_incremental_dir(fname, file);
 			goto cleanup;
 		}
 		/* The file to be received is a directory, so we need
@@ -2192,7 +2417,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 		if (INFO_GTE(SKIP, 1))
 			rprintf(FINFO, "%s is newer\n", fname);
 #ifdef SUPPORT_HARD_LINKS
-		if (F_IS_HLINKED(file))
+		if (!replacing_hlink && F_IS_HLINKED(file))
 			handle_skipped_hlink(file, itemizing, code, f_out);
 #endif
 		goto cleanup;
@@ -2207,8 +2432,10 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 		stat_errno = ENOENT;
 	}
 
-	if (basis_dir[0] != NULL && (statret != 0 || alt_dest_type != COPY_DEST)) {
-		int j = try_dests_reg(file, fname, ndx, fnamecmpbuf, &sx, statret == 0, itemizing, code);
+	if (fresh_link != FRESH_LINK_NO_BASIS && basis_dir[0] != NULL
+	 && (statret != 0 || alt_dest_type != COPY_DEST)) {
+		int j = try_dests_reg(file, fname, ndx, fnamecmpbuf, &sx, statret == 0,
+				      itemizing, code, fresh_link);
 		if (j == -2) {
 			if (remove_source_files == 1)
 				goto return_with_success;
@@ -2266,7 +2493,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 
 	if (statret != 0) {
 #ifdef SUPPORT_HARD_LINKS
-		if (preserve_hard_links && F_HLINK_NOT_LAST(file)) {
+		if (!replacing_hlink && preserve_hard_links && F_HLINK_NOT_LAST(file)) {
 			file->flags |= FLAG_HLINK_WAIT;
 			cur_flist->in_progress++;
 			goto cleanup;
@@ -2316,7 +2543,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 
 	if (append_mode > 0 && sx.st.st_size >= F_LENGTH(file)) {
 #ifdef SUPPORT_HARD_LINKS
-		if (F_IS_HLINKED(file))
+		if (!replacing_hlink && F_IS_HLINKED(file))
 			handle_skipped_hlink(file, itemizing, code, f_out);
 #endif
 		goto cleanup;
@@ -2372,7 +2599,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 	  pretend_missing:
 		/* pretend the file didn't exist */
 #ifdef SUPPORT_HARD_LINKS
-		if (preserve_hard_links && F_HLINK_NOT_LAST(file)) {
+		if (!replacing_hlink && preserve_hard_links && F_HLINK_NOT_LAST(file)) {
 			file->flags |= FLAG_HLINK_WAIT;
 			cur_flist->in_progress++;
 			goto cleanup;
@@ -2555,7 +2782,7 @@ int atomic_create(struct file_struct *file, char *fname, const char *slnk, const
 #endif
 	} else if (hlnk) {
 #ifdef SUPPORT_HARD_LINKS
-		if (!hard_link_one(file, create_name, hlnk, 0))
+		if (!hard_link_one(file, create_name, hlnk, -1, -1, 0))
 			return 0;
 #else
 		return 0;
@@ -2601,21 +2828,34 @@ static void handle_skipped_hlink(struct file_struct *file, int itemizing,
 {
 	char fbuf[MAXPATHLEN];
 	int new_ndx;
-	struct file_list *save_flist = cur_flist;
+	struct file_list *save_flist = cur_flist, *next_flist;
+	BOOL pin_saved = inc_recurse && save_flist != NULL;
 
-	/* Continue with the member selected to replace a skipped transfer. */
-	if ((new_ndx = skip_hard_link(file, &cur_flist)) < 0)
+	if ((new_ndx = skip_hard_link(file, &next_flist, False)) < 0)
 		return;
 
-	file = cur_flist->files[new_ndx - cur_flist->ndx_start];
-	if (file->flags & FLAG_HLINK_WAIT) {
-		file->flags &= ~FLAG_HLINK_WAIT;
-		cur_flist->in_progress--; /* undo prior increment */
-	}
-	f_name(file, fbuf);
-	recv_generator(fbuf, file, new_ndx, itemizing, code, f_out);
+	/* Generating a replacement can drain completions for other lists. */
+	if (pin_saved)
+		save_flist->in_progress++;
+	do {
+		cur_flist = next_flist;
+		file = cur_flist->files[new_ndx - cur_flist->ndx_start];
+		if (file->flags & FLAG_HLINK_WAIT) {
+			file->flags &= ~FLAG_HLINK_WAIT;
+			cur_flist->in_progress--;
+		}
+		f_name(file, fbuf);
+		recv_generator(fbuf, file, new_ndx, itemizing, code, f_out, True);
+
+		/* If nothing will complete this member, keep walking the chain. */
+		if (file->flags & (FLAG_FILE_SENT | FLAG_HLINK_DONE))
+			break;
+		new_ndx = skip_hard_link(file, &next_flist, True);
+	} while (new_ndx >= 0);
 
 	cur_flist = save_flist;
+	if (pin_saved)
+		save_flist->in_progress--;
 }
 #endif
 
@@ -2726,7 +2966,7 @@ void check_for_finished_files(int itemizing, enum logcode code, int check_redo)
 				strlcpy(fbuf, solo_file, sizeof fbuf);
 			else
 				f_name(file, fbuf);
-			recv_generator(fbuf, file, ndx, itemizing, code, sock_f_out);
+			recv_generator(fbuf, file, ndx, itemizing, code, sock_f_out, False);
 			cur_flist->to_redo--;
 
 			cur_flist = flist;
@@ -2818,6 +3058,7 @@ void generate_files(int f_out, const char *local_name)
 	enum logcode code;
 	int save_info_flist = info_levels[INFO_FLIST];
 	int save_info_progress = info_levels[INFO_PROGRESS];
+	reset_basis_parent_cache();
 
 	if (protocol_version >= 29) {
 		itemizing = 1;
@@ -2884,7 +3125,7 @@ void generate_files(int f_out, const char *local_name)
 			else
 				f_name(fp, fbuf);
 			ndx = cur_flist->ndx_start - 1;
-			recv_generator(fbuf, fp, ndx, itemizing, code, f_out);
+			recv_generator(fbuf, fp, ndx, itemizing, code, f_out, False);
 			if (delete_during && dry_run < 2 && !list_only
 			 && !(fp->flags & FLAG_MISSING_DIR)) {
 				if (fp->flags & FLAG_CONTENT_DIR) {
@@ -2914,7 +3155,7 @@ void generate_files(int f_out, const char *local_name)
 				strlcpy(fbuf, solo_file, sizeof fbuf);
 			else
 				f_name(file, fbuf);
-			recv_generator(fbuf, file, ndx, itemizing, code, f_out);
+			recv_generator(fbuf, file, ndx, itemizing, code, f_out, False);
 
 			check_for_finished_files(itemizing, code, 0);
 
@@ -3031,4 +3272,5 @@ void generate_files(int f_out, const char *local_name)
 
 	if (DEBUG_GTE(GENR, 1))
 		rprintf(FINFO, "generate_files finished\n");
+	reset_basis_parent_cache();
 }
