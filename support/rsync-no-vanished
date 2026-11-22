@@ -7,8 +7,8 @@ IGNOREOUT='^((file|directory) has vanished: |rsync warning: some files vanished 
 # If someone installs this as "rsync", make sure we don't affect a server run.
 for arg in "${@}"; do
     if [[ "$arg" == --server ]]; then
-	exec $REAL_RSYNC "${@}"
-	exit $? # Not reached
+        exec $REAL_RSYNC "${@}"
+        exit $? # Not reached
     fi
 done
 

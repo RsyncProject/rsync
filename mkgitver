@@ -20,13 +20,13 @@ if test -d "$srcdir/.git" || test -f "$srcdir/.git"; then
     # quoted value.  Empty (define missing/unmatched) -> leave RSYNC_GITVER unset.
     rsyncver=$(sed -n 's/^[[:space:]]*#[[:space:]]*define[[:space:]][[:space:]]*RSYNC_VERSION[[:space:]][[:space:]]*"\([^"]*\)".*/\1/p' "$srcdir/version.h")
     if [ -n "$gitsha" ] && [ -n "$rsyncver" ]; then
-	gitver="$rsyncver-g$gitsha"
-	echo "#define RSYNC_GITVER \"$gitver\"" >git-version.h.new
-	if ! diff git-version.h.new git-version.h >/dev/null; then
-	    echo "Updating git-version.h"
-	    mv git-version.h.new git-version.h
-	else
-	    rm git-version.h.new
-	fi
+        gitver="$rsyncver-g$gitsha"
+        echo "#define RSYNC_GITVER \"$gitver\"" >git-version.h.new
+        if ! diff git-version.h.new git-version.h >/dev/null; then
+            echo "Updating git-version.h"
+            mv git-version.h.new git-version.h
+        else
+            rm git-version.h.new
+        fi
     fi
 fi

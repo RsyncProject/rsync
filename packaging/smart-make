@@ -30,9 +30,9 @@ if diff configure.sh configure.sh.old >/dev/null 2>&1; then
 else
     echo "configure.sh has CHANGED."
     if test -f config.status; then
-	./config.status --recheck
+        ./config.status --recheck
     else
-	$srcdir/configure
+        $srcdir/configure
     fi
 fi
 
