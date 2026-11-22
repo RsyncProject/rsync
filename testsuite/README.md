@@ -58,7 +58,7 @@ With profiles active, an unsupported result is accepted only when the test decla
 
 [ci.yml](../.github/workflows/ci.yml) defines the platform groups and required checks. Native jobs exercise root and non-root transfers where available. Historical peers run applicable tests in both executable roles over pipe and TCP. Diagnostics cover the minimum Python version, static analysis, sanitisers, coverage and Valgrind. Coverage reports omit daemon work after chroot because its counter files are outside the chroot.
 
-The minimum Python and workflow lint jobs use the same helper test roster. Run those checks from the repository root with:
+The minimum Python and lint jobs use the same helper test roster. Run those checks from the repository root with:
 ```sh
 python3 -B -S .github/scripts/diagnostics.py check-helpers
 ```
