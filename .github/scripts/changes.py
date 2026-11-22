@@ -6,9 +6,9 @@ import subprocess
 import sys
 
 
-FAMILIES = ('linux', 'bsd', 'macos', 'other', 'versions', 'android',
+FAMILIES = ('linux', 'bsd', 'macos', 'other', 'android',
             'archive', 'diagnostics', 'valgrind', 'interoperability')
-OUTPUTS = (*FAMILIES, 'asan', 'coverage', 'clang')
+OUTPUTS = (*FAMILIES, 'versions', 'asan', 'coverage', 'clang')
 ARCHIVE_DOCUMENTS = {
     'rsync-ssl.1.md', 'rsyncd.conf.5.md', 'support/rrsync.1.md',
     'rsync.1', 'rsync.1.html', 'rsync-ssl.1', 'rsync-ssl.1.html',
@@ -58,10 +58,10 @@ def workflow(selected, name):
         'bsd.yml': ('bsd', 'diagnostics'),
         'macos.yml': ('macos', 'diagnostics'),
         'other.yml': ('other', 'diagnostics'),
-        'versions.yml': ('versions', 'diagnostics'),
+        'versions.yml': ('versions', 'diagnostics'),  # The workflow deletion is a selected change.
         'android.yml': ('android', 'diagnostics'),
         'archive.yml': ('archive', 'diagnostics'),
-        'diagnostics.yml': ('diagnostics', 'asan', 'coverage', 'clang'),
+        'diagnostics.yml': ('diagnostics', 'versions', 'asan', 'coverage', 'clang'),
         'valgrind.yml': ('valgrind', 'diagnostics'),
         'interoperability.yml': ('interoperability', 'diagnostics'),
         'interoperability-cleanup.yml': ('interoperability', 'diagnostics'),
@@ -156,7 +156,8 @@ def select(paths):
             workflow(selected, parsed.name)
         elif parsed.parent == PurePosixPath('.github/scripts'):
             script(selected, parsed.name)
-        elif path.startswith('.github/actions/interoperability/'):
+        elif path.startswith(('.github/actions/interoperability/',
+                              '.github/actions/interop-upload/')):
             enable(selected, 'interoperability', 'diagnostics')
         elif (path in FULL_CHECK_FILES or path.startswith(FULL_CHECK_DIRS)
               or len(parsed.parts) == 1 and parsed.suffix in SOURCE_SUFFIXES):
