@@ -2040,15 +2040,16 @@ sign) if you want the local shell to expand it.
     - `sha3-512`
     - `sha3-384`
     - `sha3-256`
+    - `sha256`
     - `md5`
     - `md4`
     - `sha1`
     - `none`
 
-    The `sha3-*` choices require an rsync built with OpenSSL support and
-    a libcrypto that provides SHA-3. They are not offered during default
-    negotiation. Use `--checksum-choice` or include them in both peers'
-    [`RSYNC_CHECKSUM_LIST`](#).
+    The `sha3-*` and `sha256` choices require an rsync built with OpenSSL
+    support and a libcrypto that provides the chosen digest. They are not
+    offered during default negotiation. Use `--checksum-choice` or include the
+    chosen digest in both peers' [`RSYNC_CHECKSUM_LIST`](#).
 
     Run `rsync --version` to see the checksum choices available in your build.
 

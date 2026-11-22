@@ -18,6 +18,9 @@
   Default negotiation is unchanged. Select SHA-3 with
   `--checksum-choice` or include it in both peers' `RSYNC_CHECKSUM_LIST`.
 
+- Added the opt-in SHA-256 transfer checksum `sha256` for builds with OpenSSL
+  SHA-256 support. Default negotiation is unchanged.
+
 ## Bug fixes
 
 - Fixed `-X` transfers of user xattrs on NetBSD by using the native BSD
