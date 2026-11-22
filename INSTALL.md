@@ -134,7 +134,7 @@ but feel free to combine the package names into a single install, if you like.
   > sudo apt install -y libzstd-dev
   > sudo apt install -y liblz4-dev
   > sudo apt install -y libssl-dev
-> sudo apt install -y libidn2-dev
+  > sudo apt install -y libidn2-dev
   > ```
 
 Or run `support/install_deps_ubuntu.sh`
@@ -150,8 +150,8 @@ Or run `support/install_deps_ubuntu.sh`
   > sudo yum -y install libzstd-devel
   > sudo yum -y install lz4-devel
   > sudo yum -y install openssl-devel
+  > sudo yum -y install libidn2-devel
   > python3 -mpip install --user commonmark
-> sudo yum -y install libidn2-devel
   > ```
 
 - For Fedora 33:
@@ -163,7 +163,7 @@ Or run `support/install_deps_ubuntu.sh`
   > sudo dnf -y install libzstd-devel
   > sudo dnf -y install lz4-devel
   > sudo dnf -y install openssl-devel
-> sudo dnf -y install libidn2-devel
+  > sudo dnf -y install libidn2-devel
   > ```
 
 - For FreeBSD (this assumes that the python3 version is 3.7):
@@ -173,7 +173,7 @@ Or run `support/install_deps_ubuntu.sh`
   > sudo pkg install -y xxhash
   > sudo pkg install -y zstd
   > sudo pkg install -y liblz4
-> sudo pkg install -y libidn2
+  > sudo pkg install -y libidn2
   > ```
 
 - For macOS:
@@ -184,19 +184,19 @@ Or run `support/install_deps_ubuntu.sh`
   > brew install zstd
   > brew install lz4
   > brew install openssl
-> brew install libidn2
+  > brew install libidn2
   > ```
 
 - For Cygwin (with all cygwin programs stopped, run the appropriate setup
   program from a cmd shell):
 
-  > ```bash
+  > ```bat
   > setup-x86_64 --quiet-mode -P make,gawk,autoconf,automake,gcc-core,python38,python38-pip
   > setup-x86_64 --quiet-mode -P attr,libattr-devel
   > setup-x86_64 --quiet-mode -P libzstd-devel
   > setup-x86_64 --quiet-mode -P liblz4-devel
   > setup-x86_64 --quiet-mode -P libssl-devel
-> setup-x86_64 --quiet-mode -P libidn2-devel
+  > setup-x86_64 --quiet-mode -P libidn2-devel
   > ```
 
   Sometimes cygwin has commonmark packaged and sometimes it doesn't. Now that
@@ -243,7 +243,7 @@ should be turned off for production builds.
 
 If you want to automatically use a separate `build` directory based on the
 current git branch name, start with a pristine `git checkout` and run
-`mkdir auto-build-save` before you run the first `./configure command`. That
+`mkdir auto-build-save` before you run the first `./configure` command. That
 will cause a fresh build dir to spring into existence along with a special
 Makefile symlink that allows you to run `make` and `./configure` from the source
 dir (the `build` dir gets auto switched based on branch). This is helpful when
