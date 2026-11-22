@@ -23,7 +23,7 @@
  int main(UNUSED(int argc), UNUSED(char *argv[]))
 {
 	int n, i;
-	const gid_t *list;
+	gid_t *list;
 	gid_t gid = MY_GID();
 	int gid_in_list = 0;
 

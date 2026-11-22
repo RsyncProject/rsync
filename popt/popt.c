@@ -582,12 +582,11 @@ findOption(const struct poptOption * opt,
 	     && callbackData && *callbackData == NULL)
 		*callbackData = opt->descrip;
 	    return opt2;
-	}   // break; // Already continues or returns
+	}
 	case POPT_ARG_CALLBACK:
 	    cb = opt;
 	    cbarg.ptr = opt->arg;
 	    continue;
-	    // break; // Already continues
 	default:
 	    break;
 	}

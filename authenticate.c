@@ -177,7 +177,7 @@ static const char *check_secret(int module, const char *user, const char *group,
 	}
 
 	if (user == NULL || *user == '#') {
-		/* Reject attempt to match a comment or empty string. */
+		/* Reject a missing username or an attempt to match a comment. */
 		fclose(fh);
 		return "invalid username";
 	}

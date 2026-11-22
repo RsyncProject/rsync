@@ -148,7 +148,7 @@ int start_socket_client(char *host, int remote_argc, char *remote_argv[],
 {
 	int fd, ret;
 	char *p;
-        const char *user = NULL;
+	const char *user = NULL;
 
 	/* This is redundant with code in start_inband_exchange(), but this
 	 * short-circuits a problem in the client before we open a socket,

@@ -1429,7 +1429,7 @@ int ZEXPORT inflateSyncPoint(z_streamp strm)
 int ZEXPORT inflateCopy(z_streamp dest, z_streamp source)
 {
     z_const struct inflate_state FAR *state;
-    z_const struct inflate_state FAR *copy;
+    struct inflate_state FAR *copy;
     unsigned char FAR *window;
     unsigned wsize;
 

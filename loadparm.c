@@ -317,10 +317,12 @@ static char *expand_vars(const char *str, int shell_escape)
 		exit_cleanup(RERR_MALLOC);
 	}
 
-	if (bufsize && (t = realloc(buf, t - buf + 1)) == NULL)
-		out_of_memory("expand_vars");
-	else
-		buf = t;
+	if (bufsize) {
+		char *resized = realloc(buf, t - buf + 1);
+		if (!resized)
+			out_of_memory("expand_vars");
+		buf = resized;
+	}
 
 	return buf;
 }
