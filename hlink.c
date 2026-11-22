@@ -487,9 +487,9 @@ int hard_link_check(struct file_struct *file, int ndx, char *fname,
 }
 
 int hard_link_one(struct file_struct *file, const char *fname,
-		  const char *oldname, int terse)
+		  const char *oldname, int old_parent_fd, int new_parent_fd, int terse)
 {
-	if (do_link_at(oldname, fname) < 0) {
+	if (do_link_at_from(old_parent_fd, oldname, new_parent_fd, fname) < 0) {
 		enum logcode code;
 		if (terse) {
 			if (!INFO_GTE(NAME, 1))
@@ -598,27 +598,38 @@ void finish_hard_link(struct file_struct *file, const char *fname, int fin_ndx,
 	}
 }
 
-int skip_hard_link(struct file_struct *file, struct file_list **flist_p)
+static int promote_hlink_waiter(struct file_struct *file, struct file_list **flist_p)
+{
+	struct file_list *flist;
+	struct file_struct *waiter;
+	int ndx = F_HL_PREV(file);
+
+	if (ndx < 0 || (flist = flist_for_ndx(ndx, NULL)) == NULL
+	 || ndx < flist->ndx_start)
+		return -1;
+	waiter = flist->files[ndx - flist->ndx_start];
+	if (!(waiter->flags & FLAG_HLINK_WAIT) || waiter->flags & FLAG_SKIP_HLINK)
+		return -1;
+	waiter->flags = (waiter->flags | FLAG_HLINK_FIRST) & ~FLAG_FILE_SENT;
+	*flist_p = flist;
+	return ndx;
+}
+
+int skip_hard_link(struct file_struct *file, struct file_list **flist_p, BOOL replacing_hlink)
 {
 	struct file_list *flist;
 	int prev_ndx;
 
 	file->flags |= FLAG_SKIP_HLINK;
-	if (!(file->flags & FLAG_HLINK_LAST)) {
-		/* A failed transfer leader may already have later members waiting
-		 * on it.  Promote the newest waiter and retain its chain so the
-		 * remaining members finish when the replacement transfer does. */
-		if (!inc_recurse || !(file->flags & FLAG_FILE_SENT)
-		 || (prev_ndx = F_HL_PREV(file)) < 0
-		 || (flist = flist_for_ndx(prev_ndx, NULL)) == NULL)
-			return -1;
-		file = flist->files[prev_ndx - flist->ndx_start];
-		if (!(file->flags & FLAG_HLINK_WAIT))
-			return -1;
-		file->flags = (file->flags | FLAG_HLINK_FIRST) & ~FLAG_FILE_SENT;
-		*flist_p = flist;
-		return prev_ndx;
+	/* A promoted member can own waiters before it sends a request. */
+	if (inc_recurse && !(file->flags & (FLAG_HLINK_DONE | FLAG_HLINK_WAIT))
+	 && (replacing_hlink || file->flags & FLAG_FILE_SENT)) {
+		prev_ndx = promote_hlink_waiter(file, flist_p);
+		if (prev_ndx >= 0)
+			return prev_ndx;
 	}
+	if (!(file->flags & FLAG_HLINK_LAST))
+		return -1;
 
 	check_prior(file, F_HL_GNUM(file), &prev_ndx, &flist);
 	if (prev_ndx >= 0) {

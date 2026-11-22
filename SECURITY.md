@@ -55,6 +55,8 @@ Where the operating system supports them, rsync uses held directory descriptors 
 - `rrsync` can preserve a validated inode across `exec` through `/proc/self/fd` on Linux; other platforms retain realpath validation without that inode pin;
 - `--insecure-links` and a daemon module's `insecure links = yes` deliberately restore legacy symlink-following behaviour.
 
+Holding a directory descriptor does not pin every entry in that directory or provide a consistent snapshot of a tree being modified during a transfer.
+
 Daemon authentication proves knowledge of a shared secret but does not encrypt the connection. Legacy clients can negotiate MD4 or MD5. Operators who require a strong digest should set `auth digest = sha256`; sensitive transfers should use SSH or verified TLS.
 
 ## Unsupported releases

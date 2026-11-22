@@ -2943,6 +2943,10 @@ sign) if you want the local shell to expand it.
     basis file from one of the _DIRs_ will be selected to try to speed up the
     transfer.
 
+    Basis directories and their aliases should remain stable during the
+    transfer. Rsync can continue using an opened directory after its name or
+    alias changes.
+
     If _DIR_ is a relative path, it is relative to the destination directory.
     See also [`--copy-dest`](#opt) and [`--link-dest`](#opt).
 
