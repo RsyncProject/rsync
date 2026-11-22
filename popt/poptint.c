@@ -82,7 +82,7 @@ strdup_locale_from_utf8 (char * istr)
     if (codeset != NULL && strcmp(codeset, "UTF-8") != 0
      && (cd = iconv_open(codeset, "UTF-8")) != (iconv_t)-1)
     {
-	char * shift_pin = NULL;
+	const char * shift_pin = NULL;
 	size_t db = strlen(istr);
 	char * dstr = malloc((db + 1) * sizeof(*dstr));
 	char * dstr_tmp;
@@ -122,7 +122,7 @@ strdup_locale_from_utf8 (char * istr)
 		pout = dstr + used;
 		ob = db - used;
 		continue;
-	    }   break;
+	    }
 	    case EINVAL:
 	    case EILSEQ:
 	    default:
@@ -144,7 +144,7 @@ strdup_locale_from_utf8 (char * istr)
 int
 POPT_fprintf (FILE * stream, const char * format, ...)
 {
-    char * b = NULL, * ob = NULL;
+    char * b = NULL;
     int rc;
     va_list ap;
 
@@ -161,7 +161,13 @@ POPT_fprintf (FILE * stream, const char * format, ...)
      * to do with whether the final '\0' is counted (or not). The code
      * below already adds +1 for the (possibly already counted) trailing NUL.
      */
-    while ((b = realloc(b, nb+1)) != NULL) {
+    for (;;) {
+	char * resized = realloc(b, nb+1);
+	if (resized == NULL) {
+	    free(b);
+	    return 0;
+	}
+	b = resized;
 	va_start(ap, format);
 	rc = vsnprintf(b, nb, format, ap);
 	va_end(ap);
@@ -171,14 +177,13 @@ POPT_fprintf (FILE * stream, const char * format, ...)
 	    nb = (size_t)(rc + 1);	/* precise buffer length known */
 	} else 		/* glibc 2.0 */
 	    nb += (nb < (size_t)100 ? (size_t)100 : nb);
-	ob = b;
     }
 #endif
 
     rc = 0;
     if (b != NULL) {
 #ifdef HAVE_ICONV
-	ob = strdup_locale_from_utf8(b);
+	char * ob = strdup_locale_from_utf8(b);
 	if (ob != NULL) {
 	    rc = fprintf(stream, "%s", ob);
 	    free(ob);

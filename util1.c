@@ -390,10 +390,7 @@ static int unlink_and_reopen(const char *dest, mode_t mode)
  * --copy-dest options. */
 int copy_file(const char *source, const char *dest, int tmpfilefd, mode_t mode)
 {
-	int ifd, ofd;
-	char buf[1024 * 8];
-	int len;   /* Number of bytes read into `buf'. */
-	OFF_T prealloc_len = 0, offset = 0;
+	int ifd;
 
 	/* For any hardened (non-chrooted) receiver, route the source open through
 	 * secure_relative_open so a parent-symlink on the source path (e.g.
@@ -436,6 +433,17 @@ int copy_file(const char *source, const char *dest, int tmpfilefd, mode_t mode)
 		errno = save_errno;
 		return -1;
 	}
+
+	return copy_file_from_fd(source, ifd, dest, tmpfilefd, mode);
+}
+
+/* Own the already-open input; source is used only for diagnostics and
+ * attribute reporting. Destination handling is the same as copy_file(). */
+int copy_file_from_fd(const char *source, int ifd, const char *dest, int tmpfilefd, mode_t mode)
+{
+	int ofd, len;
+	char buf[1024 * 8];
+	OFF_T prealloc_len = 0, offset = 0;
 
 	if (tmpfilefd >= 0) {
 		ofd = tmpfilefd;
@@ -1502,11 +1510,11 @@ char *normalize_path(char *path, BOOL force_newbuf, unsigned int *len_ptr)
 	unsigned int len;
 
 	if (*path != '/') { /* Make path absolute. */
-		int len = strlen(path);
-		if (curr_dir_len + 1 + len >= sizeof curr_dir)
+		int path_len = strlen(path);
+		if (curr_dir_len + 1 + path_len >= sizeof curr_dir)
 			return NULL;
 		curr_dir[curr_dir_len] = '/';
-		memcpy(curr_dir + curr_dir_len + 1, path, len + 1);
+		memcpy(curr_dir + curr_dir_len + 1, path, path_len + 1);
 		path = strdup(curr_dir);
 		curr_dir[curr_dir_len] = '\0';
 	} else if (force_newbuf)

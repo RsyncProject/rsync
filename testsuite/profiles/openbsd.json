@@ -22,7 +22,7 @@
     "search_only": "no race-safe search-only directory descriptors",
     "setpriv": "no setpriv launcher",
     "simd": "no SIMD test build",
-    "xattr_runtime": "no user xattr fixture",
-    "xattr_wire": "no xattr wire fixture"
+    "xattr_runtime": "OpenBSD has no native filesystem xattrs",
+    "xattr_wire": "the OpenBSD build has no xattr support"
   }
 }

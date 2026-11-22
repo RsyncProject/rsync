@@ -796,7 +796,7 @@ static void driver1(void)
 static void driver2(void)
 {
     uint8_t qa[MAXLEN+1], qb[MAXLEN+2], *a = &qa[0], *b = &qb[1];
-    uint32_t c[HASHSTATE], d[HASHSTATE], i=0, j=0, k, l, m=0, z;
+    uint32_t c[HASHSTATE], d[HASHSTATE], i, j, k, l, m=0, z;
     uint32_t e[HASHSTATE],f[HASHSTATE],g[HASHSTATE],h[HASHSTATE];
     uint32_t x[HASHSTATE],y[HASHSTATE];
     uint32_t hlen;
@@ -867,7 +867,7 @@ static void driver3(void)
     uint32_t j;
     uint8_t qqqq[] = "xxxThis is the time for all good men to come to the aid of their country...";
     uint32_t ref,x,y;
-    uint8_t *p;
+    const uint8_t *p;
     uint32_t m = 13;
 
     printf("Endianness.  These lines should all be the same (for values filled in):\n");

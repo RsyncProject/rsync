@@ -40,8 +40,10 @@ extern int protocol_version;
 extern int relative_paths;
 extern int preserve_hard_links;
 extern int preserve_perms;
+extern int preserve_acls;
 extern int write_devices;
 extern int preserve_xattrs;
+extern int crtimes_ndx;
 extern int do_fsync;
 extern int basis_dir_cnt;
 extern int make_backups;
@@ -133,6 +135,7 @@ static int secure_basis_open(const char *basedir, const char *relpath, int flags
 		const char *p = relpath;
 		const char *leaf;
 		int dfd, fd, saved_errno;
+		int owned = 1;
 		if (basedir) {
 			if (pathjoin(fullpath, sizeof fullpath, basedir, relpath) >= sizeof fullpath) {
 				errno = ENAMETOOLONG;
@@ -140,12 +143,22 @@ static int secure_basis_open(const char *basedir, const char *relpath, int flags
 			}
 			p = fullpath;
 		}
-		dfd = owner_walk_parent(p, &leaf);
+#ifndef __CYGWIN__
+		/* A single absolute alt-dest uses the ordinary ownership walk.
+		 * Partial, writable and daemon paths keep an uncached walk. */
+		if (basedir && basedir == basis_dir[0] && *basedir == '/'
+		 && basis_dir_cnt == 1 && !am_daemon && am_root >= 0
+		 && flags == O_RDONLY && !preserve_acls && !preserve_xattrs && !crtimes_ndx)
+			dfd = cached_basis_parent_fd(basedir, p, &leaf, &owned);
+		else
+#endif
+			dfd = owner_walk_parent(p, &leaf);
 		if (dfd < 0)
 			return -1;
 		fd = do_open_atfd(dfd, leaf, flags, mode);
 		saved_errno = fd < 0 ? errno : 0;
-		close(dfd);
+		if (owned)
+			close(dfd);
 		errno = saved_errno;
 		return fd;
 	}
@@ -419,7 +432,7 @@ int open_tmpfile(char *fnametmp, const char *fname, struct file_struct *file)
 		return -1;
 
 	if (am_root < 0) {
-		/* For --fake-super, the file must be useable by the copying
+		/* For --fake-super, the file must be usable by the copying
 		 * user, just like it would be for root. */
 		added_perms = S_IRUSR|S_IWUSR;
 	} else {
@@ -829,6 +842,8 @@ int recv_files(int f_in, int f_out, char *local_name)
 #endif
 	int ndx, recv_ok, one_inplace, write_to_device;
 	mode_t write_devices_saved_mode = 0;
+
+	reset_basis_parent_cache();
 
 	if (DEBUG_GTE(RECV, 1))
 		rprintf(FINFO, "recv_files(%d) starting\n", cur_flist->used);
@@ -1393,5 +1408,6 @@ int recv_files(int f_in, int f_out, char *local_name)
 	if (DEBUG_GTE(RECV, 1))
 		rprintf(FINFO,"recv_files finished\n");
 
+	reset_basis_parent_cache();
 	return 0;
 }

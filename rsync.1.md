@@ -4,7 +4,7 @@ rsync - a fast, versatile, local/remote file-copying tool
 
 ## SYNOPSIS
 
-```
+```plaintext
 Local:
     rsync [OPTION...] SRC... [DEST]
 
@@ -531,7 +531,7 @@ has its own detailed description later in this manpage.
 [comment]: # (help-rsync.h)
 [comment]: # (Keep these short enough that they'll be under 80 chars when indented by 7 chars.)
 
-```
+```plaintext
 --verbose, -v            increase verbosity
 --info=FLAGS             fine-grained informational verbosity
 --debug=FLAGS            fine-grained debug verbosity
@@ -559,13 +559,13 @@ has its own detailed description later in this manpage.
 --old-d                  same as --old-dirs
 --mkpath                 create destination's missing path components
 --links, -l              copy symlinks as symlinks
---copy-links, -L         transform symlink into referent file/directory
---copy-unsafe-links      only "unsafe" symlinks are transformed
+--copy-links, -L         copy the referents of symlinks
+--copy-unsafe-links      copy the referents of unsafe symlinks
 --safe-links             ignore symlinks that point outside the tree
 --insecure-links         follow attacker-owned symlinks in operator paths
 --confine-root=DIR       refuse operator paths resolving outside DIR
 --munge-links            munge symlinks to make them safe & unusable
---copy-dirlinks, -k      transform symlink to directory into referent directory
+--copy-dirlinks, -k      copy symlinks to directories as directories
 --keep-dirlinks, -K      treat symlinked directory on receiver as directory
 --hard-links, -H         preserve hard links
 --perms, -p              preserve permissions
@@ -698,7 +698,7 @@ accepted:
 
 [comment]: # (help-rsyncd.h)
 
-```
+```plaintext
 --daemon                 run as an rsync daemon
 --address=ADDRESS        bind to the specified address
 --bwlimit=RATE           limit socket I/O bandwidth
@@ -1695,6 +1695,10 @@ sign) if you want the local shell to expand it.
     This option causes rsync to update the destination extended attributes to
     be the same as the source ones.
 
+    On NetBSD rsync refuses to grow an existing extended attribute because
+    growing a value on NetBSD FFS can damage other attributes on the same
+    file. This also applies to attributes used by [`--fake-super`](#opt).
+
     For systems that support extended-attribute namespaces, a copy being done
     by a super-user copies all namespaces except system.\*.  A normal user only
     copies the user.\* namespace.  To be able to backup and restore non-user
@@ -2054,13 +2058,20 @@ sign) if you want the local shell to expand it.
     - `xxh128`
     - `xxh3`
     - `xxh64` (aka `xxhash`)
+    - `sha3-512`
+    - `sha3-384`
+    - `sha3-256`
     - `md5`
     - `md4`
     - `sha1`
     - `none`
 
-    Run `rsync --version` to see the default checksum list compiled into your
-    version (which may differ from the list above).
+    The `sha3-*` choices require an rsync built with OpenSSL support and
+    a libcrypto that provides SHA-3. They are not offered during default
+    negotiation. Use `--checksum-choice` or include them in both peers'
+    [`RSYNC_CHECKSUM_LIST`](#).
+
+    Run `rsync --version` to see the checksum choices available in your build.
 
     If "none" is specified for the first (or only) name, the [`--whole-file`](#opt)
     option is forced on and no checksum verification is performed on the
@@ -2950,6 +2961,10 @@ sign) if you want the local shell to expand it.
     basis file from one of the _DIRs_ will be selected to try to speed up the
     transfer.
 
+    Basis directories and their aliases should remain stable during the
+    transfer. Rsync can continue using an opened directory after its name or
+    alias changes.
+
     If _DIR_ is a relative path, it is relative to the destination directory.
     See also [`--copy-dest`](#opt) and [`--link-dest`](#opt).
 
@@ -3135,12 +3150,12 @@ sign) if you want the local shell to expand it.
 
 0.  `--compress-threads=NUM`, `--zt=NUM`
 
-    Set the number of threads to spawn when compressing data. Setting this 
-    option to 1 or more will instruct the compression library to spawn 1 or 
-    more threads for compression. Ideally, increasing the number of threads 
+    Set the number of threads to spawn when compressing data. Setting this
+    option to 1 or more will instruct the compression library to spawn 1 or
+    more threads for compression. Ideally, increasing the number of threads
     will increase transfer speed if the transfer is CPU bound on the sender.
-    
-    This option does not affect decompression. 
+
+    This option does not affect decompression.
 
     Compression algorithms that allow threading:
 
@@ -4260,6 +4275,10 @@ The options allowed when starting an rsync daemon are as follows:
     and the remote user is not the super-user; in that case the default is
     rsyncd.conf in the current directory (typically $HOME).
 
+    A standalone daemon opens its configuration at startup and again for
+    each client connection. Use a file that remains readable rather than a
+    pipe or pipe-backed process substitution.
+
 0.  `--dparam=OVERRIDE`, `-M`
 
     This option can be used to set a daemon-config parameter when starting up
@@ -4741,7 +4760,7 @@ like in your filter rules.  Without this, rsync would add the dir-merge rule
 for the .cvsignore file at the end of all your other rules (giving it a lower
 priority than your command-line rules).  For example:
 
-> ```
+> ```bash
 > cat <<EOT | rsync -avC --filter='. -' a/ b
 > + foo.o
 > :C
@@ -4786,7 +4805,7 @@ Let's say that we want to match two source files, one with an absolute
 path of "/home/me/foo/bar", and one with a path of "/home/you/bar/baz".
 Here is how the various command choices differ for a 2-source transfer:
 
-> ```
+> ```plaintext
 > Example cmd: rsync -a /home/me /home/you /dest
 > +/- pattern: /me/foo/bar
 > +/- pattern: /you/bar/baz
@@ -4794,7 +4813,7 @@ Here is how the various command choices differ for a 2-source transfer:
 > Target file: /dest/you/bar/baz
 > ```
 
-> ```
+> ```plaintext
 > Example cmd: rsync -a /home/me/ /home/you/ /dest
 > +/- pattern: /foo/bar               (note missing "me")
 > +/- pattern: /bar/baz               (note missing "you")
@@ -4802,7 +4821,7 @@ Here is how the various command choices differ for a 2-source transfer:
 > Target file: /dest/bar/baz
 > ```
 
-> ```
+> ```plaintext
 > Example cmd: rsync -a --relative /home/me/ /home/you /dest
 > +/- pattern: /home/me/foo/bar       (note full path)
 > +/- pattern: /home/you/bar/baz      (ditto)
@@ -4810,7 +4829,7 @@ Here is how the various command choices differ for a 2-source transfer:
 > Target file: /dest/home/you/bar/baz
 > ```
 
-> ```
+> ```plaintext
 > Example cmd: cd /home; rsync -a --relative me/foo you/ /dest
 > +/- pattern: /me/foo/bar      (starts at specified path)
 > +/- pattern: /you/bar/baz     (ditto)
@@ -4862,7 +4881,7 @@ the per-directory merge files (so that they don't get deleted) and then put
 rules into the local files to control what else should not get deleted.  Like
 one of these commands:
 
-> ```
+> ```bash
 > rsync -av --filter=':e /.rsync-filter' --delete \
 >     host:src/dir /dest
 > rsync -avFF --delete host:src/dir /dest

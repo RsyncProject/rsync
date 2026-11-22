@@ -41,8 +41,11 @@ def test(context: TestContext):
                     output = b''.join(chunks)
                     error = process.stderr.read()
         if text == valid:
-            if process.returncode != 255 or b'valid' not in output:
-                test_fail(f'valid config failed: {output!r} {error!r}')
+            lines = output.splitlines()
+            if (process.returncode != 0 or not lines or not lines[0].startswith(b'@RSYNCD: ')
+                    or lines[-1] != b'@RSYNCD: EXIT'
+                    or not any(line.split()[:1] == [b'valid'] for line in lines[1:-1])):
+                test_fail(f'valid config: exit {process.returncode}: {output!r} {error!r}')
         elif process.returncode != 1:
             test_fail(f'incomplete section: exit {process.returncode}: {output!r} {error!r}')
 
