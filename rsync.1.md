@@ -559,13 +559,13 @@ has its own detailed description later in this manpage.
 --old-d                  same as --old-dirs
 --mkpath                 create destination's missing path components
 --links, -l              copy symlinks as symlinks
---copy-links, -L         transform symlink into referent file/directory
---copy-unsafe-links      only "unsafe" symlinks are transformed
+--copy-links, -L         copy the referents of symlinks
+--copy-unsafe-links      copy the referents of unsafe symlinks
 --safe-links             ignore symlinks that point outside the tree
 --insecure-links         follow attacker-owned symlinks in operator paths
 --confine-root=DIR       refuse operator paths resolving outside DIR
 --munge-links            munge symlinks to make them safe & unusable
---copy-dirlinks, -k      transform symlink to directory into referent directory
+--copy-dirlinks, -k      copy symlinks to directories as directories
 --keep-dirlinks, -K      treat symlinked directory on receiver as directory
 --hard-links, -H         preserve hard links
 --perms, -p              preserve permissions
