@@ -218,6 +218,19 @@ AC_ARG_WITH(rsyncd-conf,
 
 AC_DEFINE_UNQUOTED(RSYNCD_SYSCONF, "$RSYNCD_SYSCONF", [location of configuration file for rsync server])
 
+AC_ARG_WITH([rsyncd-distconf],
+	AS_HELP_STRING([--with-rsyncd-distconf=PATH],[use PATH when the system daemon configuration is absent (disabled by default)]),
+	[case "$withval" in
+		no) RSYNCD_DISTCONF= ;;
+		yes) RSYNCD_DISTCONF=/usr/etc/rsyncd.conf ;;
+		/*) RSYNCD_DISTCONF="$withval" ;;
+		*) AC_MSG_ERROR([You must specify an absolute path to --with-rsyncd-distconf=PATH]) ;;
+	esac],
+	[RSYNCD_DISTCONF=])
+if test -n "$RSYNCD_DISTCONF"; then
+	AC_DEFINE_UNQUOTED(RSYNCD_DISTCONF, "$RSYNCD_DISTCONF", [vendor fallback configuration file for rsync server])
+fi
+
 AC_ARG_WITH(rsh,
 	AS_HELP_STRING([--with-rsh=CMD],[set remote shell command to CMD (default: ssh)]))
 
