@@ -101,6 +101,16 @@ static BOOL  (*the_pfunc)(char *, char *);
  * Functions...
  */
 
+static int get_char(FILE *file)
+{
+    int c;
+    if (feof(file) || ferror(file))
+        return EOF;
+    while ((c = getc(file)) == EOF && ferror(file) && errno == EINTR)
+        clearerr(file);
+    return c;
+}
+
 static int EatWhitespace( FILE *InFile )
   /* ------------------------------------------------------------------------ **
    * Scan past whitespace (see ctype(3C)) and return the first non-whitespace
@@ -121,7 +131,7 @@ static int EatWhitespace( FILE *InFile )
   {
   int c;
 
-  for( c = getc( InFile ); isspace( c ) && ('\n' != c); c = getc( InFile ) )
+  for( c = get_char( InFile ); ascii_is_space(c) && ('\n' != c); c = get_char( InFile ) )
     ;
   return( c );
   } /* EatWhitespace */
@@ -146,7 +156,7 @@ static int EatComment( FILE *InFile )
   {
   int c;
 
-  for( c = getc( InFile ); ('\n'!=c) && (EOF!=c) && (c>0); c = getc( InFile ) )
+  for( c = get_char( InFile ); ('\n'!=c) && (EOF!=c) && (c>0); c = get_char( InFile ) )
     ;
   return( c );
   } /* EatComment */
@@ -239,11 +249,11 @@ static BOOL Section( FILE *InFile, BOOL (*sfunc)(char *) )
           return( False );
           }
         end = ( (i > 0) && (' ' == bufr[i - 1]) ) ? (i - 1) : (i);
-        c = getc( InFile );             /* Continue with next line.         */
+        c = get_char( InFile );         /* Continue with next line.         */
         break;
 
       default:                        /* All else are a valid name chars.   */
-        if( isspace( c ) )              /* One space per whitespace region. */
+        if( ascii_is_space(c) )        /* One space per whitespace region. */
           {
           bufr[end] = ' ';
           i = end + 1;
@@ -253,12 +263,15 @@ static BOOL Section( FILE *InFile, BOOL (*sfunc)(char *) )
           {
           bufr[i++] = c;
           end = i;
-          c = getc( InFile );
+          c = get_char( InFile );
           }
       }
     }
 
   /* We arrive here if we've met the EOF before the closing bracket. */
+  if (ferror(InFile))
+    return False;
+  bufr[end] = '\0';
   rprintf(FLOG, "%s Unexpected EOF in the config file: %s\n", func, bufr );
   return( False );
   } /* Section */
@@ -326,11 +339,13 @@ static BOOL Parameter( FILE *InFile, BOOL (*pfunc)(char *, char *), int c )
           return( True );
           }
         end = ( (i > 0) && (' ' == bufr[i - 1]) ) ? (i - 1) : (i);
-        c = getc( InFile );       /* Read past eoln.                   */
+        c = get_char( InFile );   /* Read past eoln.                   */
         break;
 
       case '\0':                /* Shouldn't have EOF within param name. */
       case EOF:
+        if (ferror(InFile))
+          return False;
         bufr[i] = '\0';
         rprintf(FLOG, "%s Unexpected end-of-file at: %s\n", func, bufr );
         return( True );
@@ -349,7 +364,7 @@ static BOOL Parameter( FILE *InFile, BOOL (*pfunc)(char *, char *), int c )
         /* FALL THROUGH */
 
       default:
-        if( isspace( c ) )     /* One ' ' per whitespace region.       */
+        if( ascii_is_space(c) ) /* One ' ' per whitespace region.     */
           {
           bufr[end] = ' ';
           i = end + 1;
@@ -359,7 +374,7 @@ static BOOL Parameter( FILE *InFile, BOOL (*pfunc)(char *, char *), int c )
           {
           bufr[i++] = c;
           end = i;
-          c = getc( InFile );
+          c = get_char( InFile );
           }
       }
     }
@@ -377,7 +392,7 @@ static BOOL Parameter( FILE *InFile, BOOL (*pfunc)(char *, char *), int c )
     switch( c )
       {
       case '\r':              /* Explicitly remove '\r' because the older */
-        c = getc( InFile );   /* version called fgets_slash() which also  */
+        c = get_char( InFile ); /* version called fgets_slash() which also */
         break;                /* removes them.                            */
 
       case '\n':              /* Marks end of value unless there's a '\'. */
@@ -388,20 +403,22 @@ static BOOL Parameter( FILE *InFile, BOOL (*pfunc)(char *, char *), int c )
           {
           for( end = i; end >= 0 && isSpace(bufr + end); end-- )
             ;
-          c = getc( InFile );
+          c = get_char( InFile );
           }
         break;
 
       default:               /* All others verbatim.  Note that spaces do */
         bufr[i++] = c;       /* not advance <end>.  This allows trimming  */
-        if( !isspace( c ) )  /* of whitespace at the end of the line.     */
+        if( !ascii_is_space(c) ) /* of whitespace at the end of the line. */
           end = i;
-        c = getc( InFile );
+        c = get_char( InFile );
         break;
       }
     }
   bufr[end] = '\0';          /* End of value. */
 
+  if (ferror(InFile))
+    return False;
   return( pfunc( bufr, &bufr[vstart] ) );   /* Pass name & value to pfunc().  */
   } /* Parameter */
 
@@ -478,9 +495,9 @@ static int include_config(char *include, int manage_globals)
 
 static int parse_directives(char *name, char *val)
 {
-    if (strcasecmp(name, "&include") == 0)
+    if (ascii_strcasecmp(name, "&include") == 0)
         return include_config(val, 1);
-    if (strcasecmp(name, "&merge") == 0)
+    if (ascii_strcasecmp(name, "&merge") == 0)
         return include_config(val, 0);
     rprintf(FLOG, "Unknown directive: %s.\n", name);
     return 0;
@@ -580,7 +597,18 @@ static FILE *OpenConfFile( char *FileName )
     return( NULL );
     }
 
-  OpenedFile = fopen( FileName, "r" );
+  /* rsyncd.conf path (--config or default): a planted symlink could redirect
+   * the daemon's config read.  Refuse symlinks not owned by uid 0 or euid. */
+  {
+    int cfg_fd = open_no_attacker_symlinks( FileName, O_RDONLY, 0 );
+    OpenedFile = cfg_fd >= 0 ? fdopen( cfg_fd, "r" ) : NULL;
+    if( !OpenedFile && cfg_fd >= 0 )
+      {
+      int fdopen_errno = errno;
+      close( cfg_fd );
+      errno = fdopen_errno;
+      }
+  }
   if( NULL == OpenedFile )
     {
     rsyserr(FLOG, errno, "unable to open config file \"%s\"",
@@ -610,21 +638,26 @@ int pm_process( char *FileName,
   {
   int   result;
   FILE *InFile;
+  BOOL own_buffer = bufr == NULL;
   char *func = "params.c:pm_process() -";
 
   InFile = OpenConfFile( FileName );          /* Open the config file. */
   if( NULL == InFile )
     return( False );
 
-  if( NULL != bufr )                          /* If we already have a buffer */
-    result = Parse( InFile, sfunc, pfunc );   /* (recursive call), then just */
-                                              /* use it.                     */
-
-  else                                        /* If we don't have a buffer   */
-    {                                         /* allocate one, then parse,   */
-    bSize = BUFR_INC;                         /* then free.                  */
+  if (own_buffer)
+    {
+    bSize = BUFR_INC;
     bufr = new_array( char, bSize );
-    result = Parse( InFile, sfunc, pfunc );
+    }
+  result = Parse( InFile, sfunc, pfunc );
+  if (ferror(InFile))
+    {
+    rsyserr(FLOG, errno, "failed to read config file \"%s\"", FileName);
+    result = 0;
+    }
+  if (own_buffer)
+    {
     free( bufr );
     bufr  = NULL;
     bSize = 0;
