@@ -712,6 +712,21 @@ class Network(unittest.TestCase):
         self.assertEqual(json.loads((self.root / 'result.json').read_text()),
                          dict(self.state, passed=False, cleaned=True, roles=[]))
 
+    def test_cancelled_parent_after_admission_still_cleans(self):
+        broker['save'](self.root, 'lease', grant={}, devices=[], keys={}, nodes={})
+        api = Mock()
+        cleanup = Mock()
+        cancelled = Mock(side_effect=ci.NotSelected('CI was cancelled'))
+        with patch.object(sys, 'argv', ['interop-broker.py', 'finish', '--root', str(self.root)]), \
+                patch.dict(broker['main'].__globals__, Tailnet=lambda: api, cleanup=cleanup,
+                           check_ci=cancelled):
+            self.assertEqual(broker['main'](), 0)
+        cancelled.assert_not_called()
+        cleanup.assert_called_once()
+        self.assertIs(cleanup.call_args[0][0], api)
+        self.assertEqual(json.loads((self.root / 'result.json').read_text()),
+                         dict(self.state, passed=False, cleaned=True, roles=list(ROLES)))
+
     def test_delivered_enrolment_without_a_lease_requires_reconciliation(self):
         broker['save'](self.root, 'keys', keys={'linux': 'key1'}, pending=None)
         (self.root / 'enrolment.json').write_text('{}')

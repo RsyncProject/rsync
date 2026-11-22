@@ -16,17 +16,9 @@ defaults:
 
 jobs:
   mix:
-    name: ${{ matrix.name }}
+    name: Archived peers
     runs-on: ubuntu-24.04
     timeout-minutes: 45
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - name: Archived primary
-            role: primary
-          - name: Archived secondary
-            role: secondary
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -46,14 +38,25 @@ jobs:
         run: ./rsync --version
       - name: Validate profiles
         run: python3 -S testsuite/runtests.py profile --rsync-bin="$PWD/rsync"
-      - name: Tests (non-root pipe and TCP)
+      - name: Tests (archived primary)
         if: ${{ !cancelled() && steps.build.outcome == 'success' }}
-        run: python3 -S .github/scripts/versions.py --role "${{ matrix.role }}"
-      - name: Upload results
+        run: python3 -S .github/scripts/versions.py --role primary --output test-results/version-mix/primary
+      - name: Upload primary receipts
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           retention-days: 45
-          name: version-mix-${{ matrix.role }}-receipts
+          name: version-mix-primary-receipts
           if-no-files-found: error
-          path: test-results/version-mix
+          path: test-results/version-mix/primary
+      - name: Tests (archived secondary)
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: python3 -S .github/scripts/versions.py --role secondary --output test-results/version-mix/secondary
+      - name: Upload secondary receipts
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          retention-days: 45
+          name: version-mix-secondary-receipts
+          if-no-files-found: error
+          path: test-results/version-mix/secondary

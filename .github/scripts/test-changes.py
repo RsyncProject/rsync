@@ -1,6 +1,7 @@
 import json
 import os
 from pathlib import Path
+import re
 import runpy
 import subprocess
 import tempfile
@@ -88,6 +89,49 @@ class Changes(unittest.TestCase):
         for path, expected in cases.items():
             with self.subTest(path=path):
                 self.assertEqual(self.enabled([path]), expected)
+
+    def test_master_pushes_share_only_their_own_concurrency_group(self):
+        workflow = (Path(__file__).resolve().parents[1] / 'workflows/ci.yml').read_text()
+        self.assertIn("group: ${{ github.workflow }}-${{ github.event_name == 'push' && 'master' "
+                      "|| github.event.pull_request.number || github.run_id }}", workflow)
+        self.assertIn('cancel-in-progress: true', workflow)
+
+    def test_staged_families_keep_selection_after_prerequisite_failure(self):
+        workflow = (Path(__file__).resolve().parents[1] / 'workflows/ci.yml').read_text()
+        for family, prerequisite in (('android', 'diagnostics'), ('versions', 'diagnostics'),
+                                     ('archive', 'macos')):
+            with self.subTest(family=family):
+                match = re.search(r'^  ' + family + r':\n(.*?)(?=^  [a-z][a-z0-9_]*:\n|\Z)',
+                                  workflow, re.M | re.S)
+                self.assertIsNotNone(match)
+                block = match.group(1)
+                self.assertIn('needs: [changes, ' + prerequisite + ']', block)
+                condition = next(line.strip() for line in block.splitlines() if line.strip().startswith('if: '))
+                prefix, suffix = 'if: ${{ !cancelled() && ', ' }}'
+                self.assertTrue(condition.startswith(prefix) and condition.endswith(suffix))
+                selection = condition[len(prefix):-len(suffix)]
+                self.assertIn('needs.changes.outputs.' + family + " == 'true'", selection)
+                expected = 'CI_EXPECT_' + family.upper() + ': ${{ ' + selection + ' }}'
+                self.assertIn(expected, [line.strip() for line in workflow.splitlines()])
+
+    def test_version_roles_share_build_and_keep_separate_receipts(self):
+        workflow = (Path(__file__).resolve().parents[1] / 'workflows/versions.yml').read_text()
+        self.assertEqual(workflow.count('run: make check-progs'), 1)
+        self.assertNotIn('matrix.role', workflow)
+        self.assertEqual(workflow.count("!cancelled() && steps.build.outcome == 'success'"), 2)
+        for role in ('primary', 'secondary'):
+            with self.subTest(role=role):
+                self.assertIn('versions.py --role ' + role + ' --output test-results/version-mix/' + role,
+                              workflow)
+                self.assertIn('name: version-mix-' + role + '-receipts', workflow)
+                self.assertIn('path: test-results/version-mix/' + role, workflow)
+
+    def test_valgrind_stays_parallel_for_fast_feedback(self):
+        ci = (Path(__file__).resolve().parents[1] / 'workflows/ci.yml').read_text()
+        valgrind = (Path(__file__).resolve().parents[1] / 'workflows/valgrind.yml').read_text()
+        self.assertIn('  valgrind:\n    name: Valgrind\n    needs: changes\n', ci)
+        self.assertIn('CI_EXPECT_VALGRIND: *valgrind_selected', ci)
+        self.assertEqual(valgrind.count('            privilege:'), 4)
 
     def test_multiple_paths_union_their_owners(self):
         self.assertEqual(self.enabled(['README.md', '.github/scripts/android.py',
