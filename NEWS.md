@@ -26,6 +26,8 @@
   because FFS can corrupt other attributes during that operation.
 - Fixed silent loss of xattrs on Cygwin when the name list did not fit the
   initial buffer.
+- Report buffered diagnostic and logfile write failures instead of returning
+  success after dropping output.
 
 ## 3.5 maintenance line
 
