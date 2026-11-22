@@ -124,10 +124,15 @@ static int secure_basis_open(const char *basedir, const char *relpath, int flags
 	 * and traverse a symlink the secure_relative_open path can't confine: resolve
 	 * it with the ownership walk, which follows a uid0/euid-owned symlink but
 	 * refuses a foreign one AND (via abspath_excluded_by_module) refuses a target
-	 * the module's exclude hides -- closing the partial-dir exclude bypass. */
+	 * the module's exclude hides -- closing the partial-dir exclude bypass.  The
+	 * final component is opened with O_NOFOLLOW so an operator-path leaf symlink
+	 * cannot be selected as an alternate basis. */
+#if defined AT_FDCWD && defined O_NOFOLLOW && defined O_DIRECTORY
 	if (operator_path_resolve) {
 		char fullpath[MAXPATHLEN];
 		const char *p = relpath;
+		const char *leaf;
+		int dfd, fd, saved_errno;
 		if (basedir) {
 			if (pathjoin(fullpath, sizeof fullpath, basedir, relpath) >= sizeof fullpath) {
 				errno = ENAMETOOLONG;
@@ -135,8 +140,16 @@ static int secure_basis_open(const char *basedir, const char *relpath, int flags
 			}
 			p = fullpath;
 		}
-		return open_no_attacker_symlinks(p, flags, mode);
+		dfd = owner_walk_parent(p, &leaf);
+		if (dfd < 0)
+			return -1;
+		fd = do_open_atfd(dfd, leaf, flags, mode);
+		saved_errno = fd < 0 ? errno : 0;
+		close(dfd);
+		errno = saved_errno;
+		return fd;
 	}
+#endif
 
 	/* The confined resolver is needed for the sanitizing daemon
 	 * (am_daemon && !am_chrooted) and for a /./ inner-module chroot
@@ -406,7 +419,7 @@ int open_tmpfile(char *fnametmp, const char *fname, struct file_struct *file)
 		return -1;
 
 	if (am_root < 0) {
-		/* For --fake-super, the file must be useable by the copying
+		/* For --fake-super, the file must be usable by the copying
 		 * user, just like it would be for root. */
 		added_perms = S_IRUSR|S_IWUSR;
 	} else {
@@ -471,6 +484,9 @@ static int receive_data(int f_in, char *fname_r, int fd_r, OFF_T size_r,
 	char *data;
 	int32 i;
 	char *map = NULL;
+
+	/* Reset the block tracker's per-file state in case the OS reuses an fd. */
+	reset_block_tracker();
 
 #ifdef SUPPORT_PREALLOCATION
 	if (preallocate_files && fd != -1 && total_size > 0 && (!inplace_sizing || total_size > size_r)) {
@@ -1134,7 +1150,8 @@ int recv_files(int f_in, int f_out, char *local_name)
 
 		/* A peer's basis selector cannot enable direct output through a path
 		 * that the confined basis open did not validate. */
-		one_inplace = inplace_partial && fnamecmp_type == FNAMECMP_PARTIAL_DIR
+		one_inplace = inplace_partial && partial_dir
+			   && fnamecmp_type == FNAMECMP_PARTIAL_DIR
 			   && fd1 != -1;
 		updating_basis_or_equiv = one_inplace
 		    || (inplace && (fnamecmp == fname || fnamecmp_type == FNAMECMP_BACKUP));

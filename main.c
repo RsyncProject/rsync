@@ -253,6 +253,7 @@ void read_del_stats(int f)
 static void become_copy_as_user()
 {
 	char *gname;
+	const struct passwd *pw = NULL;
 	uid_t uid;
 	gid_t gid;
 
@@ -276,7 +277,6 @@ static void become_copy_as_user()
 			exit_cleanup(RERR_SYNTAX);
 		}
 	} else {
-		struct passwd *pw;
 		if ((pw = getpwuid(uid)) == NULL) {
 			rsyserr(FERROR, errno, "getpwuid failed");
 			exit_cleanup(RERR_SYNTAX);
@@ -295,7 +295,7 @@ static void become_copy_as_user()
 	}
 #endif
 #ifdef HAVE_INITGROUPS
-	if (!gname && initgroups(copy_as, gid) < 0) {
+	if (!gname && initgroups(pw->pw_name, gid) < 0) {
 		rsyserr(FERROR, errno, "initgroups failed");
 		exit_cleanup(RERR_SYNTAX);
 	}
@@ -443,6 +443,9 @@ static void output_summary(void)
 			human_num(stats.total_transferred_size));
 		rprintf(FINFO,"Literal data: %s bytes\n",
 			human_num(stats.literal_data));
+		if (protocol_version >= 33)
+			rprintf(FINFO,"Number of 4 KiB logical blocks touched: %s\n",
+				comma_num(stats.touched_blocks_4k));
 		rprintf(FINFO,"Matched data: %s bytes\n",
 			human_num(stats.matched_data));
 		rprintf(FINFO,"File list size: %s\n",
@@ -759,7 +762,7 @@ static char *get_local_name(struct file_list *flist, char *dest_path)
 		if (ret && (INFO_GTE(NAME, 1) || stdout_format_has_i)) {
 			if (cp && (file_total == 1 || trailing_slash))
 				*cp = '\0';
-			rprintf(FINFO, "created %d director%s for %s\n", ret, ret == 1 ? "y" : "ies", dest_path);
+			rprintf(FINFO, "created %s director%s for %s\n", comma_num(ret), ret == 1 ? "y" : "ies", dest_path);
 			if (cp && (file_total == 1 || trailing_slash))
 				*cp = '/';
 		}
@@ -950,7 +953,7 @@ static void read_final_goodbye(int f_in, int f_out)
 
 static void do_server_sender(int f_in, int f_out, int argc, char *argv[])
 {
-	struct file_list *flist;
+	const struct file_list *flist;
 	char *dir;
 
 	if (DEBUG_GTE(SEND, 1))
@@ -1107,6 +1110,11 @@ static int do_recv(int f_in, int f_out, char *local_name)
 
 		write_int(f_out, NDX_DONE);
 		send_msg(MSG_STATS, (char*)&stats.total_read, sizeof stats.total_read, 0);
+		if (protocol_version >= 33) {
+			char b[8];
+			SIVAL64(b, 0, stats.touched_blocks_4k);
+			send_msg(MSG_BLOCK_STATS, b, sizeof b, 0);
+		}
 		io_flush(FULL_FLUSH);
 
 		/* Handle any keep-alive packets from the post-processing work
@@ -1301,6 +1309,9 @@ void start_server(int f_in, int f_out, int argc, char *argv[])
 
 	if (protocol_version >= 23)
 		io_start_multiplex_out(f_out);
+	/* Priority diagnostics need the negotiated message channel.
+	 * File-list work starts below. */
+	niceness_apply();
 	if (am_daemon && io_timeout && protocol_version >= 31)
 		send_msg_int(MSG_IO_TIMEOUT, io_timeout);
 
@@ -1332,10 +1343,11 @@ void start_server(int f_in, int f_out, int argc, char *argv[])
  * for rsyncd, remote-shell, and local connections. */
 int client_run(int f_in, int f_out, pid_t pid, int argc, char *argv[])
 {
-	struct file_list *flist = NULL;
+	struct file_list *flist;
 	int exit_code = 0, exit_code2 = 0;
 	char *local_name = NULL;
 
+	niceness_apply();
 	cleanup_child_pid = pid;
 	if (!read_batch) {
 		set_nonblocking(f_in);
@@ -1612,7 +1624,7 @@ static int start_client(int argc, char *argv[])
 		exit_cleanup(RERR_SYNTAX);
 	}
 
-	if (connect_timeout) {
+	if (connect_timeout && !daemon_connection) {
 		rprintf(FERROR, "The --contimeout option may only be "
 				"used when connecting to an rsync daemon.\n");
 		exit_cleanup(RERR_SYNTAX);
@@ -1644,6 +1656,14 @@ static int start_client(int argc, char *argv[])
 	(void)env_port;
 #endif
 
+	/* For a daemon reached through a remote shell, the "connection" rsync
+	 * waits on is: the helper is spawned, it establishes its own link (e.g.
+	 * rsync-ssl's openssl connect + TLS handshake), and the daemon greeting is
+	 * exchanged.  Bound that whole phase with --contimeout so the option
+	 * behaves for daemon-via-rsh the way it does for a socket connection. */
+	if (daemon_connection && connect_timeout > 0)
+		set_client_connect_timeout(connect_timeout);
+
 	pid = do_cmd(shell_cmd, shell_machine, shell_user, remote_argv, remote_argc, &f_in, &f_out);
 
 	/* if we're running an rsync server on the remote host over a
@@ -1651,6 +1671,7 @@ static int start_client(int argc, char *argv[])
 	if (daemon_connection) {
 		int tmpret;
 		tmpret = start_inband_exchange(f_in, f_out, shell_user, remote_argc, remote_argv);
+		set_client_connect_timeout(0);
 		if (tmpret < 0)
 			return tmpret;
 	}

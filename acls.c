@@ -1471,6 +1471,9 @@ int default_perms_for_dir(const char *dir)
 #ifdef ENOTSUP
 		case ENOTSUP:
 #endif
+#if defined(EOPNOTSUPP) && (!defined(ENOTSUP) || EOPNOTSUPP != ENOTSUP)
+		case EOPNOTSUPP:
+#endif
 		case ENOSYS:
 			/* No ACLs are available. */
 			break;

@@ -93,6 +93,7 @@
 #define FLAG_TIME_FAILED (1<<11)/* generator */
 #define FLAG_MOD_NSEC (1<<12)	/* sender/receiver/generator */
 #define FLAG_GOT_DIR_FLIST (1<<13)/* sender/receiver/generator - dir_flist only */
+#define FLAG_HLINK_WAIT (1<<14) /* generator (w/FLAG_HLINKED): counted in in_progress, pending hard-link processing */
 
 /* These flags are passed to functions but not stored. */
 
@@ -111,7 +112,7 @@
 
 /* Update this if you make incompatible changes and ALSO update the
  * SUBPROTOCOL_VERSION if it is not a final (official) release. */
-#define PROTOCOL_VERSION 32
+#define PROTOCOL_VERSION 33
 
 /* This is used when working on a new protocol version or for any unofficial
  * protocol tweaks.  It should be a non-zero value for each pre-release repo
@@ -299,6 +300,7 @@ enum msgcode {
 	MSG_LOG=FLOG, MSG_CLIENT=FCLIENT, /* sibling logging */
 	MSG_REDO=9,	/* reprocess indicated flist index */
 	MSG_STATS=10,	/* message has stats data for generator */
+	MSG_BLOCK_STATS=11,/* message has block-level stats for sender */
 	MSG_IO_ERROR=22,/* the sending side had an I/O error */
 	MSG_IO_TIMEOUT=33,/* tell client about a daemon's timeout value */
 	MSG_NOOP=42,	/* a do-nothing message (legacy protocol-30 only) */
@@ -408,6 +410,21 @@ enum delret {
 #ifdef HAVE_SYS_FCNTL_H
 #include <sys/fcntl.h>
 #endif
+#endif
+
+/* O_CLOEXEC is absent on some still-supported targets.  Defining it to zero
+ * preserves the open flags there; the test macro exercises that fallback on
+ * build hosts that provide O_CLOEXEC. */
+#ifdef RSYNC_TEST_NO_O_CLOEXEC
+#undef O_CLOEXEC
+#endif
+#ifndef O_CLOEXEC
+#define O_CLOEXEC 0
+#endif
+
+/* Exercise the O_DIRECTORY portability path on build hosts that provide it. */
+#ifdef RSYNC_TEST_NO_O_DIRECTORY
+#undef O_DIRECTORY
 #endif
 
 #ifdef HAVE_SYS_IOCTL_H
@@ -1080,6 +1097,7 @@ struct stats {
 	int64 total_read;
 	int64 literal_data;
 	int64 matched_data;
+	int64 touched_blocks_4k;
 	int64 flist_buildtime;
 	int64 flist_xfertime;
 	int64 flist_size;
@@ -1216,6 +1234,11 @@ typedef struct {
 
 #define NSTR_CHECKSUM 0
 #define NSTR_COMPRESS 1
+
+#define NNI_BUILTIN (1<<0)
+#define NNI_EVP (1<<1)
+#define NNI_EVP_OK (1<<2)
+#define NNI_EXPLICIT_ONLY (1<<3)
 
 struct name_num_item {
 	int num, flags;

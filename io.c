@@ -117,6 +117,13 @@ static time_t last_io_out;
  * transfer timeout and may be supplied by the module or client. */
 static time_t daemon_handshake_deadline;
 
+/* Wall-clock bound the client puts on establishing a daemon connection made
+ * through a remote shell (daemon_connection == 1): spawning the helper, its
+ * connect()/TLS handshake, and the exchange of the daemon greeting all happen
+ * before any buffered I/O begins, so --contimeout can time the whole phase the
+ * same way the socket path times its connect(). */
+static time_t client_connect_deadline;
+
 static int write_batch_monitor_in = -1;
 static int write_batch_monitor_out = -1;
 
@@ -146,17 +153,28 @@ static int handshake_poll_timeout_ms(void)
 	time_t now, left;
 	int timeout = poll_timeout_ms();
 
-	if (!daemon_handshake_deadline)
+	if (!daemon_handshake_deadline && !client_connect_deadline)
 		return timeout;
 
 	now = time(NULL);
-	left = daemon_handshake_deadline - now;
-	if (left <= 0) {
-		rprintf(FERROR, "[%s] daemon handshake timeout -- exiting\n", who_am_i());
-		exit_cleanup(RERR_TIMEOUT);
+	if (daemon_handshake_deadline) {
+		left = daemon_handshake_deadline - now;
+		if (left <= 0) {
+			rprintf(FERROR, "[%s] daemon handshake timeout -- exiting\n", who_am_i());
+			exit_cleanup(RERR_TIMEOUT);
+		}
+		if (left <= INT_MAX / 1000 && left * 1000 < timeout)
+			timeout = (int)left * 1000;
 	}
-	if (left <= INT_MAX / 1000 && left * 1000 < timeout)
-		timeout = (int)left * 1000;
+	if (client_connect_deadline) {
+		left = client_connect_deadline - now;
+		if (left <= 0) {
+			rprintf(FERROR, "[%s] connection timed out -- exiting\n", who_am_i());
+			exit_cleanup(RERR_CONTIMEOUT);
+		}
+		if (left <= INT_MAX / 1000 && left * 1000 < timeout)
+			timeout = (int)left * 1000;
+	}
 	return timeout;
 }
 
@@ -1069,11 +1087,16 @@ void noop_io_until_death(void)
 /* Buffer a message for the multiplexed output stream.  Is not used for (normal) MSG_DATA. */
 int send_msg(enum msgcode code, const char *buf, size_t len, int convert)
 {
+	static int growing_msg_buffer;
 	char *hdr;
 	size_t needed, pos;
 	BOOL want_debug = DEBUG_GTE(IO, 1) && convert >= 0 && (msgs2stderr == 1 || code != MSG_INFO);
 
 	if (!OUT_MULTIPLEXED)
+		return 0;
+	/* A fatal realloc_xbuf() failure is reported via rprintf(), which would
+	 * otherwise call send_msg() again and try to grow the same full buffer. */
+	if (growing_msg_buffer)
 		return 0;
 
 	if (want_debug) {
@@ -1100,7 +1123,9 @@ int send_msg(enum msgcode code, const char *buf, size_t len, int convert)
 		else { /* We sometimes allow the iobuf.msg size to increase to avoid a deadlock. */
 			size_t old_size = iobuf.msg.size;
 			restore_iobuf_size(&iobuf.msg);
+			growing_msg_buffer = 1;
 			realloc_xbuf(&iobuf.msg, iobuf.msg.size * 2);
+			growing_msg_buffer = 0;
 			if (iobuf.msg.pos + iobuf.msg.len > old_size)
 				memcpy(iobuf.msg.buf + old_size, iobuf.msg.buf, iobuf.msg.pos + iobuf.msg.len - old_size);
 		}
@@ -1301,6 +1326,14 @@ void set_daemon_handshake_timeout(int secs)
 		daemon_handshake_deadline = time(NULL) + secs;
 	else
 		daemon_handshake_deadline = 0;
+}
+
+void set_client_connect_timeout(int secs)
+{
+	if (secs > 0)
+		client_connect_deadline = time(NULL) + secs;
+	else
+		client_connect_deadline = 0;
 }
 
 static void check_for_d_option_error(const char *msg)
@@ -1692,6 +1725,18 @@ static void read_a_msg(void)
 		raw_read_buf((char*)&stats.total_read, sizeof stats.total_read);
 		iobuf.in_multiplexed = 1;
 		break;
+	case MSG_BLOCK_STATS: {
+		char b[8];
+
+		if (msg_bytes != 8 || protocol_version < 33 || (!am_generator && !am_sender))
+			goto invalid_msg;
+		raw_read_buf(b, 8);
+		stats.touched_blocks_4k = IVAL64(b, 0);
+		iobuf.in_multiplexed = 1;
+		if (am_server && am_generator)
+			send_msg(MSG_BLOCK_STATS, b, sizeof b, 0);
+		break;
+	}
 	case MSG_REDO:
 		if (msg_bytes != 4 || !am_generator)
 			goto invalid_msg;

@@ -13,7 +13,7 @@ AC_CHECK_HEADERS(poll.h sys/fcntl.h sys/select.h fcntl.h sys/time.h sys/unistd.h
     sys/acl.h acl/libacl.h attr/xattr.h sys/xattr.h sys/extattr.h dl.h \
     popt.h popt/popt.h linux/falloc.h netinet/in_systm.h netgroup.h \
     zlib.h xxhash.h openssl/md4.h openssl/md5.h zstd.h lz4.h sys/file.h \
-    sys/resource.h bsd/string.h idn2.h)
+    sys/resource.h bsd/string.h idn2.h wchar.h linux/ioprio.h sys/syscall.h)
 AC_CHECK_HEADERS([netinet/ip.h], [], [], [[#include <netinet/in.h>]])
 AC_HEADER_MAJOR_FIXED
 
@@ -264,6 +264,13 @@ AC_DEFINE_UNQUOTED(NOBODY_GROUP, "$NOBODY_GROUP", [unprivileged group for unpriv
 # rolling-checksum SIMD optimizations
 ROLL_SIMD=
 
+# Autoconf reports x86-64 as amd64 on FreeBSD, while the object-variable
+# suffixes in Makefile.in use x86_64 on every platform.
+asm_cpu="$host_cpu"
+if test x"$asm_cpu" = x"amd64"; then
+    asm_cpu=x86_64
+fi
+
 AC_MSG_CHECKING([whether to enable rolling-checksum SIMD optimizations])
 AC_ARG_ENABLE(roll-simd,
     AS_HELP_STRING([--enable-roll-simd],[enable/disable to control rolling-checksum SIMD optimizations (requires c++)]))
@@ -315,7 +322,7 @@ if test x"$enable_roll_simd" != x"no"; then
 	AC_LANG(C)
 	if test x"$CXX_OK" = x"yes"; then
 	    # AC_MSG_RESULT() is called below.
-	    ROLL_SIMD="$host_cpu"
+	    ROLL_SIMD="$asm_cpu"
 	elif test x"$enable_roll_simd" = x"yes"; then
 	    AC_MSG_RESULT(error)
 	    AC_MSG_ERROR(The rolling-checksum SIMD compilation test failed.
@@ -479,8 +486,10 @@ AC_MSG_CHECKING([whether to use included zlib])
 if test x"$with_included_zlib" = x"yes"; then
     AC_MSG_RESULT($srcdir/zlib)
     BUILD_ZLIB='$(zlib_OBJS)'
+    BUNDLED_ZLIB_HEADERS='zlib/zconf.h zlib/zlib.h'
     CFLAGS="-I$srcdir/zlib $CFLAGS"
 else
+    BUNDLED_ZLIB_HEADERS=''
     AC_DEFINE(EXTERNAL_ZLIB, 1, [Define to 1 if using external zlib])
     AC_MSG_RESULT(no)
 fi
@@ -525,7 +534,7 @@ fi
 
 if test x"$enable_md5_asm" != x"no"; then
     if test x"$host_cpu" = x"x86_64" || test x"$host_cpu" = x"amd64"; then
-	MD5_ASM="$host_cpu"
+	MD5_ASM="$asm_cpu"
     elif test x"$enable_md5_asm" = x"yes"; then
         AC_MSG_RESULT(unavailable)
         AC_MSG_ERROR(The ASM optimizations are currently x86_64|amd64 only.
@@ -554,7 +563,7 @@ if test x"$ROLL_SIMD" = x""; then
 fi
 
 if test x"$enable_roll_asm" = x"yes"; then
-    ROLL_ASM="$host_cpu"
+    ROLL_ASM="$asm_cpu"
     AC_MSG_RESULT([yes ($ROLL_ASM)])
     AC_DEFINE(USE_ROLL_ASM, 1, [Define to 1 to enable rolling-checksum ASM optimizations (requires --enable-roll-simd)])
     ROLL_ASM='$(ROLL_ASM_'"$ROLL_ASM)"
@@ -968,10 +977,40 @@ AC_CHECK_FUNCS(waitpid wait4 getcwd chown chmod lchmod mknod mkfifo fdopendir \
     memmove lchown vsnprintf snprintf vasprintf asprintf setsid strpbrk \
     strlcat strlcpy stpcpy strtol mallinfo mallinfo2 getgroups setgroups geteuid getegid \
     setlocale setmode open64 lseek64 mkstemp64 mtrace va_copy __va_copy \
-    seteuid strerror putenv iconv_open locale_charset nl_langinfo getxattr \
+    seteuid strerror putenv iconv_open getxattr \
     extattr_get_link sigaction sigprocmask setattrlist getgrouplist \
     initgroups utimensat futimens posix_fallocate attropen setvbuf nanosleep usleep \
-    setenv unsetenv)
+    setenv unsetenv mbrtowc setpriority)
+
+dnl A link-only probe can find a symbol hidden by the target SDK headers.
+dnl Verify that each codeset query is declared and can actually be called.
+AC_CACHE_CHECK([for usable locale_charset()], [rsync_cv_HAVE_LOCALE_CHARSET], [
+    AC_LINK_IFELSE([AC_LANG_PROGRAM([[#include <libcharset.h>]], [[
+        const char *volatile charset;
+#ifndef locale_charset
+        (void) &locale_charset;
+#endif
+        charset = locale_charset();
+        return charset == 0;
+    ]])], [rsync_cv_HAVE_LOCALE_CHARSET=yes], [rsync_cv_HAVE_LOCALE_CHARSET=no])
+])
+if test x"$rsync_cv_HAVE_LOCALE_CHARSET" = xyes; then
+    AC_DEFINE([HAVE_LOCALE_CHARSET], 1, [Define to 1 if locale_charset() is usable.])
+fi
+
+AC_CACHE_CHECK([for usable nl_langinfo(CODESET)], [rsync_cv_HAVE_NL_LANGINFO_CODESET], [
+    AC_LINK_IFELSE([AC_LANG_PROGRAM([[#include <langinfo.h>]], [[
+        const char *volatile charset;
+#ifndef nl_langinfo
+        (void) &nl_langinfo;
+#endif
+        charset = nl_langinfo(CODESET);
+        return charset == 0;
+    ]])], [rsync_cv_HAVE_NL_LANGINFO_CODESET=yes], [rsync_cv_HAVE_NL_LANGINFO_CODESET=no])
+])
+if test x"$rsync_cv_HAVE_NL_LANGINFO_CODESET" = xyes; then
+    AC_DEFINE([HAVE_NL_LANGINFO], 1, [Define to 1 if nl_langinfo(CODESET) is usable.])
+fi
 
 dnl dirfd() is a macro or static inline on several systems (the BSDs), so the
 dnl default AC_CHECK_FUNCS link probe -- which declares `char dirfd(void);` and
@@ -983,6 +1022,175 @@ AC_CACHE_CHECK([for dirfd], rsync_cv_HAVE_DIRFD,
     [rsync_cv_HAVE_DIRFD=yes], [rsync_cv_HAVE_DIRFD=no])])
 if test x"$rsync_cv_HAVE_DIRFD" = x"yes"; then
     AC_DEFINE([HAVE_DIRFD], 1, [Define to 1 if you have a working dirfd() (function or macro).])
+fi
+
+dnl The confined resolver needs a directory descriptor which can be opened with
+dnl search permission alone and which still rechecks search permission when it
+dnl is used.  A defined O_SEARCH is not sufficient: NetBSD 11 discards it, and
+dnl POSIX permits an O_SEARCH descriptor to bypass later permission checks.
+AC_CACHE_CHECK([for race-safe search-only directory descriptors],
+  [rsync_cv_search_only_dirfd_flag], [
+    rm -f conftest.search-only
+    AC_RUN_IFELSE([AC_LANG_SOURCE([[
+#define _GNU_SOURCE 1
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <errno.h>
+#include <fcntl.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+
+#ifndef O_CLOEXEC
+#define O_CLOEXEC 0
+#endif
+
+static int check_flag(int flag)
+{
+    struct stat expected, observed;
+    char base[] = "/tmp/rsync-search-only.XXXXXX";
+    int root = -1, control = -1, cwd = -1, fd = -1, child = -1;
+    int dropped = 0, result = 1;
+    gid_t saved_gid = getegid();
+
+    if (!mkdtemp(base))
+        goto out;
+    root = open(base, O_RDONLY | O_DIRECTORY | O_CLOEXEC);
+    cwd = open(".", O_RDONLY | O_DIRECTORY | O_CLOEXEC);
+    if (root < 0 || cwd < 0 || mkdirat(root, "dir", 0700) < 0
+     || symlinkat("dir", root, "link") < 0)
+        goto out;
+    control = openat(root, "dir", O_RDONLY | O_DIRECTORY | O_CLOEXEC);
+    if (control < 0 || fstat(control, &expected) < 0)
+        goto out;
+    child = openat(control, "known", O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC, 0600);
+    if (child < 0 || write(child, "x", 1) != 1)
+        goto out;
+    if (geteuid() == 0) {
+        if (fchown(root, 65534, 65534) < 0
+         || fchown(control, 65534, 65534) < 0
+         || fchown(child, 65534, 65534) < 0)
+            goto out;
+    }
+    if (close(child) < 0)
+        goto out;
+    child = -1;
+    if (geteuid() == 0) {
+        if (setegid(65534) < 0)
+            goto out;
+        if (seteuid(65534) < 0) {
+            setegid(saved_gid);
+            goto out;
+        }
+        dropped = 1;
+    }
+    if (fchmod(control, 0100) < 0)
+        goto out;
+    fd = openat(root, "dir", flag | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC);
+    if (fd < 0 || fstat(fd, &observed) < 0
+     || expected.st_dev != observed.st_dev || expected.st_ino != observed.st_ino)
+        goto out;
+    child = openat(fd, "known", O_RDONLY | O_CLOEXEC);
+    if (child < 0 || close(child) < 0)
+        goto out;
+    child = -1;
+    if (fchmod(control, 0300) < 0)
+        goto out;
+    child = openat(fd, "new", O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC, 0600);
+    if (child < 0 || close(child) < 0 || unlinkat(fd, "new", 0) < 0)
+        goto out;
+    child = -1;
+    if (fchmod(control, 0000) < 0)
+        goto out;
+    child = openat(fd, "known", O_RDONLY | O_CLOEXEC);
+    if (child >= 0 || (errno != EACCES && errno != EPERM))
+        goto out;
+    if (fchdir(fd) == 0) {
+        fchdir(cwd);
+        goto out;
+    }
+    if (errno != EACCES && errno != EPERM)
+        goto out;
+    if (fchmod(control, 0700) < 0)
+        goto out;
+    child = openat(root, "link", flag | O_DIRECTORY | O_CLOEXEC);
+    if (child < 0 || close(child) < 0)
+        goto out;
+    child = -1;
+    child = openat(root, "link", flag | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC);
+    if (child >= 0)
+        goto out;
+    result = 0;
+out:
+    if (dropped && (seteuid(0) < 0 || setegid(saved_gid) < 0))
+        result = 1;
+    if (child >= 0 && close(child) < 0)
+        result = 1;
+    if (fd >= 0 && close(fd) < 0)
+        result = 1;
+    if (control >= 0) {
+        if (fchmod(control, 0700) < 0)
+            result = 1;
+        if (unlinkat(control, "new", 0) < 0 && errno != ENOENT)
+            result = 1;
+        if (unlinkat(control, "known", 0) < 0 && errno != ENOENT)
+            result = 1;
+        if (close(control) < 0)
+            result = 1;
+    }
+    if (root >= 0) {
+        if (unlinkat(root, "link", 0) < 0 && errno != ENOENT)
+            result = 1;
+        if (unlinkat(root, "dir", AT_REMOVEDIR) < 0 && errno != ENOENT)
+            result = 1;
+        if (close(root) < 0)
+            result = 1;
+    }
+    if (cwd >= 0 && close(cwd) < 0)
+        result = 1;
+    if (rmdir(base) < 0 && errno != ENOENT)
+        result = 1;
+    return result;
+}
+
+int main(void)
+{
+    const char *name = NULL;
+#ifdef O_PATH
+    if (check_flag(O_PATH) == 0)
+        name = "O_PATH";
+#endif
+#ifdef O_SEARCH
+    if (!name && check_flag(O_SEARCH) == 0)
+        name = "O_SEARCH";
+#endif
+    if (name) {
+        FILE *out = fopen("conftest.search-only", "w");
+        if (!out || fprintf(out, "%s\n", name) < 0 || fclose(out) < 0)
+            return 1;
+        return 0;
+    }
+    return 1;
+}
+]])],
+      [rsync_cv_search_only_dirfd_flag=`cat conftest.search-only`],
+      [rsync_cv_search_only_dirfd_flag=no],
+      [case "$host_os" in
+         linux*|android*)
+           AC_LINK_IFELSE([AC_LANG_PROGRAM([[
+#define _GNU_SOURCE 1
+#include <fcntl.h>
+]], [[return openat(AT_FDCWD, ".", O_PATH | O_DIRECTORY | O_NOFOLLOW) < -1;]])],
+             [rsync_cv_search_only_dirfd_flag=O_PATH],
+             [rsync_cv_search_only_dirfd_flag=no])
+           ;;
+         *) rsync_cv_search_only_dirfd_flag=no ;;
+       esac])
+    rm -f conftest.search-only
+  ])
+if test x"$rsync_cv_search_only_dirfd_flag" != x"no"; then
+    AC_DEFINE_UNQUOTED([SEARCH_ONLY_DIRFD_FLAG], [$rsync_cv_search_only_dirfd_flag],
+      [Open flag for race-safe search-only directory descriptors.])
 fi
 
 dnl cygwin iconv.h defines iconv_open as libiconv_open
@@ -1191,6 +1399,7 @@ AC_MSG_CHECKING([whether to use included libpopt])
 if test x"$with_included_popt" = x"yes"; then
     AC_MSG_RESULT($srcdir/popt)
     BUILD_POPT='$(popt_OBJS)'
+    BUNDLED_POPT_HEADERS='popt/popt.h'
     CFLAGS="-I$srcdir/popt $CFLAGS"
     AC_DEFINE(POPT_SYSCONFDIR, "/etc", [sysconfig dir for popt])
     AC_DEFINE(PACKAGE, "rsync", [package name for rsync])
@@ -1201,6 +1410,7 @@ if test x"$with_included_popt" = x"yes"; then
 	AC_MSG_WARN([included libpopt will use malloc, not alloca (which wastes a small amount of memory)])
     fi
 else
+    BUNDLED_POPT_HEADERS=''
     AC_MSG_RESULT(no)
 fi
 
@@ -1346,6 +1556,8 @@ AC_SUBST(OBJ_RESTORE)
 AC_SUBST(CC_SHOBJ_FLAG)
 AC_SUBST(BUILD_POPT)
 AC_SUBST(BUILD_ZLIB)
+AC_SUBST(BUNDLED_POPT_HEADERS)
+AC_SUBST(BUNDLED_ZLIB_HEADERS)
 AC_SUBST(MAKE_RRSYNC)
 AC_SUBST(MAKE_RRSYNC_1)
 AC_SUBST(GEN_RRSYNC)
@@ -1452,7 +1664,7 @@ if test x"$enable_xattr_support" = x"no"; then
     AC_MSG_RESULT(no)
 else
     case "$host_os" in
-    *linux*|*netbsd*|*cygwin*)
+    *linux*|*cygwin*)
 	AC_MSG_RESULT(Using Linux xattrs)
 	AC_DEFINE(HAVE_LINUX_XATTRS, 1, [True if you have Linux xattrs (or equivalent)])
 	AC_DEFINE(SUPPORT_XATTRS, 1)
@@ -1466,10 +1678,13 @@ else
 	AC_DEFINE(NO_DEVICE_XATTRS, 1, [True if device files do not support xattrs])
 	AC_DEFINE(NO_SPECIAL_XATTRS, 1, [True if special files do not support xattrs])
 	;;
-    freebsd*)
-	AC_MSG_RESULT(Using FreeBSD extattrs)
-	AC_DEFINE(HAVE_FREEBSD_XATTRS, 1, [True if you have FreeBSD xattrs])
+    freebsd*|*netbsd*)
+	AC_MSG_RESULT(Using BSD extattrs)
+	AC_DEFINE(HAVE_BSD_EXTATTRS, 1, [True if you use the BSD extattr interface])
 	AC_DEFINE(SUPPORT_XATTRS, 1)
+	case "$host_os" in
+	*netbsd*) AC_DEFINE(NO_SYMLINK_USER_XATTRS, 1) ;;
+	esac
 	;;
     solaris*)
 	AC_MSG_RESULT(Using Solaris xattrs)
@@ -1564,7 +1779,9 @@ case "$CC" in
     ;;
 esac
 
-AC_CONFIG_FILES([Makefile lib/dummy zlib/dummy popt/dummy shconfig])
+AC_CONFIG_FILES([Makefile lib/dummy shconfig])
+AS_IF([test x"$with_included_zlib" = x"yes"], [AC_CONFIG_FILES([zlib/dummy])])
+AS_IF([test x"$with_included_popt" = x"yes"], [AC_CONFIG_FILES([popt/dummy])])
 AC_OUTPUT
 
 AC_MSG_RESULT()

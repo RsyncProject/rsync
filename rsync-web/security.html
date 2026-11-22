@@ -12,27 +12,82 @@ h3 { margin-bottom: 0px; }
 
 <H2 align="center">Rsync Security Advisories</H2>
 
-<p>If you are running an rsync older than 3.5.0, you should upgrade. 3.5.0
-fixes every issue listed on this page.
+<p>Report suspected vulnerabilities through
+<a href="https://github.com/RsyncProject/rsync/security/advisories/new">GitHub's
+private reporting form</a>. If GitHub cannot be used, email
+<a href="mailto:rsync.project@gmail.com">rsync.project@gmail.com</a>.
+
+<p>Do not post vulnerability details in public issues, pull requests or mailing
+lists. See the <a href="https://github.com/RsyncProject/rsync/security/policy">security
+policy</a> for reporting details.
+
+<h3>Supported releases</h3>
+
+<table border="1" cellspacing="0" cellpadding="6">
+<tr><th>Line</th><th>Status</th><th>Upstream support</th><th>End condition</th></tr>
+<tr><td>3.5</td><td>Current stable</td><td>Security fixes, bug fixes and compatible incremental improvements</td><td>12 months after the first stable 4.x release</td></tr>
+<tr><td>3.2</td><td>LTS</td><td>Security fixes only</td><td>31 May 2029</td></tr>
+<tr><td>All other lines</td><td>Unsupported</td><td>None</td><td>Support has ended</td></tr>
+</table>
+
+<p>The repository <a href="https://github.com/RsyncProject/rsync/security/policy">security
+policy</a> is authoritative. Distribution packages may follow different support
+policies.
+
+<p>The 3.5 line receives compatible improvements which do not require a major
+migration. Broad rewrites, removals and compatibility breaks belong in the next
+major release. The 3.2 LTS line remains security-only.
+
+<p>Use 3.5.2 for the current stable line. Users who must remain on the 3.2 line
+should use 3.2.8. Other releases are unsupported upstream.
 
 <p>If you cannot upgrade, the advisories below give the affected versions and
 the conditions each issue needs. Several are only reachable in a non-default
 configuration, and some of the older ones can be mitigated from rsyncd.conf
 without an upgrade.
 
+<p><a name="s3_2_8"></a><hr>
+<h3>Security fixes in 3.2.8</h3>
+<i class=date>15 November 2026</i>
+
+<p>Rsync 3.2.8 is the first release in the 3.2 LTS line. It backports the
+security fixes from 3.5.0 and the checksum-work bound from 3.5.2 without adding
+general features or changing protocol 31.
+
+<p>The source archive and signature are available from the
+<a href="https://github.com/RsyncProject/rsync/releases/tag/v3.2.8">3.2.8
+GitHub release</a>. See the
+<a href="https://github.com/RsyncProject/rsync/blob/v3.2.8/NEWS.md">3.2.8
+NEWS</a> for the complete list of backported fixes.
+
+<p><a name="s3_5_2"></a><hr>
+<h3>Security fix in 3.5.2</h3>
+<i class=date>4 November 2026</i>
+
+<p>Rsync 3.5.2 bounds sender-side checksum work that remained after the
+CVE-2026-70453 mitigation. The current stable line is fixed in 3.5.2 and the
+3.2 LTS line is fixed in 3.2.8.
+
+<ul>
+<li><a href="https://www.cve.org/CVERecord?id=CVE-2026-119741">CVE-2026-119741</a>
+(HIGH) &mdash; a malicious receiver can supply weak checksums which collide
+with consecutive rolling windows and make the sender calculate a full strong
+checksum at every byte offset. Repeating this across public daemon connections
+can exhaust host CPU.
+</ul>
+
 <p><a name="s3_5_0"></a><hr>
 <h3>Security fixes in 3.5.0</h3>
 <i class=date>August 13th, 2026</i>
 
 <p>Rsync 3.5.0 fixes 33 security issues found during a focused audit of rsync's
-path handling and daemon protocol, a companion daemon-protocol fuzzing pass,
-and reports from external researchers. All releases up to and including 3.4.4
-are affected, except where an individual advisory gives a narrower range &mdash;
-many do, so check the advisory before deciding what needs patching.
+path handling and daemon protocol plus a companion daemon-protocol fuzzing pass
+and reports from external researchers. The maintained 3.2 line received the
+applicable backports in 3.2.8. Check each advisory for its exact affected range.
 
-<p>Upgrade to 3.5.0. See the
+<p>See the
 <a href="https://download.samba.org/pub/rsync/NEWS#3.5.0">3.5.0 NEWS</a> for the
-full changelog, and the
+full changelog and the
 <a href="https://github.com/RsyncProject/rsync/security/advisories">GitHub
 security advisories</a> for the individual reports.
 

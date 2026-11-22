@@ -22,13 +22,6 @@
 #include "itypes.h"
 #include "ifuncs.h"
 
-/* O_CLOEXEC is absent on some still-supported targets.  The random-source fd
- * is read and closed synchronously, so the established zero-value fallback is
- * sufficient without adding a configure dependency. */
-#ifndef O_CLOEXEC
-#define O_CLOEXEC 0
-#endif
-
 extern int read_only;
 extern char *password_file;
 extern struct name_num_obj valid_auth_checksums;
@@ -39,7 +32,7 @@ the result.
   ***************************************************************************/
 void base64_encode(const char *buf, int len, char *out, int pad)
 {
-	char *b64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+	static const char * const b64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 	int bit_offset, byte_offset, idx, i;
 	const uchar *d = (const uchar *)buf;
 	int bytes = (len*8 + 5)/6;
@@ -143,7 +136,7 @@ static const char *check_secret(int module, const char *user, const char *group,
 	const char *fname = lp_secrets_file(module);
 	STRUCT_STAT st;
 	int ok = 1;
-	int user_len = strlen(user);
+	int user_len = (user != NULL) ? strlen(user) : 0;
 	int group_len = group ? strlen(group) : 0;
 	char *err;
 	FILE *fh;
@@ -183,8 +176,8 @@ static const char *check_secret(int module, const char *user, const char *group,
 		return "ignoring secrets file";
 	}
 
-	if (*user == '#') {
-		/* Reject attempt to match a comment. */
+	if (user == NULL || *user == '#') {
+		/* Reject a missing username or an attempt to match a comment. */
 		fclose(fh);
 		return "invalid username";
 	}
@@ -226,7 +219,8 @@ static const char *check_secret(int module, const char *user, const char *group,
 static const char *getpassf(const char *filename)
 {
 	STRUCT_STAT st;
-	char buffer[512], *p;
+	char buffer[512];
+	char *p;
 	int n;
 
 	if (!filename)
@@ -271,8 +265,10 @@ static const char *getpassf(const char *filename)
 
 	if (n > 0) {
 		buffer[n] = '\0';
-		if ((p = strtok(buffer, "\n\r")) != NULL)
-			return strdup(p);
+		p = buffer + strcspn(buffer, "\n\r");
+		*p = '\0';
+		if (buffer[0] != '\0')
+			return strdup(buffer);
 	}
 
 	rprintf(FERROR, "ERROR: failed to read a password from %s\n", filename);

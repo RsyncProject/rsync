@@ -41,6 +41,20 @@ short info_levels[COUNT_INFO], debug_levels[COUNT_DEBUG];
 
 static int errs = 0;
 
+static void check_unc_root(const char *path, size_t expected)
+{
+	size_t got = unc_root_len(path);
+
+	if (got != expected) {
+		fprintf(stderr, "FAIL [UNC root=%s]: got %lu, expected %lu\n",
+			path ? path : "(null)", (unsigned long)got,
+			(unsigned long)expected);
+		errs++;
+	} else
+		fprintf(stderr, "OK   [UNC root=%s]: %lu\n",
+			path ? path : "(null)", (unsigned long)got);
+}
+
 static void check_relpath(const char *relpath)
 {
 	int fd;
@@ -192,6 +206,16 @@ int main(int argc, char **argv)
 	am_daemon = 1;
 	am_chrooted = 0;
 
+	check_unc_root("//server/share", strlen("//server/share"));
+	check_unc_root("//server/share/path", strlen("//server/share"));
+	check_unc_root("//server/share//path", strlen("//server/share"));
+	check_unc_root("/server/share", 0);
+	check_unc_root("///server/share", 0);
+	check_unc_root("//server", 0);
+	check_unc_root("//server/", 0);
+	check_unc_root("//server//path", 0);
+	check_unc_root(NULL, 0);
+
 	mkdir("subdir", 0755);
 	symlink("subdir", "alias");
 
@@ -224,7 +248,6 @@ int main(int argc, char **argv)
 	 * literal '..'.  Its dedicated fd-anchored entry point must preserve an
 	 * in-tree climb while refusing to pop above the anchor. */
 	check_beneath_dotdot();
-
 	if (errs)
 		fprintf(stderr, "\n%d failure(s)\n", errs);
 	return errs ? 1 : 0;

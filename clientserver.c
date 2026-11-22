@@ -22,6 +22,9 @@
 #include "rsync.h"
 #include "itypes.h"
 #include "ifuncs.h"
+#ifdef HAVE_SYS_UN_H
+#include <sys/un.h>
+#endif
 
 extern int quiet;
 extern int dry_run;
@@ -57,6 +60,7 @@ extern int logfile_format_has_o_or_i;
 extern char *bind_address;
 extern char *config_file;
 extern char *logfile_format;
+extern char *stdout_format;
 extern char *files_from;
 extern char *tmpdir;
 extern char *early_input_file;
@@ -143,7 +147,8 @@ int start_socket_client(char *host, int remote_argc, char *remote_argv[],
 			int argc, char *argv[])
 {
 	int fd, ret;
-	char *p, *user = NULL;
+	char *p;
+	const char *user = NULL;
 
 	/* This is redundant with code in start_inband_exchange(), but this
 	 * short-circuits a problem in the client before we open a socket,
@@ -173,6 +178,21 @@ int start_socket_client(char *host, int remote_argc, char *remote_argv[],
 	return ret ? ret : client_run(fd, fd, -1, argc, argv);
 }
 
+static size_t fread_retry(void *buffer, size_t length, FILE *file)
+{
+	size_t total = fread(buffer, 1, length, file);
+	while (total < length && ferror(file) && errno == EINTR) {
+		clearerr(file);
+		/* Preserve partial input across EINTR. Clang 21 does not model
+		 * the recoverable position after an interrupted stream read. */
+#ifdef __clang_analyzer__
+		__attribute__((suppress))
+#endif
+		total += fread((char *)buffer + total, 1, length - total, file);
+	}
+	return total;
+}
+
 static int exchange_protocols(int f_in, int f_out, char *buf, size_t bufsiz, int am_client)
 {
 	int remote_sub = -1;
@@ -180,16 +200,27 @@ static int exchange_protocols(int f_in, int f_out, char *buf, size_t bufsiz, int
 
 	output_daemon_greeting(f_out, am_client);
 	if (!am_client) {
-		char *motd = lp_motd_file();
+		const char *motd = lp_motd_file();
 		if (motd && *motd) {
 			/* 'motd file = PATH': motd content is sent to every client, so
 			 * a planted symlink would leak the target's bytes.  Refuse
 			 * symlinks not owned by uid 0 or our euid. */
 			int motd_fd = open_no_attacker_symlinks(motd, O_RDONLY, 0);
 			FILE *f = motd_fd >= 0 ? fdopen(motd_fd, "r") : NULL;
-			if (!f && motd_fd >= 0) close(motd_fd);
+			if (!f && motd_fd >= 0) {
+				int fdopen_errno = errno;
+				close(motd_fd);
+				rsyserr(FLOG, fdopen_errno, "failed to open motd file %s", motd);
+				return -1;
+			}
 			while (f && !feof(f)) {
-				int len = fread(buf, 1, bufsiz - 1, f);
+				int len = fread_retry(buf, bufsiz - 1, f);
+				if (ferror(f)) {
+					int read_errno = errno;
+					fclose(f);
+					rsyserr(FLOG, read_errno, "failed to read motd file %s", motd);
+					return -1;
+				}
 				if (len > 0)
 					write_buf(f_out, buf, len);
 			}
@@ -302,7 +333,11 @@ int start_inband_exchange(int f_in, int f_out, const char *user, int argc, char 
 		 * our euid anywhere in the path. */
 		int ei_fd = open_no_attacker_symlinks(early_input_file, O_RDONLY, 0);
 		FILE *f = ei_fd >= 0 ? fdopen(ei_fd, "rb") : NULL;
-		if (!f && ei_fd >= 0) close(ei_fd);
+		if (!f && ei_fd >= 0) {
+			int fdopen_errno = errno;
+			close(ei_fd);
+			errno = fdopen_errno;
+		}
 		if (!f || do_fstat(fileno(f), &st) < 0) {
 			rsyserr(FERROR, errno, "failed to open %s", early_input_file);
 			if (f)
@@ -327,7 +362,14 @@ int start_inband_exchange(int f_in, int f_out, const char *user, int argc, char 
 					free(modname);
 					return -1;
 				}
-				len = fread(line, 1, early_input_len, f);
+				len = fread_retry(line, early_input_len, f);
+				if (ferror(f)) {
+					int read_errno = errno;
+					fclose(f);
+					free(modname);
+					rsyserr(FERROR, read_errno, "failed to read early-input file %s", early_input_file);
+					return -1;
+				}
 				if (len > 0) {
 					write_buf(f_out, line, len);
 					early_input_len -= len;
@@ -365,7 +407,7 @@ int start_inband_exchange(int f_in, int f_out, const char *user, int argc, char 
 				} while ((p = strstr(p+1, line)) != NULL);
 			}
 			if (extra_chars) {
-				char *f = arg;
+				const char *f = arg;
 				char *t = arg = new_array(char, strlen(arg) + extra_chars + 1);
 				if (*f == '-') {
 					*t++ = '.';
@@ -1040,18 +1082,16 @@ static int rsync_module(int f_in, int f_out, int i, const char *addr, const char
 	if (use_chroot) {
 		/* Cache timezone data before chroot makes /etc/localtime inaccessible */
 		tzset();
-		/* Flush gcov counters now: after chroot the build-tree .gcda
-		 * paths are unreachable, so everything this child has executed
-		 * so far (the whole rsync_module() pre-chroot path) would
-		 * otherwise be lost.  Post-chroot coverage from this child is
-		 * still unrecordable -- accepted, documented in
-		 * testsuite/COVERAGE.md. */
+		/* Save gcov counters before chroot makes the build tree unreachable.
+		 * Work after chroot cannot be recorded in those files. */
 		gcov_flush();
 		if (chroot(module_chdir)) {
 			rsyserr(FLOG, errno, "chroot(\"%s\") failed", module_chdir);
 			io_printf(f_out, "@ERROR: chroot failed\n");
 			return -1;
 		}
+		if (chdir("/") < 0)
+			return path_failure(f_out, "/", True);
 		am_chrooted = 1;
 		module_chdir = module_dir;
 	}
@@ -1219,6 +1259,11 @@ static int rsync_module(int f_in, int f_out, int i, const char *addr, const char
 	}
 
 #ifndef DEBUG
+	/* Remember an explicit deletion-output request before max verbosity
+	 * clamps INFO_DEL.  stdout_format is also the server-side marker used
+	 * to decide whether deletion names need to be sent to the client. */
+	if (protocol_version >= 29 && INFO_GTE(DEL, 1) && !stdout_format)
+		stdout_format = "X";
 	/* don't allow the logs to be flooded too fast */
 	limit_output_verbosity(lp_max_verbosity(module_id));
 #endif
@@ -1237,9 +1282,9 @@ static int rsync_module(int f_in, int f_out, int i, const char *addr, const char
 			 * Without this, the socket would be in the wrong
 			 * state for the upcoming error message. */
 			if (!files_from) {
-				int i;
-				for (i = 0; i < argc; i++) {
-					if (strncmp(argv[i], "--files-from", 12) == 0) {
+				int arg_idx;
+				for (arg_idx = 0; arg_idx < argc; arg_idx++) {
+					if (strncmp(argv[arg_idx], "--files-from", 12) == 0) {
 						files_from = "";
 						break;
 					}
@@ -1433,6 +1478,7 @@ int start_daemon(int f_in, int f_out)
 	 * (when rsync is run by init and run by a remote shell). */
 	if (!load_config(0))
 		exit_cleanup(RERR_SYNTAX);
+	niceness_apply();
 
 	/* Bound the handshake before ANY peer input is read -- the PROXY-protocol
 	 * header below is peer-supplied too, and was previously unbounded.  An
@@ -1555,7 +1601,7 @@ int start_daemon(int f_in, int f_out)
 		rprintf(FLOG, "module-list request from %s (%s)\n",
 			host, addr);
 		send_listing(f_out);
-		return -1;
+		return 0;
 	}
 
 	if (*line == '#') {
@@ -1607,6 +1653,13 @@ static void create_pid_file(void)
 		const char *slash = strrchr(pid_file, '/');
 		char dirbuf[MAXPATHLEN];
 		const char *dir = ".";
+		int dir_flags = O_RDONLY;
+#ifdef O_DIRECTORY
+		dir_flags |= O_DIRECTORY;
+#elif defined O_NONBLOCK
+		/* Avoid blocking on a non-directory special file before fstat below. */
+		dir_flags |= O_NONBLOCK;
+#endif
 		if (slash) {
 			size_t dlen = slash == pid_file ? 1 : (size_t)(slash - pid_file);
 			if (dlen >= sizeof dirbuf) {
@@ -1618,7 +1671,25 @@ static void create_pid_file(void)
 			dir = dirbuf;
 			base = slash + 1;
 		}
-		if ((pdfd = do_open(dir, O_RDONLY|O_DIRECTORY, 0)) < 0) {
+		pdfd = do_open(dir, dir_flags, 0);
+#ifndef O_DIRECTORY
+		if (pdfd >= 0) {
+			STRUCT_STAT dir_st;
+			int save_errno;
+			if (do_fstat(pdfd, &dir_st) < 0)
+				save_errno = errno;
+			else if (!S_ISDIR(dir_st.st_mode))
+				save_errno = ENOTDIR;
+			else
+				save_errno = 0;
+			if (save_errno) {
+				close(pdfd);
+				pdfd = -1;
+				errno = save_errno;
+			}
+		}
+#endif
+		if (pdfd < 0) {
 			rsyserr(FLOG, errno, "failed to open pid-file directory \"%s\"", dir);
 			exit_cleanup(RERR_FILEIO);
 		}
@@ -1722,9 +1793,59 @@ static void become_daemon(void)
 	}
 }
 
+/* Inetd supplies a connected IP stream on stdin. Socket activation may also
+ * supply a connected Unix stream whose local endpoint has a name. Other
+ * launchers may use an unnamed local socket for process I/O, which must not
+ * select inetd mode. */
+static int is_inetd_socket(int fd)
+{
+	int type;
+	struct sockaddr_storage peer = {0};
+	socklen_t type_len = sizeof type;
+	socklen_t peer_len = sizeof peer;
+
+	if (getsockopt(fd, SOL_SOCKET, SO_TYPE, (char *)&type, &type_len) != 0
+	 || type != SOCK_STREAM
+	 || getpeername(fd, (struct sockaddr *)&peer, &peer_len) != 0)
+		return 0;
+
+	if (peer.ss_family == AF_INET
+#ifdef INET6
+	 || peer.ss_family == AF_INET6
+#endif
+	)
+		return 1;
+
+#ifdef HAVE_SYS_UN_H
+	if (peer.ss_family == AF_UNIX) {
+		struct sockaddr_storage local = {0};
+		struct sockaddr_un *local_un = (struct sockaddr_un *)&local;
+		socklen_t local_len = sizeof local;
+		size_t path_len, i;
+
+		if (getsockname(fd, (struct sockaddr *)&local, &local_len) != 0
+		 || local.ss_family != AF_UNIX)
+			return 0;
+
+		if (local_len <= (socklen_t)offsetof(struct sockaddr_un, sun_path))
+			return 0;
+		path_len = (size_t)local_len - offsetof(struct sockaddr_un, sun_path);
+		if (path_len > sizeof local_un->sun_path)
+			path_len = sizeof local_un->sun_path;
+		for (i = 0; i < path_len; i++) {
+			if (local_un->sun_path[i] != '\0')
+				return 1;
+		}
+		return 0;
+	}
+#endif
+
+	return 0;
+}
+
 int daemon_main(void)
 {
-	if (is_a_socket(STDIN_FILENO)) {
+	if (is_inetd_socket(STDIN_FILENO)) {
 		int i;
 
 		/* we are running via inetd - close off stdout and
@@ -1743,6 +1864,7 @@ int daemon_main(void)
 		exit_cleanup(RERR_SYNTAX);
 	}
 	set_dparams(0);
+	niceness_apply();
 
 	/* "proxy protocol = true" with no trusted-proxy list rejects every
 	 * connection as an untrusted proxy peer (fail-closed).  That is intended,
