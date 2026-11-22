@@ -13,6 +13,7 @@ from interop_policy import QUARANTINE, TAILNET, ROLES
 CLIENT_ID = 'TG2FEugs2S11CNTRL-kx3fW8WXMt11CNTRL'
 TAILNET_API = 'https://api.tailscale.com/api/v2/tailnet/-'
 RETRYABLE_HTTP = (408, 500, 502, 503, 504)
+MAX_RECORD_BYTES = 65536
 
 
 class NetworkError(ValueError):
@@ -199,7 +200,7 @@ def download_records(run_id, expected, timeout=600, progress=None, *, initial_li
                     break
                 with zipfile.ZipFile(io.BytesIO(data)) as archive:
                     files = [item for item in archive.infolist() if not item.is_dir()]
-                    if len(files) != 1 or files[0].file_size > 65536:
+                    if len(files) != 1 or files[0].file_size > MAX_RECORD_BYTES:
                         raise NetworkError('Invalid rendezvous artifact')
                     raw = archive.read(files[0])
                 result[expected[name]] = decode(raw), raw

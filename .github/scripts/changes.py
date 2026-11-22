@@ -156,7 +156,8 @@ def select(paths):
             workflow(selected, parsed.name)
         elif parsed.parent == PurePosixPath('.github/scripts'):
             script(selected, parsed.name)
-        elif path.startswith('.github/actions/interoperability/'):
+        elif path.startswith(('.github/actions/interoperability/',
+                              '.github/actions/interop-upload/')):
             enable(selected, 'interoperability', 'diagnostics')
         elif (path in FULL_CHECK_FILES or path.startswith(FULL_CHECK_DIRS)
               or len(parsed.parts) == 1 and parsed.suffix in SOURCE_SUFFIXES):
