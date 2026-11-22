@@ -1405,6 +1405,8 @@ int recv_files(int f_in, int f_out, char *local_name)
 	if (phase == 2 && delay_updates) /* for protocol_version < 29 */
 		handle_delayed_updates(local_name);
 
+	finish_progress();
+
 	if (DEBUG_GTE(RECV, 1))
 		rprintf(FINFO,"recv_files finished\n");
 
