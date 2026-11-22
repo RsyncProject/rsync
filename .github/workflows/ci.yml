@@ -21,8 +21,9 @@ defaults:
     shell: sh
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event_name == 'push' && 'master' || github.event.pull_request.number || github.run_id }}
-  cancel-in-progress: true
+  # Only pull requests share a group; queued master pushes must stay independent.
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || format('run-{0}', github.run_id) }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   changes:

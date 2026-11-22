@@ -167,30 +167,20 @@ def select(paths):
     return selected
 
 
-def changed_paths(event, event_name):
+def pull_request_paths(event):
     if not isinstance(event, dict):
         raise ValueError('Invalid CI event')
-    if event_name == 'pull_request':
-        request = event.get('pull_request')
-        if not isinstance(request, dict):
-            raise ValueError('Pull request event has no request')
-        base = request.get('base', {}).get('sha', '')
-        head = request.get('head', {}).get('sha', '')
-        separator = '...'
-    elif event_name == 'push':
-        base, head = event.get('before', ''), event.get('after', '')
-        separator = '..'
-    else:
-        raise ValueError('Unsupported CI event')
+    request = event.get('pull_request')
+    if not isinstance(request, dict):
+        raise ValueError('Pull request event has no request')
+    base = request.get('base', {}).get('sha', '')
+    head = request.get('head', {}).get('sha', '')
     if (not isinstance(base, str) or not isinstance(head, str)
             or not re.fullmatch(r'[0-9a-f]{40}', base) or not re.fullmatch(r'[0-9a-f]{40}', head)
-            or head == '0' * 40 or event_name == 'pull_request' and base == '0' * 40):
+            or base == '0' * 40 or head == '0' * 40):
         raise ValueError('Invalid change revisions')
-    if base == '0' * 40:
-        command = ['git', 'ls-tree', '--name-only', '-r', '-z', head]
-    else:
-        command = ['git', 'diff', '--name-only', '--no-renames', '-z', '--diff-filter=ACDMRTUXB',
-                   base + separator + head]
+    command = ['git', 'diff', '--name-only', '--no-renames', '-z', '--diff-filter=ACDMRTUXB',
+               base + '...' + head]
     result = subprocess.run(command, capture_output=True, timeout=30)
     if result.returncode or len(result.stdout) > 1024 * 1024:
         raise ValueError('Cannot determine changed paths')
@@ -202,10 +192,10 @@ def changed_paths(event, event_name):
 
 def main():
     event_name = os.environ.get('GITHUB_EVENT_NAME')
-    if event_name in ('pull_request', 'push'):
+    if event_name == 'pull_request':
         event = json.loads(Path(os.environ['GITHUB_EVENT_PATH']).read_text())
-        selected = select(changed_paths(event, event_name))
-    elif event_name in ('schedule', 'workflow_dispatch'):
+        selected = select(pull_request_paths(event))
+    elif event_name in ('push', 'schedule', 'workflow_dispatch'):
         selected = full()
     else:
         raise ValueError('Unsupported CI event')
