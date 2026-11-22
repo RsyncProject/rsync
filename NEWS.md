@@ -2,6 +2,17 @@
 
 ## Enhancements
 
+- Reduce directory lookups when linking unchanged regular files with non-daemon
+  `--link-dest` transfers. Reuse checked receiver and basis directories.
+- Reuse checked directories for ordinary scans and file reads beneath a
+  verified sender root. Avoid a redundant directory probe for sender file
+  reads. Set close-on-exec at open time where supported.
+- Avoid redundant stats when creating children of a fresh receiver directory.
+- Try an exact `--link-dest` match without a destination stat in new
+  incremental directories. Use the normal lookup path if the link fails.
+- Keep the checked root of a single absolute alternate destination open
+  across directories in ordinary non-daemon transfers. Reuse checked parents
+  for rechecks and delta reads.
 - Added SHA-3 (FIPS 202) transfer checksum choices `sha3-256`,
   `sha3-384` and `sha3-512` for builds with OpenSSL SHA-3 support.
   Default negotiation is unchanged. Select SHA-3 with
@@ -18,6 +29,8 @@
   because FFS can corrupt other attributes during that operation.
 - Fixed silent loss of xattrs on Cygwin when the name list did not fit the
   initial buffer.
+- Report buffered diagnostic and logfile write failures instead of returning
+  success after dropping output.
 
 ## 3.5 maintenance line
 
@@ -26,6 +39,8 @@ in the [stable/3.5 NEWS](https://github.com/RsyncProject/rsync/blob/stable/3.5/N
 
 ### Pending 3.5.3 backports
 
+- Reduce repeated basis-directory traversal in non-daemon `--link-dest`
+  transfers (#1180).
 - Fix locale-dependent option and daemon keyword matching and parse fractional
   sizes exactly.
 - Preserve complete logfile records and escape undecodable bytes (#1162).
