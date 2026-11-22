@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 
 import os
-import re
 import shlex
 import subprocess
 import sys
@@ -47,20 +46,12 @@ openssl_env = {
 }
 openssl_env.pop('RSYNC_SSL_SKIP_HOSTNAME_CHECK', None)
 
-unfixed = executable(
-    openssl_dir / 'unfixed',
-    re.sub(r'(?m)^(\s*)validate_ssl_hostname .*$', r'\1:',
-           (SRCDIR / 'rsync-ssl').read_text()),
-)
-evil_host = 'localhost INJECTED_OPENSSL_ARG'
-evil_helper = ['--HELPER', evil_host, 'rsync', '--server', '--daemon', '.']
-invoke(unfixed, evil_helper, openssl_env)
-captured = openssl_args.read_text().splitlines() if openssl_args.exists() else []
-if 'INJECTED_OPENSSL_ARG' not in captured:
-    test_fail(f'unsafe control did not inject an OpenSSL argument: {captured}')
-result = invoke(SRCDIR / 'rsync-ssl', evil_helper, openssl_env)
-if result.returncode == 0 or 'invalid rsync-ssl hostname' not in result.stdout:
-    test_fail(f'crafted hostname was not rejected:\n{result.stdout}')
+invalid_helper = ['--HELPER', 'invalid host.example', *helper[2:]]
+result = invoke(SRCDIR / 'rsync-ssl', invalid_helper, openssl_env)
+if result.returncode != 1 or 'invalid rsync-ssl hostname' not in result.stdout:
+    test_fail(f'invalid hostname was not rejected:\n{result.stdout}')
+if openssl_args.exists():
+    test_fail('OpenSSL was started for an invalid hostname')
 
 def openssl_run(env):
     unlink_if_exists(openssl_args)
