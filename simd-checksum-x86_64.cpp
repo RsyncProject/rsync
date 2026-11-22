@@ -317,6 +317,21 @@ __attribute__ ((target("sse2"))) MVSTATIC int32 get_checksum1_sse2_32(schar* buf
 
 extern "C" __attribute__ ((target("avx2"))) int32 get_checksum1_avx2_asm(schar* buf, int32 len, int32 i, uint32* ps1, uint32* ps2);
 
+/* The asm routine is AVX2-only and, unlike the multi-versioned intrinsic
+ * paths, has no compiler-generated fallback, so it must not be called on a
+ * CPU without AVX2 (it would fault with SIGILL). Gate it on a cached runtime
+ * check; when AVX2 is absent we skip it and the SSSE3/SSE2/scalar steps,
+ * which are safe everywhere, do all the work. */
+static int roll_asm_have_avx2(void)
+{
+    static int have = -1;
+    if (have < 0) {
+	__builtin_cpu_init();
+	have = __builtin_cpu_supports("avx2") ? 1 : 0;
+    }
+    return have;
+}
+
 #else /* } { */
 
 /*
@@ -461,7 +476,8 @@ static inline uint32 get_checksum1_cpp(char *buf1, int32 len)
 
     // multiples of 64 bytes using AVX2 (if available)
 #ifdef USE_ROLL_ASM
-    i = get_checksum1_avx2_asm((schar*)buf1, len, i, &s1, &s2);
+    if (roll_asm_have_avx2())
+	i = get_checksum1_avx2_asm((schar*)buf1, len, i, &s1, &s2);
 #else
     i = get_checksum1_avx2_64((schar*)buf1, len, i, &s1, &s2);
 #endif
@@ -472,8 +488,8 @@ static inline uint32 get_checksum1_cpp(char *buf1, int32 len)
     // multiples of 32 bytes using SSE2 (if available)
     i = get_checksum1_sse2_32((schar*)buf1, len, i, &s1, &s2);
 
-    // whatever is left
-    i = get_checksum1_default_1((schar*)buf1, len, i, &s1, &s2);
+    // whatever is left (updates s1/s2; the returned offset is unused here)
+    get_checksum1_default_1((schar*)buf1, len, i, &s1, &s2);
 
     return (s1 & 0xffff) + (s2 << 16);
 }
@@ -548,6 +564,8 @@ int main() {
 #endif /* BENCHMARK_SIMD_CHECKSUM1 */
 
 #ifdef TEST_SIMD_CHECKSUM1
+#include <sys/mman.h>
+#include <unistd.h>
 
 static uint32 checksum_via_default(char *buf, int32 len)
 {
@@ -579,12 +597,77 @@ static uint32 checksum_via_avx2(char *buf, int32 len)
     int32 i;
     uint32 s1 = 0, s2 = 0;
 #ifdef USE_ROLL_ASM
-    i = get_checksum1_avx2_asm((schar*)buf, len, 0, &s1, &s2);
+    if (roll_asm_have_avx2())
+	i = get_checksum1_avx2_asm((schar*)buf, len, 0, &s1, &s2);
+    else
+	i = 0;
 #else
     i = get_checksum1_avx2_64((schar*)buf, len, 0, &s1, &s2);
 #endif
     get_checksum1_default_1((schar*)buf, len, i, &s1, &s2);
     return (s1 & 0xffff) + (s2 << 16);
+}
+
+
+/* Run every implementation on a buffer placed flush against an unreadable page,
+ * so any read past buf+len faults here instead of in a user's transfer.  The
+ * buffers above deliberately carry 64 spare bytes for the unaligned case, which
+ * is exactly what let a 64-byte over-read in the AVX2 assembly go unnoticed:
+ * it only crashed when an allocation happened to end at a page boundary. */
+static int test_no_overread(void)
+{
+#if defined HAVE_SYS_MMAN_H || defined __linux__ || defined __APPLE__ || defined BSD
+    /* Setting the guard up is not optional on the platforms this is compiled
+     * for: if it fails we are not testing what the caller thinks, so say so and
+     * fail rather than return a pass that looks identical to a real one. */
+    long pagesz = sysconf(_SC_PAGESIZE);
+    if (pagesz <= 0) {
+        printf("FAIL guard-page: sysconf(_SC_PAGESIZE) gave %ld\n", pagesz);
+        return 1;
+    }
+    size_t region = (size_t)pagesz * 4;
+    char *base = (char *)mmap(NULL, region, PROT_READ | PROT_WRITE,
+                              MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    if (base == MAP_FAILED) {
+        printf("FAIL guard-page: mmap failed\n");
+        return 1;
+    }
+    if (mprotect(base + region - pagesz, pagesz, PROT_NONE) != 0) {
+        printf("FAIL guard-page: mprotect failed\n");
+        munmap(base, region);
+        return 1;
+    }
+    /* Whether the ASSEMBLY was reached is a separate question from whether the
+     * checks passed.  Without AVX2 the dispatcher falls back and the guard loop
+     * proves nothing about it, which must not read as coverage. */
+    __builtin_cpu_init();
+    printf("guard-page: AVX2 %s\n",
+           __builtin_cpu_supports("avx2")
+             ? "present, assembly and intrinsics exercised"
+             : "ABSENT -- fallback only, the AVX2 paths were NOT exercised");
+    int failures = 0;
+    /* 128 is the shortest the AVX2 paths will touch; step by 1 so every
+     * remainder mod 64, and both alignments, get covered. */
+    for (int32 len = 128; len <= 4096; len++) {
+        char *buf = base + region - pagesz - len;   /* last byte abuts the guard */
+        for (int32 i = 0; i < len; i++)
+            buf[i] = (char)((i + (i % 3) + (i % 11)) % 256);
+        uint32 ref = checksum_via_default(buf, len);
+        if (checksum_via_sse2(buf, len) != ref
+         || checksum_via_ssse3(buf, len) != ref
+         || checksum_via_avx2(buf, len) != ref
+         || get_checksum1(buf, len) != ref) {
+            printf("FAIL guard-page size=%5d: mismatch at the page boundary\n", len);
+            if (++failures > 4)
+                break;
+        }
+    }
+    munmap(base, region);
+    return failures;
+#else
+    printf("guard-page: no mmap on this platform, over-read check NOT RUN\n");
+    return 0;
+#endif
 }
 
 int main()
@@ -648,6 +731,8 @@ int main()
     }
 
     free(raw);
+
+    failures += test_no_overread();
 
     if (failures) {
         printf("%d checksum mismatches!\n", failures);

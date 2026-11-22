@@ -23,10 +23,14 @@
 #include "itypes.h"
 #include "ifuncs.h"
 #include <popt.h>
+#if defined CONFIG_LOCALE && defined HAVE_LOCALE_H
+#include <locale.h>
+#endif
 
 extern int module_id;
 extern int local_server;
 extern int sanitize_paths;
+extern int operator_path_resolve;
 extern int trust_sender_args;
 extern int trust_sender_filter;
 extern unsigned int module_dirlen;
@@ -59,6 +63,9 @@ int preserve_perms = 0;
 int preserve_executability = 0;
 int preserve_devices = 0;
 int preserve_specials = 0;
+int drop_devices = 0;
+char *confine_root = NULL;		/* --confine-root: see syscall.c */
+unsigned int confine_rootlen = 0;
 int preserve_uid = 0;
 int preserve_gid = 0;
 int preserve_mtimes = 0;
@@ -87,6 +94,7 @@ int preallocate_files = 0;
 int do_compression = 0;
 int do_compression_level = CLVL_NOT_SPECIFIED;
 int do_compression_threads = 0; /*n = 0 use rsync thread, n >= 1 spawn n threads for compression */
+#define MAX_DAEMON_COMPRESSION_THREADS 8
 int am_root = 0; /* 0 = normal, 1 = root, 2 = --super, -1 = --fake-super */
 int am_server = 0;
 int am_sender = 0;
@@ -126,6 +134,7 @@ int connect_timeout = 0;
 int keep_partial = 0;
 int safe_symlinks = 0;
 int copy_unsafe_links = 0;
+int insecure_links = 0;
 int munge_symlinks = 0;
 int use_secure_symlinks = 0;
 int size_only = 0;
@@ -145,6 +154,7 @@ int blocking_io = -1;
 int checksum_seed = 0;
 int inplace = 0;
 int delay_updates = 0;
+int delay_symlinks = 0;
 int32 block_size = 0;
 time_t stop_at_utime = 0;
 char *skip_compress = NULL;
@@ -446,24 +456,27 @@ static void parse_output_words(struct output_struct *words, short *levels, const
 			len = strlen(str);
 		if (!len)
 			continue;
-		if (!isDigit(str)) {
-			while (len && isDigit(str+len-1))
+		if (!ascii_is_digit((uchar)*str)) {
+			while (len && ascii_is_digit((uchar)str[len-1]))
 				len--;
 		}
-		lev = isDigit(str+len) ? atoi(str+len) : 1;
-		if (lev > MAX_OUT_LEVEL)
+		lev = ascii_is_digit((uchar)str[len]) ? atoi(str+len) : 1;
+		/* atoi() of an overflowing positive digit string can return a
+		 * negative int (LONG_MAX truncated on LP64); a negative lev
+		 * here later indexes counts[lev] in make_output_option(). */
+		if (lev > MAX_OUT_LEVEL || lev < 0)
 			lev = MAX_OUT_LEVEL;
-		if (len == 4 && strncasecmp(str, "help", 4) == 0) {
+		if (len == 4 && ascii_strncasecmp(str, "help", 4) == 0) {
 			output_item_help(words);
 			exit_cleanup(0);
 		}
-		if (len == 4 && strncasecmp(str, "none", 4) == 0)
+		if (len == 4 && ascii_strncasecmp(str, "none", 4) == 0)
 			len = lev = 0;
-		else if (len == 3 && strncasecmp(str, "all", 3) == 0)
+		else if (len == 3 && ascii_strncasecmp(str, "all", 3) == 0)
 			len = 0;
 		for (j = 0; words[j].name; j++) {
 			if (!len
-			 || (len == words[j].namelen && strncasecmp(str, words[j].name, len) == 0)) {
+			 || (len == words[j].namelen && ascii_strncasecmp(str, words[j].name, len) == 0)) {
 				if (priority >= words[j].priority) {
 					words[j].priority = priority;
 					levels[j] = lev;
@@ -594,7 +607,7 @@ enum {OPT_SERVER = 1000, OPT_DAEMON, OPT_SENDER, OPT_EXCLUDE, OPT_EXCLUDE_FROM,
       OPT_NO_D, OPT_APPEND, OPT_NO_ICONV, OPT_INFO, OPT_DEBUG, OPT_BLOCK_SIZE,
       OPT_USERMAP, OPT_GROUPMAP, OPT_CHOWN, OPT_BWLIMIT, OPT_STDERR,
       OPT_OLD_COMPRESS, OPT_NEW_COMPRESS, OPT_NO_COMPRESS, OPT_OLD_ARGS,
-      OPT_STOP_AFTER, OPT_STOP_AT,
+      OPT_STOP_AFTER, OPT_STOP_AT, OPT_NICE, OPT_NO_NICE,
       OPT_REFUSED_BASE = 9000};
 
 static struct poptOption long_options[] = {
@@ -676,12 +689,17 @@ static struct poptOption long_options[] = {
   {"no-write-devices", 0,  POPT_ARG_VAL,    &write_devices, 0, 0, 0 },
   {"specials",         0,  POPT_ARG_VAL,    &preserve_specials, 1, 0, 0 },
   {"no-specials",      0,  POPT_ARG_VAL,    &preserve_specials, 0, 0, 0 },
+  {"drop-D",           0,  POPT_ARG_VAL,    &drop_devices, 1, 0, 0 },
+  {"no-drop-D",        0,  POPT_ARG_VAL,    &drop_devices, 0, 0, 0 },
+  {"confine-root",     0,  POPT_ARG_STRING, &confine_root, 0, 0, 0 },
   {"links",           'l', POPT_ARG_VAL,    &preserve_links, 1, 0, 0 },
   {"no-links",         0,  POPT_ARG_VAL,    &preserve_links, 0, 0, 0 },
   {"no-l",             0,  POPT_ARG_VAL,    &preserve_links, 0, 0, 0 },
   {"copy-links",      'L', POPT_ARG_NONE,   &copy_links, 0, 0, 0 },
   {"copy-unsafe-links",0,  POPT_ARG_NONE,   &copy_unsafe_links, 0, 0, 0 },
   {"safe-links",       0,  POPT_ARG_NONE,   &safe_symlinks, 0, 0, 0 },
+  {"insecure-links",   0,  POPT_ARG_VAL,    &insecure_links, 1, 0, 0 },
+  {"no-insecure-links",0,  POPT_ARG_VAL,    &insecure_links, 0, 0, 0 },
   {"munge-links",      0,  POPT_ARG_VAL,    &munge_symlinks, 1, 0, 0 },
   {"no-munge-links",   0,  POPT_ARG_VAL,    &munge_symlinks, 0, 0, 0 },
   {"copy-dirlinks",   'k', POPT_ARG_NONE,   &copy_dirlinks, 0, 0, 0 },
@@ -776,6 +794,8 @@ static struct poptOption long_options[] = {
   {"partial-dir",      0,  POPT_ARG_STRING, &partial_dir, 0, 0, 0 },
   {"delay-updates",    0,  POPT_ARG_VAL,    &delay_updates, 1, 0, 0 },
   {"no-delay-updates", 0,  POPT_ARG_VAL,    &delay_updates, 0, 0, 0 },
+  {"delay-symlinks",   0,  POPT_ARG_VAL,    &delay_symlinks, 1, 0, 0 },
+  {"no-delay-symlinks",0,  POPT_ARG_VAL,    &delay_symlinks, 0, 0, 0 },
   {"prune-empty-dirs",'m', POPT_ARG_VAL,    &prune_empty_dirs, 1, 0, 0 },
   {"no-prune-empty-dirs",0,POPT_ARG_VAL,    &prune_empty_dirs, 0, 0, 0 },
   {"no-m",             0,  POPT_ARG_VAL,    &prune_empty_dirs, 0, 0, 0 },
@@ -845,6 +865,8 @@ static struct poptOption long_options[] = {
   {"remote-option",   'M', POPT_ARG_STRING, 0, 'M', 0, 0 },
   {"protocol",         0,  POPT_ARG_INT,    &protocol_version, 0, 0, 0 },
   {"checksum-seed",    0,  POPT_ARG_INT,    &checksum_seed, 0, 0, 0 },
+  {"nice",             0,  POPT_ARG_STRING, 0, OPT_NICE, 0, 0 },
+  {"no-nice",          0,  POPT_ARG_NONE,   0, OPT_NO_NICE, 0, 0 },
   {"server",           0,  POPT_ARG_NONE,   0, OPT_SERVER, 0, 0 },
   {"sender",           0,  POPT_ARG_NONE,   0, OPT_SENDER, 0, 0 },
   /* All the following options switch us into daemon-mode option-parsing. */
@@ -872,6 +894,8 @@ static const struct poptOption long_daemon_options[] = {
   {"port",             0,  POPT_ARG_INT,    &rsync_port, 0, 0, 0 },
   {"sockopts",         0,  POPT_ARG_STRING, &sockopts, 0, 0, 0 },
   {"protocol",         0,  POPT_ARG_INT,    &protocol_version, 0, 0, 0 },
+  {"nice",             0,  POPT_ARG_STRING, 0, OPT_NICE, 0, 0 },
+  {"no-nice",          0,  POPT_ARG_NONE,   0, OPT_NO_NICE, 0, 0 },
   {"server",           0,  POPT_ARG_NONE,   &am_server, 0, 0, 0 },
   {"temp-dir",        'T', POPT_ARG_STRING, &tmpdir, 0, 0, 0 },
   {"verbose",         'v', POPT_ARG_NONE,   0, 'v', 0, 0 },
@@ -883,6 +907,17 @@ static const struct poptOption long_daemon_options[] = {
 
 
 static char err_buf[200];
+
+static int parse_niceness_option(poptContext pc)
+{
+	const char *arg = poptGetOptArg(pc);
+
+	if (niceness_parse(arg))
+		return 1;
+	snprintf(err_buf, sizeof err_buf,
+		"Invalid argument passed to --nice (%s)\n", arg);
+	return 0;
+}
 
 
 /**
@@ -904,9 +939,54 @@ void option_error(void)
 }
 
 
+/* Does this row store a compile-time constant, and if so which?
+ *
+ * popt's `val` is not comparable across argInfo kinds.  For POPT_ARG_VAL it IS
+ * the value stored in `arg`; for the others a nonzero `val` is an action code
+ * handed to the parser's switch, and POPT_ARG_NONE with a destination stores 1
+ * regardless.  Comparing the raw field therefore misses aliases spelled with
+ * different table shapes -- --del is POPT_ARG_NONE/&delete_during/0 and
+ * --delete-during is POPT_ARG_VAL/&delete_during/1, and both set it to 1. */
+static int refuse_const_assign(const struct poptOption *op, int *valp)
+{
+	if (!op->arg)
+		return 0;
+	if (op->argInfo == POPT_ARG_VAL) {
+		*valp = op->val;
+		return 1;
+	}
+	/* A nonzero val here means the row ALSO runs a parser action, so it is
+	 * not merely an assignment and must not be folded in with one. */
+	if (op->argInfo == POPT_ARG_NONE && op->val == 0) {
+		*valp = 1;
+		return 1;
+	}
+	return 0;
+}
+
+/* Do two table rows name the same capability?  An exact refuse rule names a
+ * capability, not one spelling of it. */
+static int same_refuse_action(const struct poptOption *a, const struct poptOption *b)
+{
+	int a_val, b_val;
+
+	/* Constant assignments: same destination, same resulting value.  The
+	 * value check keeps opposite switches such as --foo and --no-foo apart,
+	 * since they differ only in what they store. */
+	if (refuse_const_assign(a, &a_val) && refuse_const_assign(b, &b_val))
+		return a->arg == b->arg && a_val == b_val;
+
+	/* Anything else has to match as a table entry: a row storing a runtime
+	 * value (POPT_ARG_INT, POPT_ARG_STRING) needs the same destination and
+	 * action code, and an action-only row the same nonzero code. */
+	if (a->argInfo != b->argInfo || a->val != b->val)
+		return 0;
+	return a->arg ? a->arg == b->arg : !b->arg && a->val != 0;
+}
+
 static void parse_one_refuse_match(int negated, const char *ref, const struct poptOption *list_end)
 {
-	struct poptOption *op;
+	struct poptOption *op, *matched_op = NULL;
 	char shortName[2];
 	int is_wild = strpbrk(ref, "*?[") != NULL;
 	int found_match = 0;
@@ -927,8 +1007,21 @@ static void parse_one_refuse_match(int negated, const char *ref, const struct po
 			else if (!is_wild)
 				op->descrip = negated ? "a=" : "r=";
 			found_match = 1;
-			if (!is_wild)
+			if (!is_wild) {
+				matched_op = op;
 				break;
+			}
+		}
+	}
+
+	if (matched_op) {
+		for (op = long_options; op != list_end; op++) {
+			if (op == matched_op || !same_refuse_action(op, matched_op))
+				continue;
+			if (op->descrip[1] == '*')
+				op->descrip = negated ? "a*" : "r*";
+			else
+				op->descrip = negated ? "a=" : "r=";
 		}
 	}
 
@@ -1008,6 +1101,11 @@ static void set_refuse_options(void)
 			parse_one_refuse_match(0, "iconv", list_end);
 #endif
 		parse_one_refuse_match(0, "log-file*", list_end);
+		/* A client must never disable the daemon's symlink confinement:
+		 * --insecure-links is a local-only flag, so the daemon hard-refuses it
+		 * (dropping the connection).  The daemon's own opt-out is the
+		 * "insecure links" module parameter, not this flag. */
+		parse_one_refuse_match(0, "insecure-links", list_end);
 	}
 
 #ifndef SUPPORT_ATIMES
@@ -1080,19 +1178,62 @@ static int count_args(const char **argv)
 	return i;
 }
 
+/* The largest value parse_size_arg() will accept when no explicit max_value is
+ * given.  It is SIZE_MAX/2 rather than SIZE_MAX because the parser computes and
+ * returns the size as a signed ssize_t (with a negative return meaning error),
+ * so this keeps every accepted size representable as a positive ssize_t. */
+#define SIZE_ARG_MAX ((ssize_t)(SIZE_MAX / 2))
+
+static const char *size_fraction_start(const char *point)
+{
+	if (*point == '.')
+		return point + 1;
+#if defined CONFIG_LOCALE && defined HAVE_LOCALE_H
+	const char *decimal = localeconv()->decimal_point;
+	size_t len = strlen(decimal);
+
+	if (len && strncmp(point, decimal, len) == 0)
+		return point + len;
+#endif
+	if (*point == ',' && get_decimal_point() == ',')
+		return point + 1;
+	return point;
+}
+
+static size_t scale_size_fraction(const char *start, const char *end, size_t unit)
+{
+	size_t fraction = 0;
+	size_t tens = unit / 10, ones = unit % 10;
+
+	/* Fold right to left and round down to bytes. Split the multiplier
+	 * before multiplying so even the largest unit cannot overflow. */
+	while (end > start) {
+		unsigned int digit = *--end - '0';
+		fraction = tens * digit + fraction / 10 + (ones * digit + fraction % 10) / 10;
+	}
+	return fraction;
+}
+
 /* If the size_arg is an invalid string or the value is < min_value, an error
  * is put into err_buf & the return is -1.  Note that this parser does NOT
  * support negative numbers, so a min_value < 0 doesn't make any sense. */
 static ssize_t parse_size_arg(const char *size_arg, char def_suf, const char *opt_name,
 			      ssize_t min_value, ssize_t max_value, BOOL unlimited_0)
 {
-	int reps, mult, len;
+	int reps, mult, len, adjustment = 0;
 	const char *arg, *err = "invalid", *min_max = NULL;
-	ssize_t limit = -1, size = 1;
+	const char *whole_end, *fraction, *number_end;
+	ssize_t limit = -1;
+	ssize_t size_max = max_value >= 0 ? max_value : SIZE_ARG_MAX;
+	size_t unit = 1, whole = 0, size, fraction_bytes, allowed, whole_limit;
 
-	for (arg = size_arg; isDigit(arg); arg++) {}
-	if (*arg == '.' || *arg == get_decimal_point()) /* backward compatibility: always allow '.' */
-		for (arg++; isDigit(arg); arg++) {}
+	for (whole_end = size_arg; ascii_is_digit((uchar)*whole_end); whole_end++) {}
+	fraction = size_fraction_start(whole_end);
+	for (number_end = fraction; ascii_is_digit((uchar)*number_end); number_end++) {}
+	if (whole_end == size_arg && number_end == fraction)
+		goto failure;
+
+	arg = number_end;
 	switch (*arg && *arg != '+' && *arg != '-' ? *arg++ : def_suf) {
 	case 'b': case 'B':
 		reps = 0;
@@ -1119,31 +1260,57 @@ static ssize_t parse_size_arg(const char *size_arg, char def_suf, const char *op
 		mult = 1000, arg++;
 	else if (!*arg || *arg == '+' || *arg == '-')
 		mult = 1024;
-	else if (strncasecmp(arg, "ib", 2) == 0)
+	else if (ascii_strncasecmp(arg, "ib", 2) == 0)
 		mult = 1024, arg += 2;
 	else
 		goto failure;
-	while (reps--)
-		size *= mult;
-	size *= atof(size_arg);
-	if ((*arg == '+' || *arg == '-') && arg[1] == '1' && arg != size_arg)
-		size += atoi(arg), arg += 2;
+	while (reps--) {
+		if (unit > SIZE_MAX / (size_t)mult)
+			goto too_large;
+		unit *= mult;
+	}
+	if ((*arg == '+' || *arg == '-') && arg[1] == '1') {
+		adjustment = *arg == '+' ? 1 : -1;
+		arg += 2;
+	}
 	if (*arg)
 		goto failure;
-	if (size < 0 || (max_value >= 0 && size > max_value)) {
-		err = "too large";
-		min_max = "max";
-		limit = max_value;
-		goto failure;
+
+	allowed = (size_t)size_max + (adjustment < 0);
+	whole_limit = allowed / unit;
+	for (arg = size_arg; arg < whole_end; arg++) {
+		unsigned int digit = *arg - '0';
+		if (whole > whole_limit / 10
+		 || (whole == whole_limit / 10 && digit > whole_limit % 10))
+			goto too_large;
+		whole = whole * 10 + digit;
 	}
-	if (size < min_value && (!unlimited_0 || size != 0)) {
+	size = whole * unit;
+	fraction_bytes = scale_size_fraction(fraction, number_end, unit);
+	if (fraction_bytes > allowed - size)
+		goto too_large;
+	size += fraction_bytes;
+	if (adjustment < 0) {
+		if (!size)
+			goto too_large;
+		size--;
+	} else if (adjustment > 0) {
+		if (size == (size_t)size_max)
+			goto too_large;
+		size++;
+	}
+	if (size < (size_t)min_value && (!unlimited_0 || size != 0)) {
 		err = "too small";
 		min_max = "min";
 		limit = min_value;
 		goto failure;
 	}
-	return size;
+	return (ssize_t)size;
 
+too_large:
+	err = "too large";
+	min_max = "max";
+	limit = max_value;
 failure:
 	len = snprintf(err_buf, sizeof err_buf - 1, "--%s=%s is %s", opt_name, size_arg, err);
 	if (min_max && limit >= 0 && len < (int)sizeof err_buf - 10) {
@@ -1151,6 +1318,8 @@ failure:
 			min_max, do_big_num(limit, 3, NULL),
 			unlimited_0 && min_max[1] == 'i' ? " or 0 for unlimited" : "");
 	}
+	if (len < 0 || len > (int)sizeof err_buf - 2)
+		len = sizeof err_buf - 2;
 	err_buf[len] = '\n';
 	err_buf[len+1] = '\0';
 	return -1;
@@ -1457,6 +1626,15 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 					verbose++;
 					break;
 
+				case OPT_NICE:
+					if (!parse_niceness_option(pc))
+						goto cleanup;
+					break;
+
+				case OPT_NO_NICE:
+					niceness_reset();
+					break;
+
 				default:
 					rprintf(FERROR,
 						"rsync: %s: %s (in daemon mode)\n",
@@ -1489,7 +1667,6 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 				*argc_p = 0;
 			} else if (poptDupArgv(argc, argv, argc_p, argv_p) != 0)
 				out_of_memory("parse_arguments");
-			argv = *argv_p;
 			poptFreeContext(pc);
 
 			am_starting_up = 0;
@@ -1596,6 +1773,15 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 
 		case 'q':
 			quiet++;
+			break;
+
+		case OPT_NICE:
+			if (!parse_niceness_option(pc))
+				goto cleanup;
+			break;
+
+		case OPT_NO_NICE:
+			niceness_reset();
 			break;
 
 		case 'x':
@@ -1711,11 +1897,17 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 			break;
 
 		case OPT_BWLIMIT: {
-			ssize_t size = parse_size_arg(bwlimit_arg, 'K', "bwlimit", 512, -1, True);
+			size_t rate_max = INT_MAX;
+			ssize_t bytes_max = SIZE_ARG_MAX;
+			ssize_t size;
+
+			if (rate_max <= (size_t)(bytes_max - 511) / 1024)
+				bytes_max = (ssize_t)(rate_max * 1024 + 511);
+			size = parse_size_arg(bwlimit_arg, 'K', "bwlimit", 512, bytes_max, True);
 			if (size < 0)
 				goto cleanup;
 			bwlimit_arg = strdup(do_big_num(size, 0, NULL));
-			bwlimit = (size + 512) / 1024;
+			bwlimit = (int)(size / 1024 + (size % 1024 >= 512));
 			break;
 		}
 
@@ -1960,10 +2152,10 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 		ssize_t size = parse_size_arg(max_alloc_arg, 'B', "max-alloc", 1024*1024, -1, True);
 		if (size < 0)
 			goto cleanup;
-		max_alloc = size;
+		/* Pass zero through to the peer so each build applies its own ceiling. */
+		max_alloc_arg = strdup(do_big_num(size, 0, NULL));
+		max_alloc = size ? (size_t)size : (size_t)SIZE_ARG_MAX;
 	}
-	if (!max_alloc)
-		max_alloc = SIZE_MAX;
 
 	if (old_style_args < 0) {
 		if (!am_server && protect_args <= 0 && (arg = getenv("RSYNC_OLD_ARGS")) != NULL && *arg) {
@@ -1994,7 +2186,8 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 		}
 	}
 
-	if (checksum_choice && strcasecmp(checksum_choice, "auto") != 0 && strcasecmp(checksum_choice, "auto,auto") != 0) {
+	if (checksum_choice && ascii_strcasecmp(checksum_choice, "auto") != 0
+	 && ascii_strcasecmp(checksum_choice, "auto,auto") != 0) {
 		/* Call this early to verify the args and figure out if we need to force
 		 * --whole-file. Note that the parse function will get called again later,
 		 * just in case an "auto" choice needs to know the protocol_version. */
@@ -2010,7 +2203,7 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 
 	if (!compress_choice && do_compression > 1)
 		compress_choice = "zlibx";
-	if (compress_choice && strcasecmp(compress_choice, "auto") != 0)
+	if (compress_choice && ascii_strcasecmp(compress_choice, "auto") != 0)
 		parse_compress_choice(0); /* Twiddles do_compression and can possibly NULL-out compress_choice. */
 	else
 		compress_choice = NULL;
@@ -2024,24 +2217,28 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 		}
 		if (do_compression_threads < 0)
 			do_compression_threads = 0;
+		/* A daemon client controls the server-side sender arguments.  Keep one
+		 * unauthenticated connection from asking Zstandard to materialize its
+		 * implementation maximum (currently hundreds) of worker threads.  Local
+		 * and remote-shell invocations retain the operator-requested value. */
+		if (am_daemon && do_compression_threads > MAX_DAEMON_COMPRESSION_THREADS)
+			do_compression_threads = MAX_DAEMON_COMPRESSION_THREADS;
 	}
 
 #ifdef HAVE_SETVBUF
 	if (outbuf_mode && !am_server) {
-		int mode = *(uchar *)outbuf_mode;
-		if (islower(mode))
-			mode = toupper(mode);
+		int mode = ascii_lower(*(uchar *)outbuf_mode);
 		fflush(stdout); /* Just in case... */
 		switch (mode) {
-		case 'N': /* None */
-		case 'U': /* Unbuffered */
+		case 'n': /* None */
+		case 'u': /* Unbuffered */
 			mode = _IONBF;
 			break;
-		case 'L': /* Line */
+		case 'l': /* Line */
 			mode = _IOLBF;
 			break;
-		case 'B': /* Block */
-		case 'F': /* Full */
+		case 'b': /* Block */
+		case 'f': /* Full */
 			mode = _IOFBF;
 			break;
 		default:
@@ -2090,6 +2287,9 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 		poptFreeContext(pc);
 		return 1;
 	}
+	if (am_daemon && module_id >= 0
+	 && !niceness_check_daemon_request(err_buf, sizeof err_buf))
+		goto cleanup;
 
 	/* Because popt 1.19 has started to free the returned args data, we now
 	 * make a copy of the array and then do an immediate cleanup. */
@@ -2164,6 +2364,22 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 		snprintf(err_buf, sizeof err_buf,
 			"--read-batch cannot be used with --remove-%s-files\n",
 			remove_source_files == 1 ? "source" : "sent");
+		goto cleanup;
+	}
+	if (delay_symlinks && remove_source_files) {
+		snprintf(err_buf, sizeof err_buf,
+			"--delay-symlinks cannot be used with --remove-%s-files\n",
+			remove_source_files == 1 ? "source" : "sent");
+		goto cleanup;
+	}
+	if (delay_symlinks && preserve_hard_links) {
+		snprintf(err_buf, sizeof err_buf,
+			"--delay-symlinks cannot be used with --hard-links\n");
+		goto cleanup;
+	}
+	if (delay_symlinks && basis_dir_cnt) {
+		snprintf(err_buf, sizeof err_buf,
+			"--delay-symlinks cannot be used with %s\n", alt_dest_opt(0));
 		goto cleanup;
 	}
 	if (batch_name && strlen(batch_name) > MAX_BATCH_NAME_LEN) {
@@ -2262,6 +2478,26 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 		}
 	}
 
+	if (confine_root) {
+		/* A daemon already has module_dir for this job, and honouring a
+		 * peer-supplied root there could only loosen the module boundary. */
+		if (am_daemon)
+			confine_root = NULL;
+		else if (*confine_root != '/') {
+			snprintf(err_buf, sizeof err_buf,
+				 "--confine-root must be an absolute path\n");
+			return 0;
+		} else if (insecure_links) {
+			/* The opt-out restores the legacy open, which short-circuits the
+			 * walk that enforces the root -- so the pair would silently mean
+			 * no confinement at all.  Say so instead. */
+			snprintf(err_buf, sizeof err_buf,
+				 "--insecure-links cannot be combined with --confine-root\n");
+			return 0;
+		} else
+			confine_root = normalize_path(confine_root, True, &confine_rootlen);
+	}
+
 	if (sanitize_paths) {
 		int i;
 		for (i = argc; i-- > 0; )
@@ -2273,21 +2509,26 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 	}
 	if (daemon_filter_list.head && !am_sender) {
 		filter_rule_list *elp = &daemon_filter_list;
+		/* Strip the module-dir prefix to get the module-relative name, but keep a
+		 * leading "/" for a "path = /" module (module_dirlen <= 1) so an absolute
+		 * (module-rooted) filter rule still matches. */
 		if (tmpdir) {
-			char *dir;
+			char clean[MAXPATHLEN], *dir;
 			if (!*tmpdir)
 				goto options_rejected;
-			dir = tmpdir + (*tmpdir == '/' ? module_dirlen : 0);
-			clean_fname(dir, CFN_COLLAPSE_DOT_DOT_DIRS);
+			if (!sanitize_path(clean, tmpdir, "/", 0, SP_DEFAULT))
+				strlcpy(clean, tmpdir, sizeof clean);
+			dir = clean + (*clean == '/' && module_dirlen > 1 ? module_dirlen : 0);
 			if (check_filter(elp, FLOG, dir, 1) < 0)
 				goto options_rejected;
 		}
 		if (backup_dir) {
-			char *dir;
+			char clean[MAXPATHLEN], *dir;
 			if (!*backup_dir)
 				goto options_rejected;
-			dir = backup_dir + (*backup_dir == '/' ? module_dirlen : 0);
-			clean_fname(dir, CFN_COLLAPSE_DOT_DOT_DIRS);
+			if (!sanitize_path(clean, backup_dir, "/", 0, SP_DEFAULT))
+				strlcpy(clean, backup_dir, sizeof clean);
+			dir = clean + (*clean == '/' && module_dirlen > 1 ? module_dirlen : 0);
 			if (check_filter(elp, FLOG, dir, 1) < 0)
 				goto options_rejected;
 		}
@@ -2464,7 +2705,7 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 
 	if (files_from) {
 		char *h, *p;
-		int q;
+		int q = 0;
 		if (argc > 2 || (!am_daemon && !am_server && argc == 1)) {
 			usage(FERROR);
 			exit_cleanup(RERR_SYNTAX);
@@ -2498,7 +2739,20 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 				if (check_filter(&daemon_filter_list, FLOG, dir, 0) < 0)
 					goto options_rejected;
 			}
-			filesfrom_fd = open(files_from, O_RDONLY|O_BINARY);
+			/* Operator-supplied path that may transit attacker-writable
+			 * parents; refuse symlinks not owned by uid 0 or our euid,
+			 * as for --exclude-from/--include-from/--filter in exclude.c.
+			 * A daemon reads this list from a CLIENT-requested path
+			 * (--files-from=:LIST) and it must stay inside the module:
+			 * operator_path_resolve makes the ownership walk also refuse a
+			 * (trusted-owned) symlink that redirects the list outside the
+			 * module root -- e.g. a root-owned backup symlink. No-op off a
+			 * daemon (the module-root check only fires when am_daemon). */
+			int save_opr = operator_path_resolve;
+			/* The daemon process is the only case that the files-from path comes from an untrusted argument */
+			operator_path_resolve = am_daemon ? 1 : 0;
+			filesfrom_fd = open_no_attacker_symlinks(files_from, O_RDONLY|O_BINARY, 0);
+			operator_path_resolve = save_opr;
 			if (filesfrom_fd < 0) {
 				snprintf(err_buf, sizeof err_buf,
 					"failed to open files-from file %s: %s\n",
@@ -2538,7 +2792,7 @@ static char SPLIT_ARG_WHEN_OLD[1];
  **/
 char *safe_arg(const char *opt, const char *arg)
 {
-#define SHELL_CHARS "!#$&;|<>(){}\"'` \t\\"
+#define SHELL_CHARS "!#$&;|<>(){}\"\'` \t\n\r\\"
 #define WILD_CHARS  "*?[]" /* We don't allow remote brace expansion */
 	BOOL is_filename_arg = !opt;
 	char *escapes = is_filename_arg ? SHELL_CHARS : WILD_CHARS SHELL_CHARS;
@@ -2557,7 +2811,16 @@ char *safe_arg(const char *opt, const char *arg)
 			escape_leading_tilde = 1;
 		}
 		for (f = arg; *f; f++) {
-			if (strchr(escapes, *f))
+			if (*f == '\\') {
+				/* Mirror the writer below: in filename mode a backslash
+				 * before a wildcard is not doubled, so don't reserve a slot
+				 * for it.  The "f[1] &&" also avoids the strchr(WILD_CHARS,
+				 * '\0') footgun (which matches the terminator) on a trailing
+				 * backslash -- otherwise the counter and writer disagree and
+				 * an uninitialized heap byte leaks into the result. */
+				if (!is_filename_arg || !(f[1] && strchr(WILD_CHARS, f[1])))
+					extras++;
+			} else if (strchr(escapes, *f))
 				extras++;
 		}
 	}
@@ -2582,7 +2845,7 @@ char *safe_arg(const char *opt, const char *arg)
 			*t++ = '\\';
 		while (*f) {
 			if (*f == '\\') {
-				if (!is_filename_arg || !strchr(WILD_CHARS, f[1]))
+				if (!is_filename_arg || !(f[1] && strchr(WILD_CHARS, f[1])))
 					*t++ = '\\';
 			} else if (strchr(escapes, *f))
 				*t++ = '\\';
@@ -2610,11 +2873,21 @@ void server_options(char **args, int *argc_p)
 	char *arg;
 	int i, x;
 
+	/* Keep every append inside the caller's reserved range.  The do-while
+	 * makes the macro one statement so it is safe in unbraced conditionals. */
+#define ADD_SERVER_ARG(value) do { \
+		if (ac >= MAX_SERVER_ARGS) { \
+			rprintf(FERROR, "argc overflow in server_options().\n"); \
+			exit_cleanup(RERR_MALLOC); \
+		} \
+		args[ac++] = (value); \
+	} while (0)
+
 	/* This should always remain first on the server's command-line. */
-	args[ac++] = "--server";
+	ADD_SERVER_ARG("--server");
 
 	if (!am_sender)
-		args[ac++] = "--sender";
+		ADD_SERVER_ARG("--sender");
 
 	x = 1;
 	argstr[0] = '-';
@@ -2622,7 +2895,10 @@ void server_options(char **args, int *argc_p)
 	if (protect_args)
 		argstr[x++] = 's';
 
-	for (i = 0; i < verbose; i++)
+	/* `verbose` is unbounded (one increment per -v on our own command
+	 * line), so an uncapped loop walks past argstr[64].  Anything beyond
+	 * level ~5 is meaningless to the server anyway. */
+	for (i = 0; i < verbose && i < 9; i++)
 		argstr[x++] = 'v';
 
 	if (quiet && msgs2stderr)
@@ -2728,7 +3004,7 @@ void server_options(char **args, int *argc_p)
 	x += maybe_add_e_option(argstr + x, (int)sizeof argstr - x);
 
 	if (x > 1)
-		args[ac++] = argstr;
+		ADD_SERVER_ARG(argstr);
 
 #ifdef ICONV_OPTION
 	if (iconv_opt) {
@@ -2737,198 +3013,206 @@ void server_options(char **args, int *argc_p)
 			set++;
 		else
 			set = iconv_opt;
-		args[ac++] = safe_arg("--iconv", set);
+		ADD_SERVER_ARG(safe_arg("--iconv", set));
 	}
 #endif
 
 	if (protect_args && !local_server) /* unprotected args stop here */
-		args[ac++] = NULL;
+		ADD_SERVER_ARG(NULL);
 
 	if (list_only > 1)
-		args[ac++] = "--list-only";
+		ADD_SERVER_ARG("--list-only");
 
 	/* This makes sure that the remote rsync can handle deleting with -d
 	 * sans -r because the --no-r option was added at the same time. */
 	if (xfer_dirs && !recurse && delete_mode && am_sender)
-		args[ac++] = "--no-r";
+		ADD_SERVER_ARG("--no-r");
 
 	if (do_compression && do_compression_level != CLVL_NOT_SPECIFIED) {
 		if (asprintf(&arg, "--compress-level=%d", do_compression_level) < 0)
 			goto oom;
-		args[ac++] = arg;
+		ADD_SERVER_ARG(arg);
 	}
 
 	if (preserve_devices) {
 		/* Note: sending "--devices" would not be backward-compatible. */
 		if (!preserve_specials)
-			args[ac++] = "--no-specials"; /* -D is already set. */
+			ADD_SERVER_ARG("--no-specials"); /* -D is already set. */
 	} else if (preserve_specials)
-		args[ac++] = "--specials";
+		ADD_SERVER_ARG("--specials");
 
 	/* The server side doesn't use our log-format, but in certain
 	 * circumstances they need to know a little about the option. */
 	if (stdout_format && am_sender) {
 		/* Use --log-format, not --out-format, for compatibility. */
 		if (stdout_format_has_i > 1)
-			args[ac++] = "--log-format=%i%I";
+			ADD_SERVER_ARG("--log-format=%i%I");
 		else if (stdout_format_has_i)
-			args[ac++] = "--log-format=%i";
+			ADD_SERVER_ARG("--log-format=%i");
 		else if (stdout_format_has_o_or_i)
-			args[ac++] = "--log-format=%o";
+			ADD_SERVER_ARG("--log-format=%o");
 		else if (!verbose)
-			args[ac++] = "--log-format=X";
+			ADD_SERVER_ARG("--log-format=X");
 	}
 
 	if (msgs2stderr == 1)
-		args[ac++] = "--msgs2stderr";
+		ADD_SERVER_ARG("--msgs2stderr");
 	else if (msgs2stderr == 0)
-		args[ac++] = "--no-msgs2stderr";
+		ADD_SERVER_ARG("--no-msgs2stderr");
 
 	if (block_size) {
 		if (asprintf(&arg, "-B%u", (int)block_size) < 0)
 			goto oom;
-		args[ac++] = arg;
+		ADD_SERVER_ARG(arg);
 	}
 
 	if (io_timeout) {
 		if (asprintf(&arg, "--timeout=%d", io_timeout) < 0)
 			goto oom;
-		args[ac++] = arg;
+		ADD_SERVER_ARG(arg);
 	}
 
 	if (bwlimit) {
 		if (asprintf(&arg, "--bwlimit=%d", bwlimit) < 0)
 			goto oom;
-		args[ac++] = arg;
+		ADD_SERVER_ARG(arg);
 	}
 
 	if (backup_dir) {
 		/* This split idiom allows for ~/path expansion via the shell. */
-		args[ac++] = "--backup-dir";
-		args[ac++] = safe_arg("", backup_dir);
+		ADD_SERVER_ARG("--backup-dir");
+		ADD_SERVER_ARG(safe_arg("", backup_dir));
 	}
 
 	/* Only send --suffix if it specifies a non-default value. */
 	if (strcmp(backup_suffix, backup_dir ? "" : BACKUP_SUFFIX) != 0)
-		args[ac++] = safe_arg("--suffix", backup_suffix);
+		ADD_SERVER_ARG(safe_arg("--suffix", backup_suffix));
 
 	if (checksum_choice)
-		args[ac++] = safe_arg("--checksum-choice", checksum_choice);
+		ADD_SERVER_ARG(safe_arg("--checksum-choice", checksum_choice));
 
 	if (do_compression == CPRES_ZLIBX)
-		args[ac++] = "--new-compress";
+		ADD_SERVER_ARG("--new-compress");
 	else if (compress_choice && do_compression == CPRES_ZLIB)
-		args[ac++] = "--old-compress";
+		ADD_SERVER_ARG("--old-compress");
 	else if (compress_choice)
-		args[ac++] = safe_arg("--compress-choice", compress_choice);
+		ADD_SERVER_ARG(safe_arg("--compress-choice", compress_choice));
 
 	if (am_sender) {
 		if (max_delete > 0) {
 			if (asprintf(&arg, "--max-delete=%d", max_delete) < 0)
 				goto oom;
-			args[ac++] = arg;
+			ADD_SERVER_ARG(arg);
 		} else if (max_delete == 0)
-			args[ac++] = "--max-delete=-1";
+			ADD_SERVER_ARG("--max-delete=-1");
 		if (min_size >= 0)
-			args[ac++] = safe_arg("--min-size", min_size_arg);
+			ADD_SERVER_ARG(safe_arg("--min-size", min_size_arg));
 		if (max_size >= 0)
-			args[ac++] = safe_arg("--max-size", max_size_arg);
+			ADD_SERVER_ARG(safe_arg("--max-size", max_size_arg));
 		if (delete_before)
-			args[ac++] = "--delete-before";
+			ADD_SERVER_ARG("--delete-before");
 		else if (delete_during == 2)
-			args[ac++] = "--delete-delay";
+			ADD_SERVER_ARG("--delete-delay");
 		else if (delete_during)
-			args[ac++] = "--delete-during";
+			ADD_SERVER_ARG("--delete-during");
 		else if (delete_after)
-			args[ac++] = "--delete-after";
+			ADD_SERVER_ARG("--delete-after");
 		else if (delete_mode && !delete_excluded)
-			args[ac++] = "--delete";
+			ADD_SERVER_ARG("--delete");
 		if (delete_excluded)
-			args[ac++] = "--delete-excluded";
+			ADD_SERVER_ARG("--delete-excluded");
 		if (force_delete)
-			args[ac++] = "--force";
+			ADD_SERVER_ARG("--force");
 		if (write_batch < 0)
-			args[ac++] = "--only-write-batch=X";
+			ADD_SERVER_ARG("--only-write-batch=X");
 		if (am_root > 1)
-			args[ac++] = "--super";
+			ADD_SERVER_ARG("--super");
 		if (size_only)
-			args[ac++] = "--size-only";
+			ADD_SERVER_ARG("--size-only");
 		if (do_stats)
-			args[ac++] = "--stats";
+			ADD_SERVER_ARG("--stats");
 	} else {
 		if (skip_compress)
-			args[ac++] = safe_arg("--skip-compress", skip_compress);
+			ADD_SERVER_ARG(safe_arg("--skip-compress", skip_compress));
 	}
 
 	if (max_alloc_arg && max_alloc != DEFAULT_MAX_ALLOC)
-		args[ac++] = safe_arg("--max-alloc", max_alloc_arg);
+		ADD_SERVER_ARG(safe_arg("--max-alloc", max_alloc_arg));
 
 	/* --delete-missing-args needs the cooperation of both sides, but
 	 * the sender can handle --ignore-missing-args by itself. */
 	if (missing_args == 2)
-		args[ac++] = "--delete-missing-args";
+		ADD_SERVER_ARG("--delete-missing-args");
 	else if (missing_args == 1 && !am_sender)
-		args[ac++] = "--ignore-missing-args";
+		ADD_SERVER_ARG("--ignore-missing-args");
 
 	if (modify_window_set && am_sender) {
 		char *fmt = modify_window < 0 ? "-@%d" : "--modify-window=%d";
 		if (asprintf(&arg, fmt, modify_window) < 0)
 			goto oom;
-		args[ac++] = arg;
+		ADD_SERVER_ARG(arg);
 	}
 
 	if (checksum_seed) {
 		if (asprintf(&arg, "--checksum-seed=%d", checksum_seed) < 0)
 			goto oom;
-		args[ac++] = arg;
+		ADD_SERVER_ARG(arg);
 	}
 
 	if (partial_dir && am_sender) {
 		if (partial_dir != tmp_partialdir) {
-			args[ac++] = "--partial-dir";
-			args[ac++] = safe_arg("", partial_dir);
+			ADD_SERVER_ARG("--partial-dir");
+			ADD_SERVER_ARG(safe_arg("", partial_dir));
 		}
 		if (delay_updates)
-			args[ac++] = "--delay-updates";
+			ADD_SERVER_ARG("--delay-updates");
 	} else if (keep_partial && am_sender)
-		args[ac++] = "--partial";
+		ADD_SERVER_ARG("--partial");
+
+	if (delay_symlinks && am_sender)
+		ADD_SERVER_ARG("--delay-symlinks");
 
 	if (ignore_errors)
-		args[ac++] = "--ignore-errors";
+		ADD_SERVER_ARG("--ignore-errors");
 
 	if (copy_unsafe_links)
-		args[ac++] = "--copy-unsafe-links";
+		ADD_SERVER_ARG("--copy-unsafe-links");
+
+	/* --insecure-links is NOT forwarded: it is a local-only opt-out.  A daemon
+	 * governs its own confinement via the "insecure links" module parameter and
+	 * drops a connection that sends --insecure-links; a remote-shell peer that
+	 * wants it must be given it on its own side (e.g. via --rsync-path). */
 
 	if (safe_symlinks)
-		args[ac++] = "--safe-links";
+		ADD_SERVER_ARG("--safe-links");
 
 	if (numeric_ids)
-		args[ac++] = "--numeric-ids";
+		ADD_SERVER_ARG("--numeric-ids");
 
 	if (use_qsort)
-		args[ac++] = "--use-qsort";
+		ADD_SERVER_ARG("--use-qsort");
 
 	if (am_sender) {
 		if (usermap)
-			args[ac++] = safe_arg("--usermap", usermap);
+			ADD_SERVER_ARG(safe_arg("--usermap", usermap));
 
 		if (groupmap)
-			args[ac++] = safe_arg("--groupmap", groupmap);
+			ADD_SERVER_ARG(safe_arg("--groupmap", groupmap));
 
 		if (ignore_existing)
-			args[ac++] = "--ignore-existing";
+			ADD_SERVER_ARG("--ignore-existing");
 
 		/* Backward compatibility: send --existing, not --ignore-non-existing. */
 		if (ignore_non_existing)
-			args[ac++] = "--existing";
+			ADD_SERVER_ARG("--existing");
 
 		if (tmpdir) {
-			args[ac++] = "--temp-dir";
-			args[ac++] = safe_arg("", tmpdir);
+			ADD_SERVER_ARG("--temp-dir");
+			ADD_SERVER_ARG(safe_arg("", tmpdir));
 		}
 
 		if (do_fsync)
-			args[ac++] = "--fsync";
+			ADD_SERVER_ARG("--fsync");
 
 		if (basis_dir[0]) {
 			/* the server only needs this option if it is not the sender,
@@ -2936,8 +3220,8 @@ void server_options(char **args, int *argc_p)
 			 *   option, so don't send it if client is the sender.
 			 */
 			for (i = 0; i < basis_dir_cnt; i++) {
-				args[ac++] = alt_dest_opt(0);
-				args[ac++] = safe_arg("", basis_dir[i]);
+				ADD_SERVER_ARG(alt_dest_opt(0));
+				ADD_SERVER_ARG(safe_arg("", basis_dir[i]));
 			}
 		}
 	}
@@ -2946,60 +3230,58 @@ void server_options(char **args, int *argc_p)
 	where = (am_server ? W_CLI : W_SRV) | (am_sender ? W_REC : W_SND);
 	arg = make_output_option(info_words, info_levels, where);
 	if (arg)
-		args[ac++] = arg;
+		ADD_SERVER_ARG(arg);
 
 	if (append_mode) {
 		if (append_mode > 1)
-			args[ac++] = "--append";
-		args[ac++] = "--append";
+			ADD_SERVER_ARG("--append");
+		ADD_SERVER_ARG("--append");
 	} else if (inplace) {
-		args[ac++] = "--inplace";
+		ADD_SERVER_ARG("--inplace");
 		/* Work around a bug in older rsync versions (on the remote side) for --inplace --sparse */
 		if (sparse_files && !whole_file && am_sender)
-			args[ac++] = "--no-W";
+			ADD_SERVER_ARG("--no-W");
 	}
 
 	if (files_from && (!am_sender || filesfrom_host)) {
 		if (filesfrom_host) {
-			args[ac++] = "--files-from";
-			args[ac++] = safe_arg("", files_from);
+			ADD_SERVER_ARG("--files-from");
+			ADD_SERVER_ARG(safe_arg("", files_from));
 			if (eol_nulls)
-				args[ac++] = "--from0";
+				ADD_SERVER_ARG("--from0");
 		} else {
-			args[ac++] = "--files-from=-";
-			args[ac++] = "--from0";
+			ADD_SERVER_ARG("--files-from=-");
+			ADD_SERVER_ARG("--from0");
 		}
 		if (!relative_paths)
-			args[ac++] = "--no-relative";
+			ADD_SERVER_ARG("--no-relative");
 	}
 	/* It's OK that this checks the upper-bound of the protocol_version. */
 	if (relative_paths && !implied_dirs && (!am_sender || protocol_version >= 30))
-		args[ac++] = "--no-implied-dirs";
+		ADD_SERVER_ARG("--no-implied-dirs");
 
 	if (write_devices && am_sender)
-		args[ac++] = "--write-devices";
+		ADD_SERVER_ARG("--write-devices");
 
 	if (remove_source_files == 1)
-		args[ac++] = "--remove-source-files";
+		ADD_SERVER_ARG("--remove-source-files");
 	else if (remove_source_files)
-		args[ac++] = "--remove-sent-files";
+		ADD_SERVER_ARG("--remove-sent-files");
 
 	if (copy_devices && !am_sender)
-		args[ac++] = "--copy-devices";
+		ADD_SERVER_ARG("--copy-devices");
 
 	if (preallocate_files && am_sender)
-		args[ac++] = "--preallocate";
+		ADD_SERVER_ARG("--preallocate");
 
 	if (open_noatime && preserve_atimes <= 1)
-		args[ac++] = "--open-noatime";
+		ADD_SERVER_ARG("--open-noatime");
 
 	if (mkpath_dest_arg && am_sender)
-		args[ac++] = "--mkpath";
+		ADD_SERVER_ARG("--mkpath");
 
-	if (ac > MAX_SERVER_ARGS) { /* Not possible... */
-		rprintf(FERROR, "argc overflow in server_options().\n");
-		exit_cleanup(RERR_MALLOC);
-	}
+	if ((arg = niceness_remote_option()) != NULL)
+		ADD_SERVER_ARG(arg);
 
 	if (remote_option_cnt) {
 		int j;
@@ -3008,8 +3290,10 @@ void server_options(char **args, int *argc_p)
 			exit_cleanup(RERR_SYNTAX);
 		}
 		for (j = 1; j <= remote_option_cnt; j++)
-			args[ac++] = safe_arg(SPLIT_ARG_WHEN_OLD, remote_options[j]);
+			ADD_SERVER_ARG(safe_arg(SPLIT_ARG_WHEN_OLD, remote_options[j]));
 	}
+
+#undef ADD_SERVER_ARG
 
 	*argc_p = ac;
 	return;
@@ -3131,7 +3415,7 @@ char *check_for_hostspec(char *s, char **host_ptr, int *port_ptr)
 {
 	char *path;
 
-	if (port_ptr && strncasecmp(URL_PREFIX, s, strlen(URL_PREFIX)) == 0) {
+	if (port_ptr && ascii_strncasecmp(URL_PREFIX, s, strlen(URL_PREFIX)) == 0) {
 		*host_ptr = parse_hostspec(s + strlen(URL_PREFIX), &path, port_ptr);
 		if (*host_ptr) {
 			if (!*port_ptr)

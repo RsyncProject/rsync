@@ -57,5 +57,6 @@
 		printf("%lu", (unsigned long)gid);
 	printf("\n");
 
+	free(list);
 	return 0;
 }

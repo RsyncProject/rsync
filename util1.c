@@ -24,6 +24,9 @@
 #include "ifuncs.h"
 #include "itypes.h"
 #include "inums.h"
+#ifdef SUPPORT_IDN
+#include <idn2.h>
+#endif
 
 extern int dry_run;
 extern int module_id;
@@ -34,6 +37,7 @@ extern int relative_paths;
 extern int preserve_xattrs;
 extern int omit_link_times;
 extern int preallocate_files;
+extern int operator_path_resolve;
 extern char *module_dir;
 extern unsigned int module_dirlen;
 extern char *partial_dir;
@@ -180,6 +184,26 @@ int set_times(const char *fname, STRUCT_STAT *stp)
 	return 0;
 }
 
+/* Held-dirfd variant of set_times(): set `name`'s times relative to dir fd
+ * `dfd`.  Returns 0/-1 like set_times(), or -2 when this platform's active
+ * time-setting tier has no dfd-relative form (caller must fall back to
+ * set_times(fname, stp)).  Only the utimensat tier has an at-on-dfd form, so
+ * macOS (setattrlist) and pre-utimensat systems take the -2 path. */
+int set_times_at(int dfd, const char *name, STRUCT_STAT *stp)
+{
+#if defined HAVE_UTIMENSAT && !defined HAVE_SETATTRLIST
+	int r = do_utimensat_atfd(dfd, name, stp);
+	if (r == 0)
+		return 0;
+	if (errno == ENOSYS)
+		return -2;	/* fall back to the full set_times() tier walk */
+	return -1;
+#else
+	(void)dfd; (void)name; (void)stp;
+	return -2;
+#endif
+}
+
 /* Create any necessary directories in fname.  Any missing directories are
  * created with default permissions.  Returns < 0 on error, or the number
  * of directories created. */
@@ -214,7 +238,7 @@ int make_path(char *fname, int flags)
 				else
 					errno = ENOTDIR;
 			}
-		} else if (do_mkdir(fname, ACCESSPERMS) == 0) {
+		} else if (do_mkdir_at(fname, ACCESSPERMS) == 0) {
 			ret++;
 			break;
 		}
@@ -253,7 +277,7 @@ int make_path(char *fname, int flags)
 		p += strlen(p);
 		if (ret < 0) /* Skip mkdir on error, but keep restoring the path. */
 			continue;
-		if (do_mkdir(fname, ACCESSPERMS) < 0)
+		if (do_mkdir_at(fname, ACCESSPERMS) < 0)
 			ret = -ret - 1;
 		else
 			ret++;
@@ -366,20 +390,44 @@ static int unlink_and_reopen(const char *dest, mode_t mode)
  * --copy-dest options. */
 int copy_file(const char *source, const char *dest, int tmpfilefd, mode_t mode)
 {
-	extern int am_daemon, am_chrooted;
 	int ifd, ofd;
 	char buf[1024 * 8];
 	int len;   /* Number of bytes read into `buf'. */
 	OFF_T prealloc_len = 0, offset = 0;
 
-	/* On a daemon without chroot, route the source open through
-	 * secure_relative_open so a parent-symlink on the source path
-	 * (e.g. --copy-dest=cd where cd is a symlink to an outside
-	 * directory) cannot redirect the read to a file the daemon can
-	 * see but the attacker should not. Plain do_open_nofollow only
-	 * refuses a final-component symlink; parents are still followed. */
-	if (am_daemon && !am_chrooted && source && *source && source[0] != '/')
+	/* For any hardened (non-chrooted) receiver, route the source open through
+	 * secure_relative_open so a parent-symlink on the source path (e.g.
+	 * --copy-dest=cd where cd is a symlink to an outside directory) cannot
+	 * redirect the read to a file the attacker should not see.  Plain
+	 * do_open_nofollow only refuses a final-component symlink; parents are
+	 * still followed.  An ABSOLUTE source is an operator basis (e.g. an absolute
+	 * --copy-dest): confine its parents via the ownership walk -- a foreign-owned
+	 * parent symlink is refused, the operator's own dirs/uid0/euid symlinks
+	 * followed -- so a flipped parent can't redirect the basis read out of tree.
+	 * operator_path_resolve is set only across the walk (so module-exclude is
+	 * enforced) and restored, leaving the caller's value for the dest side -- this
+	 * is why confining the source here does not re-open the copy_xattrs dest
+	 * race the way wrapping the whole copy_altdest_file would. */
+	if (secure_relpath_active() && source && *source && source[0] != '/')
 		ifd = secure_relative_open(NULL, source, O_RDONLY | O_NOFOLLOW, 0);
+#if defined AT_FDCWD && defined O_NOFOLLOW && defined O_DIRECTORY
+	else if (secure_relpath_active() && source && source[0] == '/'
+	      && !symlink_optout_allowed()) {
+		int save = operator_path_resolve, dfd, e;
+		const char *leaf;
+		operator_path_resolve = 1;
+		dfd = owner_walk_parent(source, &leaf);
+		operator_path_resolve = save;
+		if (dfd < 0)
+			ifd = -1;
+		else {
+			ifd = openat(dfd, leaf, O_RDONLY | O_NOFOLLOW);
+			e = errno;
+			close(dfd);
+			errno = e;
+		}
+	}
+#endif
 	else
 		ifd = do_open_nofollow(source, O_RDONLY);
 	if (ifd < 0) {
@@ -438,11 +486,6 @@ int copy_file(const char *source, const char *dest, int tmpfilefd, mode_t mode)
 		return -1;
 	}
 
-	if (close(ifd) < 0) {
-		rsyserr(FWARNING, errno, "close failed on %s",
-			full_fname(source));
-	}
-
 	/* Source file might have shrunk since we fstatted it.
 	 * Cut off any extra preallocated zeros from dest file. */
 	if (offset < prealloc_len) {
@@ -460,8 +503,22 @@ int copy_file(const char *source, const char *dest, int tmpfilefd, mode_t mode)
 		int save_errno = errno;
 		rsyserr(FERROR, errno, "fsync failed on %s", full_fname(dest));
 		close(ofd);
+		close(ifd);	/* ifd is held open until after the xattr copy below */
 		errno = save_errno;
 		return -1;
+	}
+
+#ifdef SUPPORT_XATTRS
+	/* Read the source xattrs through the held source fd (ifd) and set them
+	 * through ofd while both are still held, so a parent-symlink race can't
+	 * redirect the read out of tree or the write onto a file outside it. */
+	if (preserve_xattrs)
+		copy_xattrs(source, ifd, dest, ofd);
+#endif
+
+	if (close(ifd) < 0) {
+		rsyserr(FWARNING, errno, "close failed on %s",
+			full_fname(source));
 	}
 
 	if (close(ofd) < 0) {
@@ -470,11 +527,6 @@ int copy_file(const char *source, const char *dest, int tmpfilefd, mode_t mode)
 		errno = save_errno;
 		return -1;
 	}
-
-#ifdef SUPPORT_XATTRS
-	if (preserve_xattrs)
-		copy_xattrs(source, dest);
-#endif
 
 	return 0;
 }
@@ -524,7 +576,7 @@ int robust_unlink(const char *fname)
 		snprintf(&path[pos], MAX_RENAMES_DIGITS+1, "%03d", counter);
 		if (++counter >= MAX_RENAMES)
 			counter = 1;
-	} while ((rc = access(path, 0)) == 0 && counter != start);
+	} while (access(path, 0) == 0 && counter != start);
 
 	if (INFO_GTE(MISC, 1)) {
 		rprintf(FWARNING, "renaming %s to %s because of text busy\n",
@@ -545,7 +597,7 @@ int robust_unlink(const char *fname)
  * If partialptr is not NULL and we need to do a copy, copy the file into
  * the active partial-dir instead of over the destination file. */
 int robust_rename(const char *from, const char *to, const char *partialptr,
-		  int mode)
+		  int mode, struct file_struct *file)
 {
 	int tries = 4;
 
@@ -555,7 +607,18 @@ int robust_rename(const char *from, const char *to, const char *partialptr,
 		return 0;
 
 	while (tries--) {
-		if (do_rename_at(from, to) == 0)
+		/* tmp -> final usually live in the entry's own dir: rename via the
+		 * held dir fd when both do, else the full-path wrapper. */
+		int ofd = held_dfd_for(from, file);
+		int nfd = held_dfd_for(to, file);
+		int rr;
+		if (ofd >= 0 && nfd >= 0) {
+			const char *os = strrchr(from, '/');
+			const char *ns = strrchr(to, '/');
+			rr = do_rename_atfd(ofd, os ? os + 1 : from, nfd, ns ? ns + 1 : to);
+		} else
+			rr = do_rename_at(from, to);
+		if (rr == 0)
 			return 0;
 
 		switch (errno) {
@@ -568,16 +631,33 @@ int robust_rename(const char *from, const char *to, const char *partialptr,
 			errno = ETXTBSY;
 			break;
 #endif
-		case EXDEV:
+		case EXDEV: {
+			int save = operator_path_resolve, rc;
 			if (partialptr) {
 				if (!handle_partial_dir(partialptr,PDIR_CREATE))
 					return -2;
 				to = partialptr;
 			}
-			if (copy_file(from, to, -1, mode) != 0)
+			/* Cross-fs fallback: copy then unlink.  An absolute --temp-dir
+			 * source / --partial-dir dest is an operator path whose parents
+			 * do_open_at()/do_unlink_at() would otherwise follow via plain libc
+			 * -- confine them through the ownership walk so a raced parent
+			 * symlink can't redirect the dest-write or the source-unlink out of
+			 * the module.  copy_file already confines the source READ; a
+			 * relative in-module path stays on the secure_relative_open arm, so
+			 * only flip the flag for an absolute (operator) path. */
+			if (*to == '/')
+				operator_path_resolve = 1;
+			rc = copy_file(from, to, -1, mode);
+			operator_path_resolve = save;
+			if (rc != 0)
 				return -2;
+			if (*from == '/')
+				operator_path_resolve = 1;
 			do_unlink_at(from);
+			operator_path_resolve = save;
 			return 1;
+		}
 		default:
 			return -1;
 		}
@@ -838,15 +918,109 @@ void glob_expand_module(char *base1, char *arg, char ***argv_p, int *argc_p, int
 
 /**
  * Convert a string to lower case
+ *
+ * Only ASCII is folded.  The hosts allow/deny list that calls this can hold
+ * UTF-8, and a per-byte fold via the locale's ctype would mangle it (in
+ * ISO-8859-1 the 0xC4 lead byte of "č" is an upper-case 'Ä').
  **/
 void strlower(char *s)
 {
 	while (*s) {
-		if (isUpper(s))
+		if (!(*(unsigned char *)s & 0x80) && isUpper(s))
 			*s = toLower(s);
 		s++;
 	}
 }
+
+#ifdef SUPPORT_IDN
+/* Does this label hold nothing but the [-a-z0-9] of an A-label? */
+static int is_a_label(const char *s)
+{
+	if (!*s)
+		return 0;
+
+	for ( ; *s; s++) {
+		if (!(*s >= 'a' && *s <= 'z') && !(*s >= '0' && *s <= '9') && *s != '-')
+			return 0;
+	}
+
+	return 1;
+}
+
+/**
+ * Convert the non-ASCII labels of a host name into their IDNA A-label
+ * (Punycode) form, putting the result in buf.  Returns 1 if buf was filled in,
+ * or 0 to tell the caller to keep the name it has.
+ *
+ * A label that is already ASCII is copied verbatim, so an address, a mask, an
+ * xn-- name, and any wildmatch characters come out just as they went in.  A
+ * converted label is only used if it comes back as a bare A-label: the IDNA
+ * mapping folds some non-ASCII characters onto ASCII ones (U+FF0A FULLWIDTH
+ * ASTERISK becomes '*'), and a hosts allow/deny entry must not pick up a
+ * wildcard that its author never typed.  Anything else leaves the name alone,
+ * which fails to match instead of matching too much.
+ *
+ * Set from_locale for a name that came from the command line, which is in the
+ * user's locale encoding; the daemon's config file is read as UTF-8.
+ **/
+int idn_to_ascii(const char *name, int from_locale, char *buf, size_t buflen)
+{
+	const char *lab, *end;
+	size_t len = 0;
+	int converted = 0;
+
+	for (lab = name; ; lab = end + 1) {
+		char label[256], *idn;
+		size_t lablen, alen;
+		int is_ascii = 1;
+
+		for (end = lab; *end && *end != '.'; end++) {
+			if (*(unsigned char *)end & 0x80)
+				is_ascii = 0;
+		}
+		lablen = end - lab;
+
+		if (is_ascii) {
+			if (len + lablen + 2 > buflen)
+				return 0;
+			memcpy(buf + len, lab, lablen);
+			len += lablen;
+		} else {
+			/* IDN2_NFC_INPUT has libidn2 normalize the label, so a name
+			 * typed with combining marks folds to the same A-label as
+			 * its composed spelling.  IDN2_NONTRANSITIONAL asks for the
+			 * TR46 processing that everything else does these days. */
+			int flags = IDN2_NFC_INPUT | IDN2_NONTRANSITIONAL;
+			int rc;
+			if (lablen >= sizeof label)
+				return 0;
+			memcpy(label, lab, lablen);
+			label[lablen] = '\0';
+			rc = from_locale ? idn2_lookup_ul(label, &idn, flags)
+					 : idn2_to_ascii_8z(label, &idn, flags);
+			if (rc != IDN2_OK)
+				return 0;
+			alen = strlen(idn);
+			if (!is_a_label(idn) || len + alen + 2 > buflen) {
+				idn2_free(idn);
+				return 0;
+			}
+			memcpy(buf + len, idn, alen);
+			len += alen;
+			idn2_free(idn);
+			converted = 1;
+		}
+
+		if (!*end)
+			break;
+		buf[len++] = '.';
+	}
+
+	buf[len] = '\0';
+
+	return converted;
+}
+#endif
 
 /**
  * Split a string into tokens based (usually) on whitespace & commas.  If the
@@ -1008,9 +1182,14 @@ int clean_fname(char *name, int flags)
 				while (s > limit && s[-1] != '/')
 					s--;
 
-				/* If found prior '/', or we reached the start, adjust t. */
-				if (s != t - 1 && (s <= name || *s == '/')) {
-					t = (s == name) ? name : s + 1;
+				/* If found prior '/', or we reached the start, adjust t.
+				 * After the backward walk, s points at the first char of the
+				 * prior component and s[-1] is its leading '/' -- so test
+				 * s[-1] (not *s) and reset t to s (not s+1) to actually drop
+				 * the component; the old off-by-one left CFN_COLLAPSE_DOT_DOT_DIRS
+				 * dead for multi-component and absolute paths. */
+				if (s != t - 1 && (s <= name || s[-1] == '/')) {
+					t = (s == name) ? name : s;
 					f += 2;
 					continue;
 				}
@@ -1133,7 +1312,7 @@ char *sanitize_path(char *dest, const char *p, const char *rootdir, int depth, i
  * Also cleans the path using the clean_fname() function. */
 int change_dir(const char *dir, int set_path_only)
 {
-	extern int am_daemon, am_chrooted;
+	extern int am_daemon, am_chrooted, am_sender, insecure_links;
 	static int initialised, skipped_chdir;
 	unsigned int len;
 
@@ -1158,8 +1337,64 @@ int change_dir(const char *dir, int set_path_only)
 			errno = ENAMETOOLONG;
 			return 0;
 		}
-		if (!set_path_only && chdir(dir))
-			return 0;
+		if (!set_path_only) {
+			/* The destination is operator-supplied (like --log-file et al.), so
+			 * resolve it with open_no_attacker_symlinks: walk each component
+			 * refusing a symlink not owned by uid 0 or our euid, then fchdir to
+			 * the result.  This still follows the operator's/root's own symlinked
+			 * dest -- the `/backup -> /mnt/disk` / `/var/www -> /srv/www` admin
+			 * pattern -- but refuses one an attacker raced in from another uid,
+			 * closing the dest chdir TOCTOU (the daemon `use chroot = no` module
+			 * path is the same class).  The daemon is always confined; a
+			 * non-daemon receiver can opt back into the legacy plain chdir with
+			 * --insecure-links. */
+			if (am_daemon && !am_chrooted) {
+				int dfd = open_no_attacker_symlinks_dirfd(dir);
+				if (dfd < 0)
+					return 0;
+				if (fchdir(dfd) != 0) {
+					int e = errno;
+					close(dfd);
+					errno = e;
+					return 0;
+				}
+				close(dfd);
+#if defined O_NOFOLLOW && defined O_DIRECTORY
+			} else if (!am_chrooted && !am_sender && !insecure_links) {
+				/* Strip the trailing slash: a symlink opened as "name/" is
+				 * always followed, so safe_open's final-component O_NOFOLLOW
+				 * must see the bare name to refuse an attacker's symlink. */
+				char nf[MAXPATHLEN];
+				unsigned int nl = len;
+				int dfd;
+				if (nl >= sizeof nf) {
+					errno = ENAMETOOLONG;
+					return 0;
+				}
+				memcpy(nf, dir, nl + 1);
+				while (nl > 1 && nf[nl-1] == '/')
+					nf[--nl] = '\0';
+				/* Follow a symlinked dest only when it is owned by uid 0 or our
+				 * euid (the admin `/backup -> /mnt/disk` pattern and the
+				 * operator's own symlinks); refuse one an attacker raced in from
+				 * another uid.  A real dir is opened directly.  This closes the
+				 * destination chdir TOCTOU; --insecure-links keeps the plain
+				 * chdir for an operator whose dest is a foreign-owned symlink. */
+				dfd = open_no_attacker_symlinks_dirfd(nf);
+				if (dfd < 0)
+					return 0;
+				if (fchdir(dfd) != 0) {
+					int e = errno;
+					close(dfd);
+					errno = e;
+					return 0;
+				}
+				close(dfd);
+#endif
+			} else if (chdir(dir)) {
+				return 0;
+			}
+		}
 		skipped_chdir = set_path_only;
 		memcpy(curr_dir, dir, len + 1);
 	} else {
@@ -1192,7 +1427,7 @@ int change_dir(const char *dir, int set_path_only)
 			 * branch still anchors at the operator-trusted
 			 * directory rather than wherever the kernel CWD
 			 * happens to be. */
-			if (am_daemon && !am_chrooted) {
+			if (am_daemon && (!am_chrooted || module_dirlen) && !symlink_optout_allowed()) {
 				const char *basedir = NULL;
 				char prefix[MAXPATHLEN];
 				int dfd;
@@ -1206,11 +1441,28 @@ int change_dir(const char *dir, int set_path_only)
 					prefix[save_dir_len] = '\0';
 					basedir = prefix;
 				}
-				dfd = secure_relative_open(basedir, dir,
-					O_RDONLY | O_DIRECTORY, 0);
+				dfd = secure_relative_dirfd(basedir, dir);
 				if (dfd < 0) {
 					chdir_failed = 1;
 				} else {
+					chdir_failed = fchdir(dfd) != 0;
+					close(dfd);
+				}
+			} else if (am_daemon && symlink_optout_allowed()) {
+				/* "insecure links = yes": restore the 3.2.7 follow-any-symlink
+				 * traversal with a plain chdir to the accumulated path, the same
+				 * legacy behaviour the per-operation sites grant under the opt-out. */
+				chdir_failed = chdir(curr_dir) != 0;
+			} else if (!am_chrooted && !am_sender && !insecure_links) {
+				/* Non-daemon receiver: confine the operator-named relative
+				 * destination like the absolute case above -- refuse a component
+				 * symlink not owned by uid 0 or our euid, closing the
+				 * relative-dest chdir TOCTOU while still following the operator's
+				 * own symlinks.  --insecure-links keeps the plain chdir. */
+				int dfd = open_no_attacker_symlinks_dirfd(curr_dir);
+				if (dfd < 0)
+					chdir_failed = 1;
+				else {
 					chdir_failed = fchdir(dfd) != 0;
 					close(dfd);
 				}
@@ -1233,6 +1485,9 @@ int change_dir(const char *dir, int set_path_only)
 			module_dirlen = curr_dir_len;
 		curr_dir_depth = count_dir_elements(curr_dir + module_dirlen);
 	}
+
+	if (!set_path_only)	/* a real chdir invalidates the cwd-relative dir-fd stack */
+		reset_dir_fd_cache();
 
 	if (DEBUG_GTE(CHDIR, 1) && !set_path_only)
 		rprintf(FINFO, "[%s] change_dir(%s)\n", who_am_i(), curr_dir);
@@ -1278,6 +1533,9 @@ char *full_fname(const char *fn)
 
 	if (result)
 		free(result);
+
+	if (!fn)
+		fn = "(null)";
 
 	if (*fn == '/')
 		p1 = p2 = "";
@@ -1348,22 +1606,30 @@ int handle_partial_dir(const char *fname, int create)
 
 	*fn = '\0';
 	dir = partial_fname;
+	/* The --partial-dir is an operator-supplied path (an absolute one may point
+	 * outside the tree): resolve it with the ownership walk -- follow a
+	 * uid0/euid-owned symlink, refuse a foreign one, absolute and relative alike.
+	 * --insecure-links (or a daemon module's "insecure links =") opts out. */
+	operator_path_resolve = 1;
 	if (create) {
 		STRUCT_STAT st;
 		int statret = do_lstat_at(dir, &st);
 		if (statret == 0 && !S_ISDIR(st.st_mode)) {
 			if (do_unlink_at(dir) < 0) {
+				operator_path_resolve = 0;
 				*fn = '/';
 				return 0;
 			}
 			statret = -1;
 		}
 		if (statret < 0 && do_mkdir_at(dir, 0700) < 0) {
+			operator_path_resolve = 0;
 			*fn = '/';
 			return 0;
 		}
 	} else
 		do_rmdir_at(dir);
+	operator_path_resolve = 0;
 	*fn = '/';
 
 	return 1;

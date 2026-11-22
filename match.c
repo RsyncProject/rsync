@@ -44,6 +44,29 @@ extern struct stats stats;
 
 #define TRADITIONAL_TABLESIZE (1<<16)
 
+/* The maximum number of same-weak-checksum candidates we will compare
+ * against at a single file offset before giving up and rolling forward a
+ * byte.  A weak checksum that collides thousands of times (very common in
+ * disk/VM images, which contain large runs of identical blocks) would
+ * otherwise turn hash_search()'s inner loop into an O(file_size *
+ * chain_length) scan, pegging a CPU at 100% for hours with no apparent
+ * progress (issue #217).
+ *
+ * Concretely, a synthetic 40000-block basis whose blocks all share one weak
+ * checksum took ~18.4s to sync a 60KB source on a modern x86_64 box before
+ * this cap and ~0.7s after it -- and the unbounded cost grows with the
+ * square of the file size, which is what produced the multi-hour "hangs"
+ * reported against real multi-GB images.
+ *
+ * Capping the per-offset work keeps the search bounded; any block we skip
+ * over is simply sent as literal data, so the result is always correct --
+ * only the transfer size is (slightly) affected.  This is purely a
+ * sender-side search limit: it changes no checksum, emitted byte, or
+ * protocol field, so a capped sender interoperates with any receiver. */
+#ifndef MAX_CHAIN_LEN
+#define MAX_CHAIN_LEN 1024
+#endif
+
 static uint32 tablesize;
 static int32 *hash_table;
 
@@ -143,7 +166,9 @@ static void hash_search(int f,struct sum_struct *s,
 	OFF_T offset, aligned_offset, end;
 	int32 k, want_i, aligned_i, backup;
 	char sum2[MAX_DIGEST_LEN];
+	int32 consecutive_false_offsets = 0;
 	uint32 s1, s2, sum;
+	uchar last_false_flags = 0;
 	int more;
 	schar *map;
 
@@ -180,8 +205,11 @@ static void hash_search(int f,struct sum_struct *s,
 
 	do {
 		int done_csum2 = 0;
+		int matched_block = 0;
+		const char *last_false_sum2 = NULL;
 		uint32 hash_entry;
 		int32 i, *prev;
+		int32 chain_len = 0;
 
 		if (DEBUG_GTE(DELTASUM, 4)) {
 			rprintf(FINFO, "offset=%s sum=%04x%04x\n",
@@ -190,14 +218,18 @@ static void hash_search(int f,struct sum_struct *s,
 
 		if (tablesize == TRADITIONAL_TABLESIZE) {
 			hash_entry = SUM2HASH2(s1,s2);
-			if ((i = hash_table[hash_entry]) < 0)
+			if ((i = hash_table[hash_entry]) < 0) {
+				consecutive_false_offsets = 0;
 				goto null_hash;
+			}
 			sum = (s1 & 0xffff) | (s2 << 16);
 		} else {
 			sum = (s1 & 0xffff) | (s2 << 16);
 			hash_entry = BIG_SUM2HASH(sum);
-			if ((i = hash_table[hash_entry]) < 0)
+			if ((i = hash_table[hash_entry]) < 0) {
+				consecutive_false_offsets = 0;
 				goto null_hash;
+			}
 		}
 		prev = &hash_table[hash_entry];
 
@@ -213,15 +245,28 @@ static void hash_search(int f,struct sum_struct *s,
 				*prev = s->sums[i].chain;
 				continue;
 			}
+            l = (int32)MIN((OFF_T)s->blength, len-offset);
+			if (sum != s->sums[i].sum1 || l != s->sums[i].len) {
+				prev = &s->sums[i].chain;
+				continue;
+			}
+
+			if (last_false_sum2
+			 && (!(s->sums[i].flags & SUMFLG_SAME_OFFSET)
+			  || (last_false_flags & SUMFLG_SAME_OFFSET))
+			 && memcmp(sum2_at(s, i), last_false_sum2, s->s2length) == 0) {
+				*prev = s->sums[i].chain;
+				continue;
+			}
 			prev = &s->sums[i].chain;
 
-			if (sum != s->sums[i].sum1)
-				continue;
-
-			/* also make sure the two blocks are the same length */
-			l = (int32)MIN((OFF_T)s->blength, len-offset);
-			if (l != s->sums[i].len)
-				continue;
+			/* Bound the work spent on a single pathological hash
+			 * bucket.  If this weak checksum matches more than
+			 * MAX_CHAIN_LEN records, stop scanning and treat this
+			 * offset as a non-match (issue #217).  The skipped data
+			 * is sent literally, never corrupted. */
+			if (++chain_len > MAX_CHAIN_LEN)
+				break;
 
 			if (DEBUG_GTE(DELTASUM, 3)) {
 				rprintf(FINFO,
@@ -237,6 +282,8 @@ static void hash_search(int f,struct sum_struct *s,
 
 			if (memcmp(sum2, sum2_at(s, i), s->s2length) != 0) {
 				false_alarms++;
+				last_false_sum2 = sum2_at(s, i);
+				last_false_flags = s->sums[i].flags;
 				continue;
 			}
 
@@ -245,7 +292,7 @@ static void hash_search(int f,struct sum_struct *s,
 			 * the adjacent want_i optimization. */
 			if (updating_basis_file) {
 				/* All the generator's chunks start at blength boundaries. */
-				while (aligned_offset < offset) {
+				while (aligned_offset < offset && aligned_i < s->count) {
 					aligned_offset += s->blength;
 					aligned_i++;
 				}
@@ -293,6 +340,7 @@ static void hash_search(int f,struct sum_struct *s,
 			 && (!updating_basis_file || s->sums[want_i].offset >= offset
 			  || s->sums[want_i].flags & SUMFLG_SAME_OFFSET)
 			 && sum == s->sums[want_i].sum1
+			 && l == s->sums[want_i].len
 			 && memcmp(sum2, sum2_at(s, want_i), s->s2length) == 0) {
 				/* we've found an adjacent match - the RLL coder
 				 * will be happy */
@@ -308,8 +356,29 @@ static void hash_search(int f,struct sum_struct *s,
 			s1 = sum & 0xFFFF;
 			s2 = sum >> 16;
 			matches++;
+			matched_block = 1;
+			consecutive_false_offsets = 0;
 			break;
 		} while ((i = s->sums[i].chain) >= 0);
+		/* If we computed a strong checksum (weak collision) and the entire
+		 * chain failed to match, don't let repeated collisions force a
+		 * 1-byte walk with a full strong-checksum calculation on every byte. */
+		if (!matched_block && (done_csum2 || chain_len > MAX_CHAIN_LEN)) {
+			if (++consecutive_false_offsets >= 4 && k > 1) {
+				OFF_T skip = MIN((OFF_T)(k - 1), end - 1 - offset);
+				if (skip > 0) {
+					offset += skip;
+					k = (int32)MIN((OFF_T)s->blength, len-offset);
+					map = (schar *)map_ptr(buf, offset, k);
+					sum = get_checksum1((char *)map, k);
+					s1 = sum & 0xFFFF;
+					s2 = sum >> 16;
+				}
+				consecutive_false_offsets = 3;
+			}
+		}
+		else if (!matched_block)
+			consecutive_false_offsets = 0;
 
 	  null_hash:
 		backup = (int32)(offset - last_match);
@@ -370,6 +439,14 @@ void match_sums(int f, struct sum_struct *s, struct map_struct *buf, OFF_T len)
 	sum_init(xfer_sum_nni, checksum_seed);
 
 	if (append_mode > 0) {
+		if (s->flength > len) {
+			/* A hostile or confused peer can claim a verified-prefix
+			 * length that exceeds what we have on disk -- including
+			 * for an empty local file, where buf is NULL and the
+			 * map_ptr() calls below would dereference it.  Clamp to
+			 * what we can actually read. */
+			s->flength = len;
+		}
 		if (append_mode == 2) {
 			OFF_T j = 0;
 			for (j = CHUNK_SIZE; j < s->flength; j += CHUNK_SIZE) {
@@ -417,7 +494,7 @@ void match_sums(int f, struct sum_struct *s, struct map_struct *buf, OFF_T len)
 		int i;
 		for (i = 0; i < xfer_sum_len && sender_file_sum[i] == 0; i++) {}
 		memset(sender_file_sum, 0, xfer_sum_len);
-		if (i == xfer_sum_len)
+		if (i == xfer_sum_len && i > 0)
 			sender_file_sum[i-1]++;
 	}
 
