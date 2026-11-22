@@ -93,11 +93,12 @@ class Changes(unittest.TestCase):
             with self.subTest(path=path):
                 self.assertEqual(self.enabled([path]), expected)
 
-    def test_master_pushes_share_only_their_own_concurrency_group(self):
+    def test_only_pull_requests_share_a_concurrency_group(self):
         workflow = (Path(__file__).resolve().parents[1] / 'workflows/ci.yml').read_text()
-        self.assertIn("group: ${{ github.workflow }}-${{ github.event_name == 'push' && 'master' "
-                      "|| github.event.pull_request.number || github.run_id }}", workflow)
-        self.assertIn('cancel-in-progress: true', workflow)
+        lines = workflow.splitlines()
+        self.assertIn("  group: ${{ github.workflow }}-${{ github.event.pull_request.number "
+                      "|| format('run-{0}', github.run_id) }}", lines)
+        self.assertIn("  cancel-in-progress: ${{ github.event_name == 'pull_request' }}", lines)
 
     def test_staged_families_keep_selection_after_prerequisite_failure(self):
         workflow = (Path(__file__).resolve().parents[1] / 'workflows/ci.yml').read_text()
@@ -163,44 +164,28 @@ class Changes(unittest.TestCase):
         event = {'pull_request': {'base': {'sha': 'a' * 40}, 'head': {'sha': 'b' * 40}}}
         result = subprocess.CompletedProcess([], 0, b'README.md\0receiver.c\0', b'')
         with patch.object(changes['subprocess'], 'run', return_value=result) as run:
-            self.assertEqual(changes['changed_paths'](event, 'pull_request'), ['README.md', 'receiver.c'])
+            self.assertEqual(changes['pull_request_paths'](event), ['README.md', 'receiver.c'])
         self.assertEqual(run.call_args[0][0][-1], 'a' * 40 + '...' + 'b' * 40)
         self.assertIn('--no-renames', run.call_args[0][0])
         self.assertIn('--diff-filter=ACDMRTUXB', run.call_args[0][0])
         for mutation in ({}, {'pull_request': {}},
-                         {'pull_request': {'base': {'sha': 'x'}, 'head': {'sha': 'b' * 40}}}):
+                         {'pull_request': {'base': {'sha': 'x'}, 'head': {'sha': 'b' * 40}}},
+                         {'pull_request': {'base': {'sha': '0' * 40}, 'head': {'sha': 'b' * 40}}},
+                         {'pull_request': {'base': {'sha': 'a' * 40}, 'head': {'sha': '0' * 40}}}):
             with self.subTest(event=mutation), self.assertRaises(ValueError):
-                changes['changed_paths'](mutation, 'pull_request')
+                changes['pull_request_paths'](mutation)
         with patch.object(changes['subprocess'], 'run', return_value=subprocess.CompletedProcess([], 1, b'', b'')), \
                 self.assertRaises(ValueError):
-            changes['changed_paths'](event, 'pull_request')
+            changes['pull_request_paths'](event)
 
-    def test_push_uses_the_whole_before_after_range(self):
-        event = {'before': 'a' * 40, 'after': 'b' * 40}
-        result = subprocess.CompletedProcess([], 0, b'receiver.c\0README.md\0', b'')
-        with patch.object(changes['subprocess'], 'run', return_value=result) as run:
-            self.assertEqual(changes['changed_paths'](event, 'push'), ['receiver.c', 'README.md'])
-        self.assertEqual(run.call_args[0][0][-1], 'a' * 40 + '..' + 'b' * 40)
-        for mutation in ({}, {'before': 'a' * 40}, {'before': 'x', 'after': 'b' * 40},
-                         {'before': 'a' * 40, 'after': '0' * 40}, None, []):
-            with self.subTest(event=mutation), self.assertRaises(ValueError):
-                changes['changed_paths'](mutation, 'push')
-
-    def test_first_push_classifies_the_whole_tree(self):
-        event = {'before': '0' * 40, 'after': 'b' * 40}
-        result = subprocess.CompletedProcess([], 0, b'README.md\0receiver.c\0', b'')
-        with patch.object(changes['subprocess'], 'run', return_value=result) as run:
-            paths = changes['changed_paths'](event, 'push')
-        self.assertEqual(run.call_args[0][0], ['git', 'ls-tree', '--name-only', '-r', '-z', 'b' * 40])
-        self.assertEqual(self.enabled(paths), full_selection)
-
-    def test_unclassified_push_does_not_write_partial_outputs(self):
+    def test_unclassified_pull_request_does_not_write_partial_outputs(self):
         with tempfile.TemporaryDirectory() as directory:
             output = Path(directory) / 'output'
             event = Path(directory) / 'event.json'
-            event.write_text(json.dumps({'before': 'a' * 40, 'after': 'b' * 40}))
+            event.write_text(json.dumps({'pull_request': {'base': {'sha': 'a' * 40},
+                                                          'head': {'sha': 'b' * 40}}}))
             git = subprocess.CompletedProcess([], 0, b'receiver.c\0unclassified\0', b'')
-            with patch.dict(os.environ, GITHUB_EVENT_NAME='push', GITHUB_EVENT_PATH=str(event),
+            with patch.dict(os.environ, GITHUB_EVENT_NAME='pull_request', GITHUB_EVENT_PATH=str(event),
                             GITHUB_OUTPUT=str(output)), patch.object(changes['subprocess'], 'run', return_value=git), \
                     self.assertRaisesRegex(ValueError, 'unclassified'):
                 changes['main']()
@@ -220,7 +205,7 @@ class Changes(unittest.TestCase):
             self.assertEqual(set(values), set(changes['OUTPUTS']))
             self.assertEqual(set(values.values()), {'false'})
 
-    def test_push_of_the_security_documentation_selects_no_test_family(self):
+    def test_documentation_push_selects_every_family_without_a_diff(self):
         with tempfile.TemporaryDirectory() as directory:
             output = Path(directory) / 'output'
             event = Path(directory) / 'event.json'
@@ -228,11 +213,12 @@ class Changes(unittest.TestCase):
             git = subprocess.CompletedProcess([], 0,
                 b'README.md\0SECURITY.md\0rsync-web/security.html\0rsync-web/bug-tracking.html\0', b'')
             with patch.dict(os.environ, GITHUB_EVENT_NAME='push', GITHUB_EVENT_PATH=str(event),
-                            GITHUB_OUTPUT=str(output)), patch.object(changes['subprocess'], 'run', return_value=git):
+                            GITHUB_OUTPUT=str(output)), patch.object(changes['subprocess'], 'run', return_value=git) as run:
                 self.assertEqual(changes['main'](), 0)
             values = dict(line.split('=', 1) for line in output.read_text().splitlines())
             self.assertEqual(set(values), set(changes['OUTPUTS']))
-            self.assertEqual(set(values.values()), {'false'})
+            self.assertEqual(set(values.values()), {'true'})
+            run.assert_not_called()
 
     def test_scheduled_and_manual_runs_select_every_family(self):
         with tempfile.TemporaryDirectory() as directory:

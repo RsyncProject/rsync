@@ -1729,8 +1729,10 @@ static void siginfo_handler(UNUSED(int val))
 }
 #endif
 
-void remember_children(UNUSED(int val))
+static void remember_children(UNUSED(int val))
 {
+	int saved_errno = errno;
+
 #ifdef WNOHANG
 	int cnt, status;
 	pid_t pid;
@@ -1751,6 +1753,26 @@ void remember_children(UNUSED(int val))
 	}
 #endif
 #ifndef HAVE_SIGACTION
+	signal(SIGCHLD, remember_children);
+#endif
+	errno = saved_errno;
+}
+
+void install_child_exit_handler(void)
+{
+#ifdef HAVE_SIGACTION
+	struct sigaction action = {0};
+
+	action.sa_handler = remember_children;
+	action.sa_flags = SA_NOCLDSTOP;
+	sigemptyset(&action.sa_mask);
+#ifdef SA_RESTART
+	/* Child exit is not cancellation. Stdio may discard buffered output
+	 * when a flush fails, so restart the underlying syscall instead. */
+	action.sa_flags |= SA_RESTART;
+#endif
+	sigaction(SIGCHLD, &action, NULL);
+#else
 	signal(SIGCHLD, remember_children);
 #endif
 }
@@ -1857,12 +1879,13 @@ int main(int argc,char *argv[])
 	sigset_t sigmask;
 
 	sigemptyset(&sigmask);
+	sigaddset(&sigmask, SIGCHLD);
 # endif
 	sigact.sa_flags = SA_NOCLDSTOP;
 #endif
 	SIGACTMASK(SIGUSR1, sigusr1_handler);
 	SIGACTMASK(SIGUSR2, sigusr2_handler);
-	SIGACTMASK(SIGCHLD, remember_children);
+	install_child_exit_handler();
 #ifdef MAINTAINER_MODE
 	SIGACTMASK(SIGSEGV, rsync_panic_handler);
 	SIGACTMASK(SIGFPE, rsync_panic_handler);
