@@ -16,6 +16,44 @@
  * with this program; if not, visit the http://fsf.org website.
  */
 
+/* These predicates are for rsync syntax, not localised text. */
+static inline int
+ascii_is_digit(int ch)
+{
+	return ch >= '0' && ch <= '9';
+}
+
+static inline int
+ascii_is_space(int ch)
+{
+	return ch == ' ' || (ch >= '\t' && ch <= '\r');
+}
+
+static inline int
+ascii_lower(int ch)
+{
+	return ch >= 'A' && ch <= 'Z' ? ch + ('a' - 'A') : ch;
+}
+
+static inline int
+ascii_strncasecmp(const char *left, const char *right, size_t len)
+{
+	while (len) {
+		int a = ascii_lower((uchar)*left++);
+		int b = ascii_lower((uchar)*right++);
+		if (a != b || !a)
+			return a - b;
+		len--;
+	}
+	return 0;
+}
+
+static inline int
+ascii_strcasecmp(const char *left, const char *right)
+{
+	return ascii_strncasecmp(left, right, SIZE_MAX);
+}
+
 static inline int
 isDigit(const char *ptr)
 {

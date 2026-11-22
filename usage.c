@@ -23,6 +23,7 @@
 #include "git-version.h"
 #include "default-cvsignore.h"
 #include "itypes.h"
+#include "lib/acl.h"
 
 extern struct name_num_obj valid_checksums, valid_compressions, valid_auth_checksums;
 
@@ -36,7 +37,7 @@ static char *istring(const char *fmt, int val)
 
 static void print_info_flags(enum logcode f)
 {
-	STRUCT_STAT *dumstat;
+	const STRUCT_STAT *dumstat;
 	BOOL as_json = f == FNONE ? 1 : 0; /* We use 1 == first attribute, 2 == need closing array */
 	char line_buf[75], item_buf[32];
 	int line_len, j;
@@ -101,10 +102,32 @@ static void print_info_flags(enum logcode f)
 #endif
 			"append",
 
+#ifndef SEARCH_ONLY_DIRFD_FLAG
+		"no "
+#endif
+			"search-only-dirs",
+
 #ifndef SUPPORT_ACLS
 		"no "
 #endif
 			"ACLs",
+
+#ifdef SUPPORT_ACL_FD
+#ifdef HAVE_LIBACL_AT
+		/* The patched libacl *_at calls apply received ACLs race-safely
+		 * on every Linux kernel (compat layer below 6.13).  Emit ACL-at (true, so
+		 * the JSON "ACL_at": true lets acl-symlink-race assert) plus a
+		 * distinguishing libacl token. */
+		"ACL-at",
+		"ACL-libacl-at",
+#else
+		/* Runtime: are the *xattrat syscalls usable, so a received ACL is
+		 * applied race-safely (dirfd+leaf, AT_SYMLINK_NOFOLLOW) even when the
+		 * leaf can't be pinned?  False => ACLs are applied via the path on an
+		 * un-pinnable leaf, which carries the parent-symlink-race exposure. */
+		xacl_at_available() ? "ACL-at" : "no ACL-at",
+#endif
+#endif
 
 #ifndef SUPPORT_XATTRS
 		"no "
@@ -138,6 +161,11 @@ static void print_info_flags(enum logcode f)
 #endif
 			"crtimes",
 
+#ifndef SUPPORT_IDN
+		"no "
+#endif
+			"IDN",
+
 	"*Optimizations",
 
 #ifndef USE_ROLL_SIMD
@@ -164,7 +192,7 @@ static void print_info_flags(enum logcode f)
 	};
 
 	for (line_len = 0, j = 0; ; j++) {
-		char *str = info_flags[j], *next_nfo = str ? info_flags[j+1] : NULL;
+		const char *str = info_flags[j], *next_nfo = str ? info_flags[j+1] : NULL;
 		int need_comma = next_nfo && *next_nfo != '*' ? 1 : 0;
 		int item_len;
 		if (!str || *str == '*')
@@ -218,7 +246,8 @@ static void print_info_flags(enum logcode f)
 static void output_nno_list(enum logcode f, const char *name, struct name_num_obj *nno)
 {
 	char namebuf[64], tmpbuf[256];
-	char *tok, *next_tok, *comma = ",";
+	char *tok, *next_tok;
+	static const char * const comma = ",";
 	char *cp;
 
 	/* Using '(' ensures that we get a trailing "none" but also includes aliases. */
@@ -241,7 +270,7 @@ static void output_nno_list(enum logcode f, const char *name, struct name_num_ob
 
 	for (tok = strtok(tmpbuf, " "); tok; tok = next_tok) {
 		next_tok = strtok(NULL, " ");
-		if (*tok != '(') /* Ignore the alises in the JSON output */
+		if (*tok != '(') /* Ignore the aliases in the JSON output */
 			printf(" \"%s\"%s", tok, comma + (next_tok ? 0 : 1));
 	}
 
@@ -313,7 +342,7 @@ void print_rsync_version(enum logcode f)
 	rprintf(f,"\n");
 	rprintf(f,"rsync comes with ABSOLUTELY NO WARRANTY.  This is free software, and you\n");
 	rprintf(f,"are welcome to redistribute it under certain conditions.  See the GNU\n");
-	rprintf(f,"General Public Licence for details.\n");
+	rprintf(f,"General Public License, version 3 or later, for details.\n");
 }
 
 void usage(enum logcode F)
