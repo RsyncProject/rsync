@@ -36,6 +36,7 @@ extern int fuzzy_basis;
 extern int read_batch;
 extern int write_batch;
 extern int delay_updates;
+extern int delay_symlinks;
 extern int checksum_seed;
 extern int basis_dir_cnt;
 extern int prune_empty_dirs;
@@ -132,7 +133,7 @@ static const char *client_info;
  * of that protocol for it to be advertised as available. */
 static void check_sub_protocol(void)
 {
-	char *dot;
+	const char *dot;
 	int their_protocol, their_sub;
 	int our_sub = get_subprotocol_version();
 
@@ -173,7 +174,7 @@ void set_allow_inc_recurse(void)
 		allow_inc_recurse = 0;
 	else if (!am_sender
 	 && (delete_before || delete_after
-	  || delay_updates || prune_empty_dirs))
+	  || delay_updates || delay_symlinks || prune_empty_dirs))
 		allow_inc_recurse = 0;
 	else if (am_server && strchr(client_info, 'i') == NULL)
 		allow_inc_recurse = 0;
@@ -184,7 +185,7 @@ void parse_compress_choice(int final_call)
 	if (valid_compressions.negotiated_nni)
 		do_compression = valid_compressions.negotiated_nni->num;
 	else if (compress_choice) {
-		struct name_num_item *nni = get_nni_by_name(&valid_compressions, compress_choice, -1);
+		struct name_num_item const * const nni = get_nni_by_name(&valid_compressions, compress_choice, -1);
 		if (!nni) {
 			rprintf(FERROR, "unknown compress name: %s\n", compress_choice);
 			exit_cleanup(RERR_UNSUPPORTED);
@@ -230,7 +231,7 @@ struct name_num_item *get_nni_by_name(struct name_num_obj *nno, const char *name
 	for (nni = nno->list; nni->name; nni++) {
 		if (nni->num == CSUM_gone)
 			continue;
-		if (strncasecmp(name, nni->name, len) == 0 && nni->name[len] == '\0')
+		if (ascii_strncasecmp(name, nni->name, len) == 0 && nni->name[len] == '\0')
 			return nni;
 	}
 
@@ -292,7 +293,7 @@ static int parse_nni_str(struct name_num_obj *nno, const char *from, char *tobuf
 			ch = '\0';
 		if (!ch || at_space) {
 			if (tok) {
-				struct name_num_item *nni = get_nni_by_name(nno, tok, to - tok);
+				struct name_num_item const * const nni = get_nni_by_name(nno, tok, to - tok);
 				if (nni && !nno->saw[nni->num]) {
 					nno->saw[nni->num] = ++cnt;
 					if (nni->main_nni) {
@@ -351,7 +352,7 @@ static int parse_negotiate_str(struct name_num_obj *nno, char *tmpbuf)
 			continue;
 		ret = nni;
 		best = nno->saw[nni->num];
-		if (best == 1 || am_server) /* The server side stops at the first acceptable client choice */
+		if (best == 1) /* Can't improve on our own #1 preference */
 			break;
 	}
 	if (ret) {
@@ -415,7 +416,7 @@ static const char *getenv_nstr(int ntype)
 		env_str = ntype == NSTR_COMPRESS ? "zlib" : protocol_version >= 30 ? "md5" : "md4";
 
 	if (am_server && env_str) {
-		char *cp = strchr(env_str, '&');
+		const char *cp = strchr(env_str, '&');
 		if (cp)
 			env_str = cp + 1;
 	}
@@ -458,7 +459,8 @@ void validate_choice_vs_env(int ntype, int num1, int num2)
  * for the order of the args in the array.  If dup_markup == '\0', duplicates
  * are removed otherwise the char is prefixed to the duplicate term and, if it
  * is an opening paren/bracket/brace, the matching closing char is suffixed.
- * "none" is removed on the client side unless dup_markup != '\0'. */
+ * "none" is removed on the client side unless dup_markup != '\0'.
+ * Negotiation lists omit explicit-only choices. Display lists keep them. */
 int get_default_nno_list(struct name_num_obj *nno, char *to_buf, int to_buf_len, char dup_markup)
 {
 	struct name_num_item *nni;
@@ -475,7 +477,7 @@ int get_default_nno_list(struct name_num_obj *nno, char *to_buf, int to_buf_len,
 	init_nno_saw(nno, 0);
 
 	for (nni = nno->list, len = 0; nni->name; nni++) {
-		if (nni->num == CSUM_gone)
+		if (nni->num == CSUM_gone || (!dup_markup && (nni->flags & NNI_EXPLICIT_ONLY)))
 			continue;
 		if (nni->main_nni) {
 			if (!dup_markup || nni->main_nni->num == CSUM_gone)
@@ -526,8 +528,11 @@ static void send_negotiate_str(int f_out, struct name_num_obj *nno, int ntype)
 			rprintf(FINFO, "Client %s list (on client): %s\n", nno->type, tmpbuf);
 	}
 
-	/* Each side sends their list of valid names to the other side and then both sides
-	 * pick the first name in the client's list that is also in the server's list. */
+	/* Each side sends their list of valid names to the other side and then each
+	 * side picks its own most-preferred name that also appears in the peer's
+	 * list.  Honest peers emit their list in table (strongest-first) order via
+	 * get_default_nno_list(), so both sides converge on the strongest mutual
+	 * choice; a peer that front-loads a weaker name only desyncs itself. */
 	if (do_negotiated_strings)
 		write_vstring(f_out, tmpbuf, len);
 }
@@ -585,14 +590,13 @@ void setup_protocol(int f_out,int f_in)
 		pathname_ndx = (file_extra_cnt += PTR_EXTRA_CNT);
 	else
 		depth_ndx = ++file_extra_cnt;
-	if (preserve_uid)
-		uid_ndx = ++file_extra_cnt;
-	if (preserve_gid)
-		gid_ndx = ++file_extra_cnt;
-	if (preserve_acls && !am_sender)
-		acls_ndx = ++file_extra_cnt;
-	if (preserve_xattrs)
-		xattrs_ndx = ++file_extra_cnt;
+	/* uid_ndx/gid_ndx/acls_ndx/xattrs_ndx are assigned AFTER
+	 * check_batch_flags() below: a batch file's stream-flags can flip
+	 * preserve_uid/gid/acls/xattrs on, and computing the *_ndx slots
+	 * before that leaves e.g. preserve_xattrs=1 with xattrs_ndx=0 -- so
+	 * F_XATTR(file) (= REQ_EXTRA(file, 0)) writes at offset 0 of every
+	 * file_struct, clobbering file->dirname.  Nothing between here and
+	 * check_batch_flags() reads file_extra_cnt or the *_ndx values. */
 
 	if (am_server)
 		set_allow_inc_recurse();
@@ -638,6 +642,15 @@ void setup_protocol(int f_out,int f_in)
 	}
 	if (read_batch)
 		check_batch_flags();
+
+	if (preserve_uid)
+		uid_ndx = ++file_extra_cnt;
+	if (preserve_gid)
+		gid_ndx = ++file_extra_cnt;
+	if (preserve_acls && !am_sender)
+		acls_ndx = ++file_extra_cnt;
+	if (preserve_xattrs)
+		xattrs_ndx = ++file_extra_cnt;
 
 	if (!saw_stderr_opt && protocol_version <= 28 && am_server)
 		msgs2stderr = 0; /* The client side may not have stderr setup for us. */
@@ -708,6 +721,14 @@ void setup_protocol(int f_out,int f_in)
 				protocol_version);
 			exit_cleanup(RERR_PROTOCOL);
 		}
+
+		if (delay_symlinks) {
+			rprintf(FERROR,
+				"--delay-symlinks requires protocol 29 or higher"
+				" (negotiated %d).\n",
+				protocol_version);
+			exit_cleanup(RERR_PROTOCOL);
+		}
 	} else if (protocol_version >= 30) {
 		if (am_server) {
 			compat_flags = allow_inc_recurse ? CF_INC_RECURSE : 0;
@@ -743,11 +764,11 @@ void setup_protocol(int f_out,int f_in)
 				do_negotiated_strings = 1;
 		}
 		/* The inc_recurse var MUST be set to 0 or 1. */
-		inc_recurse = compat_flags & CF_INC_RECURSE ? 1 : 0;
+		inc_recurse = (compat_flags & CF_INC_RECURSE) ? 1 : 0;
 		want_xattr_optim = protocol_version >= 31 && !(compat_flags & CF_AVOID_XATTR_OPTIM);
-		proper_seed_order = compat_flags & CF_CHKSUM_SEED_FIX ? 1 : 0;
-		xfer_flags_as_varint = compat_flags & CF_VARINT_FLIST_FLAGS ? 1 : 0;
-		xmit_id0_names = compat_flags & CF_ID0_NAMES ? 1 : 0;
+		proper_seed_order = (compat_flags & CF_CHKSUM_SEED_FIX) ? 1 : 0;
+		xfer_flags_as_varint = (compat_flags & CF_VARINT_FLIST_FLAGS) ? 1 : 0;
+		xmit_id0_names = (compat_flags & CF_ID0_NAMES) ? 1 : 0;
 		if (!xfer_flags_as_varint && preserve_crtimes) {
 			fprintf(stderr, "Both rsync versions must be at least 3.2.0 for --crtimes.\n");
 			exit_cleanup(RERR_PROTOCOL);

@@ -1,0 +1,119 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 3.2 Final//EN">
+<!--Converted with LaTeX2HTML 98.1p1 release (March 2nd, 1998)
+originally by Nikos Drakos (nikos@cbl.leeds.ac.uk), CBLU, University of Leeds
+* revised and updated by:  Marcus Hennecke, Ross Moore, Herb Swan
+* with significant contributions from:
+  Jens Lippmann, Marek Rouchal, Martin Wilck and others -->
+<HTML>
+<HEAD>
+<TITLE>The problem</TITLE>
+<META NAME="description" CONTENT="The problem">
+<META NAME="keywords" CONTENT="tech_report">
+<META NAME="resource-type" CONTENT="document">
+<META NAME="distribution" CONTENT="global">
+<META HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=iso-8859-1">
+<LINK REL="STYLESHEET" HREF="tech_report.css">
+<LINK REL="next" HREF="node2.html">
+<LINK REL="previous" HREF="tech_report.html">
+<LINK REL="up" HREF="tech_report.html">
+<LINK REL="next" HREF="node2.html">
+</HEAD>
+<BODY >
+<!--Navigation Panel-->
+<A NAME="tex2html22"
+ HREF="node2.html">
+<IMG WIDTH="37" HEIGHT="24" ALIGN="BOTTOM" BORDER="0" ALT="next"
+ SRC="next.gif"></A> 
+<A NAME="tex2html20"
+ HREF="tech_report.html">
+<IMG WIDTH="26" HEIGHT="24" ALIGN="BOTTOM" BORDER="0" ALT="up"
+ SRC="up.gif"></A> 
+<A NAME="tex2html14"
+ HREF="tech_report.html">
+<IMG WIDTH="63" HEIGHT="24" ALIGN="BOTTOM" BORDER="0" ALT="previous"
+ SRC="previous.gif"></A>   
+<BR>
+<B> Next:</B> <A NAME="tex2html23"
+ HREF="node2.html">The rsync algorithm</A>
+<B> Up:</B> <A NAME="tex2html21"
+ HREF="tech_report.html">The rsync algorithm</A>
+<B> Previous:</B> <A NAME="tex2html15"
+ HREF="tech_report.html">The rsync algorithm</A>
+<BR>
+<BR>
+<!--End of Navigation Panel-->
+
+<H1><A NAME="SECTION00010000000000000000">
+The problem</A>
+</H1>
+
+<P>
+Imagine you have two files, <I>A</I> and <I>B</I>, and you wish to update <I>B</I> to be
+the same as <I>A</I>. The obvious method is to copy <I>A</I> onto <I>B</I>.
+
+<P>
+Now imagine that the two files are on machines connected by a slow
+communications link, for example a dial up IP link.  If <I>A</I> is large,
+copying <I>A</I> onto <I>B</I> will be slow.  To make it faster you could
+compress <I>A</I> before sending it, but that will usually only gain a
+factor of 2 to 4.
+
+<P>
+Now assume that <I>A</I> and <I>B</I> are quite similar, perhaps both derived
+from the same original file. To really speed things up you would need
+to take advantage of this similarity. A common method is to send just
+the differences between <I>A</I> and <I>B</I> down the link and then use this
+list of differences to reconstruct the file.
+
+<P>
+The problem is that the normal methods for creating a set of
+differences between two files rely on being able to read both files.
+Thus they require that both files are available beforehand at one end
+of the link.  If they are not both available on the same machine,
+these algorithms cannot be used (once you had copied the file over,
+you wouldn't need the differences).  This is the problem that rsync
+addresses.
+
+<P>
+The rsync algorithm efficiently computes which parts of a source file
+match some part of an existing destination file.  These parts need not
+be sent across the link; all that is needed is a reference to the part
+of the destination file.  Only parts of the source file which are not
+matched in this way need to be sent verbatim.  The receiver can then
+construct a copy of the source file using the references to parts of
+the existing destination file and the verbatim material.
+
+<P>
+Trivially, the data sent to the receiver can be compressed using any
+of a range of common compression algorithms, for further speed
+improvements.
+
+<P>
+<HR>
+<!--Navigation Panel-->
+<A NAME="tex2html22"
+ HREF="node2.html">
+<IMG WIDTH="37" HEIGHT="24" ALIGN="BOTTOM" BORDER="0" ALT="next"
+ SRC="next.gif"></A> 
+<A NAME="tex2html20"
+ HREF="tech_report.html">
+<IMG WIDTH="26" HEIGHT="24" ALIGN="BOTTOM" BORDER="0" ALT="up"
+ SRC="up.gif"></A> 
+<A NAME="tex2html14"
+ HREF="tech_report.html">
+<IMG WIDTH="63" HEIGHT="24" ALIGN="BOTTOM" BORDER="0" ALT="previous"
+ SRC="previous.gif"></A>   
+<BR>
+<B> Next:</B> <A NAME="tex2html23"
+ HREF="node2.html">The rsync algorithm</A>
+<B> Up:</B> <A NAME="tex2html21"
+ HREF="tech_report.html">The rsync algorithm</A>
+<B> Previous:</B> <A NAME="tex2html15"
+ HREF="tech_report.html">The rsync algorithm</A>
+<!--End of Navigation Panel-->
+<ADDRESS>
+<I>Andrew Tridgell</I>
+<BR><I>1998-11-09</I>
+</ADDRESS>
+</BODY>
+</HTML>

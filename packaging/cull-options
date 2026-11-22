@@ -20,6 +20,8 @@ long_opts = { # These include some extra long-args that BackupPC uses:
         'links': 0,
         'log-file': 3,
         'munge-links': 0,
+        # niceness_remote_option() constructs this outside options.c.
+        'nice': 4,
         'no-munge-links': -1,
         'one-file-system': 0,
         'owner': 0,
@@ -97,11 +99,12 @@ def main():
     txt += '# These are all possible short options that we will accept (when not disabled above):\n'
     txt += str_assign('short_no_arg', ''.join(sorted(short_no_arg)), 'DO NOT REMOVE ANY')
     txt += str_assign('short_with_num', ''.join(sorted(short_with_num)), 'DO NOT REMOVE ANY')
-   
+
     txt += """
 # To disable a long-named option, change its value to a -1.  The values mean:
 # 0 = the option has no arg; 1 = the arg doesn't need any checking; 2 = only
-# check the arg when receiving; and 3 = always check the arg.
+# check the path arg when receiving; 3 = always check the path arg; and 4 =
+# allow only a non-elevating --nice setting.
 """
 
     print(txt, end='')

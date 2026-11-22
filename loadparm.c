@@ -47,7 +47,6 @@
 
 extern item_list dparam_list;
 
-#define strequal(a, b) (strcasecmp(a, b)==0)
 
 #ifndef LOG_DAEMON
 #define LOG_DAEMON 0
@@ -164,11 +163,81 @@ static const struct enum_list enum_syslog_facility[] = {
 
 /* Expand %VAR% references.  Any unknown vars or unrecognized
  * syntax leaves the raw chars unchanged. */
-static char *expand_vars(const char *str)
+enum shell_quote_context {
+	SHELL_UNQUOTED,
+	SHELL_SINGLE_QUOTED,
+	SHELL_DOUBLE_QUOTED
+};
+
+/* Characters that can turn a substituted value into shell syntax rather than
+ * data, in any quoting context.  Quoting alone cannot be relied on here:
+ * context-aware escaping is correct for exactly one level of shell parsing,
+ * and a hook such as `sh -c '... %RSYNC_USER_NAME% ...'` re-parses the word in
+ * a second shell that sees the value bare.  Peer-supplied values carrying any
+ * of these are refused instead. */
+static int shell_unsafe_value(const char *val)
+{
+	const char *s;
+
+	for (s = val; *s; s++) {
+		/* '!' negates in command position (a hook `sh -c '%VAR% false'`
+		 * becomes `! false` and reports success, inverting an access
+		 * check); '~' is tilde-expanded; '{' and '}' brace-expand in
+		 * bash and zsh.  None of them execute anything on their own,
+		 * which is why a set built from the obvious metacharacters
+		 * missed them. */
+		if (strchr("'\"`$\\;&|<>()*?[]# !~{}", *s)
+		 || (unsigned char)*s < 0x20 || (unsigned char)*s == 0x7f)
+			return 1;
+	}
+	return 0;
+}
+
+static char *expand_vars_shell_escape(const char *val, int quote_context)
+{
+	const char *s;
+	char *ret, *t;
+	/* A double-quoted value is deliberately BOTH backslash-escaped and
+	 * wrapped in single quotes.  The wrap is redundant for one level of
+	 * shell parsing (and shows up as literal quotes in the value), but a
+	 * hook such as `sh -c "... %RSYNC_USER_NAME% ..."` re-parses the word
+	 * in a second shell, where the backslashes are already gone and only
+	 * the quotes still protect it. */
+	size_t len = quote_context == SHELL_SINGLE_QUOTED ? 0 : 2;
+
+	for (s = val; *s; s++) {
+		if (quote_context == SHELL_DOUBLE_QUOTED
+		 && strchr("\\\"`$", *s))
+			len += 2;
+		else
+			len += *s == '\'' ? 4 : 1;
+	}
+	ret = new_array(char, len + 1);
+	t = ret;
+	if (quote_context != SHELL_SINGLE_QUOTED)
+		*t++ = '\'';
+	for (s = val; *s; s++) {
+		if (quote_context == SHELL_DOUBLE_QUOTED
+		 && strchr("\\\"`$", *s)) {
+			*t++ = '\\';
+			*t++ = *s;
+		} else if (*s == '\'') {
+			memcpy(t, "'\\''", 4);
+			t += 4;
+		} else
+			*t++ = *s;
+	}
+	if (quote_context != SHELL_SINGLE_QUOTED)
+		*t++ = '\'';
+	*t = '\0';
+	return ret;
+}
+
+static char *expand_vars(const char *str, int shell_escape)
 {
 	char *buf, *t;
 	const char *f;
-	int bufsize;
+	int bufsize, quote_context = SHELL_UNQUOTED, escaped_char = 0;
 
 	if (!str || !strchr(str, '%'))
 		return (char *)str; /* TODO change return value to const char* at some point. */
@@ -178,13 +247,35 @@ static char *expand_vars(const char *str)
 
 	for (t = buf, f = str; bufsize && *f; ) {
 		if (*f == '%' && isUpper(f+1)) {
-			char *percent = strchr(f+1, '%');
+			const char *percent = strchr(f+1, '%');
 			if (percent && percent - f < bufsize) {
-				char *val;
+				const char *val;
 				strlcpy(t, f+1, percent - f);
 				val = getenv(t);
 				if (val) {
-					int len = strlcpy(t, val, bufsize+1);
+					char *escaped = NULL;
+					int len;
+					/* %RSYNC_*% values originate from the peer request/args.
+					 * When the result is fed to a shell-executed hook, escape it
+					 * for the template's current shell quote context so a value
+					 * containing shell metacharacters can't inject.  For ordinary string
+					 * params (path, uid, gid, ...) leave them verbatim --
+					 * quoting there would corrupt the value (e.g. a documented
+					 * `path = /home/%RSYNC_USER_NAME%` would become /home/'x'). */
+					if (shell_escape && strncmp(t, "RSYNC_", 6) == 0) {
+						if (shell_unsafe_value(val)) {
+							/* Fail closed: the hook may be an access
+							 * check, so skipping it is not an option. */
+							rprintf(FLOG,
+								"refusing to run shell hook: %%%s%% holds a shell metacharacter\n",
+								t);
+							exit_cleanup(RERR_UNSUPPORTED);
+						}
+						val = escaped = expand_vars_shell_escape(val, quote_context);
+					}
+					len = strlcpy(t, val, bufsize+1);
+					if (escaped)
+						free(escaped);
 					if (len > bufsize)
 						break;
 					bufsize -= len;
@@ -193,6 +284,28 @@ static char *expand_vars(const char *str)
 					continue;
 				}
 			}
+		}
+		if (shell_escape) {
+			if (quote_context == SHELL_SINGLE_QUOTED) {
+				/* Nothing is special inside '...', not even a backslash;
+				 * only the closing quote ends it. */
+				if (*f == '\'')
+					quote_context = SHELL_UNQUOTED;
+			} else if (escaped_char)
+				escaped_char = 0;
+			else if (*f == '\\')
+				escaped_char = 1;
+			else if (quote_context == SHELL_DOUBLE_QUOTED) {
+				/* A single quote inside "..." is literal and must not be
+				 * taken as opening a single-quoted run -- doing so would
+				 * de-sync the tracker and escape a later value for the
+				 * wrong context. */
+				if (*f == '"')
+					quote_context = SHELL_UNQUOTED;
+			} else if (*f == '\'')
+				quote_context = SHELL_SINGLE_QUOTED;
+			else if (*f == '"')
+				quote_context = SHELL_DOUBLE_QUOTED;
 		}
 		*t++ = *f++;
 		bufsize--;
@@ -204,8 +317,12 @@ static char *expand_vars(const char *str)
 		exit_cleanup(RERR_MALLOC);
 	}
 
-	if (bufsize && (buf = realloc(buf, t - buf + 1)) == NULL)
-		out_of_memory("expand_vars");
+	if (bufsize) {
+		char *resized = realloc(buf, t - buf + 1);
+		if (!resized)
+			out_of_memory("expand_vars");
+		buf = resized;
+	}
 
 	return buf;
 }
@@ -213,7 +330,10 @@ static char *expand_vars(const char *str)
 /* Each "char* foo" has an associated "BOOL foo_EXP" that tracks if the string has been expanded yet or not. */
 
 /* NOTE: use this function and all the FN_{GLOBAL,LOCAL} ones WITHOUT a trailing semicolon! */
-#define RETURN_EXPANDED(val) {if (!val ## _EXP) {val = expand_vars(val); val ## _EXP = True;} return val ? val : "";}
+#define RETURN_EXPANDED(val) {if (!val ## _EXP) {val = expand_vars(val, 0); val ## _EXP = True;} return val ? val : "";}
+/* Variant for params whose expansion is fed to a shell-executed hook: quote
+ * %RSYNC_*% peer-controlled values to prevent shell injection. */
+#define RETURN_EXPANDED_SHELL(val) {if (!val ## _EXP) {val = expand_vars(val, 1); val ## _EXP = True;} return val ? val : "";}
 
 /* In this section all the functions that are used to access the
  * parameters from the rest of the program are defined. */
@@ -229,6 +349,8 @@ static char *expand_vars(const char *str)
 
 #define FN_LOCAL_STRING(fn_name, val) \
  char *fn_name(int i) {if (LP_SNUM_OK(i) && iSECTION(i).val) RETURN_EXPANDED(iSECTION(i).val) else RETURN_EXPANDED(Vars.l.val)}
+#define FN_LOCAL_STRING_SHELL(fn_name, val) \
+ char *fn_name(int i) {if (LP_SNUM_OK(i) && iSECTION(i).val) RETURN_EXPANDED_SHELL(iSECTION(i).val) else RETURN_EXPANDED_SHELL(Vars.l.val)}
 #define FN_LOCAL_BOOL(fn_name, val) \
  BOOL fn_name(int i) {return LP_SNUM_OK(i)? iSECTION(i).val : Vars.l.val;}
 #define FN_LOCAL_CHAR(fn_name, val) \
@@ -278,29 +400,39 @@ static void init_section(local_vars *psection)
 	copy_section(psection, &Vars.l);
 }
 
-/* Do a case-insensitive, whitespace-ignoring string equality check. */
-static int strwiEQ(char *psz1, char *psz2)
+enum config_comparison { COMPARE_CONFIG_SYNTAX, COMPARE_MODULE_NAME };
+
+static int config_name_equal(const char *left, const char *right, enum config_comparison comparison)
 {
-	/* If one or both strings are NULL, we return equality right away. */
-	if (psz1 == psz2)
+	if (left == right)
 		return 1;
-	if (psz1 == NULL || psz2 == NULL)
+	if (!left || !right)
 		return 0;
 
-	/* sync the strings on first non-whitespace */
-	while (1) {
-		while (isSpace(psz1))
-			psz1++;
-		while (isSpace(psz2))
-			psz2++;
-		if (*psz1 == '\0' || *psz2 == '\0')
-			break;
-		if (toUpper(psz1) != toUpper(psz2))
-			break;
-		psz1++;
-		psz2++;
+	for (;;) {
+		int a, b;
+
+		if (comparison == COMPARE_MODULE_NAME) {
+			/* Module names are user data and retain their existing matching rules. */
+			while (isSpace(left))
+				left++;
+			while (isSpace(right))
+				right++;
+			a = toUpper(left);
+			b = toUpper(right);
+		} else {
+			while (ascii_is_space((uchar)*left))
+				left++;
+			while (ascii_is_space((uchar)*right))
+				right++;
+			a = ascii_lower((uchar)*left);
+			b = ascii_lower((uchar)*right);
+		}
+		if (a != b || !a)
+			return a == b;
+		left++;
+		right++;
 	}
-	return *psz1 == *psz2;
 }
 
 /* Find a section by name. Otherwise works like get_section. */
@@ -309,7 +441,7 @@ static int getsectionbyname(char *name)
 	int i;
 
 	for (i = section_list.count - 1; i >= 0; i--) {
-		if (strwiEQ(iSECTION(i).name, name))
+		if (config_name_equal(iSECTION(i).name, name, COMPARE_MODULE_NAME))
 			break;
 	}
 
@@ -349,7 +481,7 @@ static int map_parameter(char *parmname)
 		return -1;
 
 	for (iIndex = 0; parm_table[iIndex].label; iIndex++) {
-		if (strwiEQ(parm_table[iIndex].label, parmname))
+		if (config_name_equal(parm_table[iIndex].label, parmname, COMPARE_CONFIG_SYNTAX))
 			return iIndex;
 	}
 
@@ -362,11 +494,16 @@ static int map_parameter(char *parmname)
  * represent a boolean. */
 static BOOL set_boolean(BOOL *pb, char *parmvalue, int allow_unset)
 {
-	if (strwiEQ(parmvalue, "yes") || strwiEQ(parmvalue, "true") || strwiEQ(parmvalue, "1"))
+	if (config_name_equal(parmvalue, "yes", COMPARE_CONFIG_SYNTAX)
+	 || config_name_equal(parmvalue, "true", COMPARE_CONFIG_SYNTAX)
+	 || config_name_equal(parmvalue, "1", COMPARE_CONFIG_SYNTAX))
 		*pb = True;
-	else if (strwiEQ(parmvalue, "no") || strwiEQ(parmvalue, "false") || strwiEQ(parmvalue, "0"))
+	else if (config_name_equal(parmvalue, "no", COMPARE_CONFIG_SYNTAX)
+	      || config_name_equal(parmvalue, "false", COMPARE_CONFIG_SYNTAX)
+	      || config_name_equal(parmvalue, "0", COMPARE_CONFIG_SYNTAX))
 		*pb = False;
-	else if (allow_unset && (strwiEQ(parmvalue, "unset") || strwiEQ(parmvalue, "-1")))
+	else if (allow_unset && (config_name_equal(parmvalue, "unset", COMPARE_CONFIG_SYNTAX)
+			     || config_name_equal(parmvalue, "-1", COMPARE_CONFIG_SYNTAX)))
 		*pb = Unset;
 	else {
 		rprintf(FLOG, "Badly formed boolean in configuration file: \"%s\".\n", parmvalue);
@@ -410,7 +547,7 @@ static BOOL do_parameter(char *parmname, char *parmvalue)
 		break;
 	default:
 		/* expand any %VAR% strings now */
-		parmvalue = expand_vars(parmvalue);
+		parmvalue = expand_vars(parmvalue, 0);
 		break;
 	}
 
@@ -455,7 +592,7 @@ static BOOL do_parameter(char *parmname, char *parmvalue)
 
 	case P_ENUM:
 		for (i=0; parm_table[parmnum].enum_list[i].name; i++) {
-			if (strequal(parmvalue, parm_table[parmnum].enum_list[i].name)) {
+			if (ascii_strcasecmp(parmvalue, parm_table[parmnum].enum_list[i].name) == 0) {
 				*(int *)parm_ptr = parm_table[parmnum].enum_list[i].value;
 				break;
 			}
@@ -483,7 +620,7 @@ static BOOL do_section(char *sectionname)
 			memcpy(vp, &Vars, sizeof Vars);
 		} else if (strcmp(sectionname+1, "pop") == 0
 		 || strcmp(sectionname+1, "reset") == 0) {
-			all_vars *vp = ((all_vars*)Vars_stack.items) + Vars_stack.count - 1;
+			const all_vars *vp = ((all_vars*)Vars_stack.items) + Vars_stack.count - 1;
 			if (!Vars_stack.count)
 				return False;
 			memcpy(&Vars, vp, sizeof Vars);
@@ -494,7 +631,7 @@ static BOOL do_section(char *sectionname)
 		return True;
 	}
 
-	isglobal = strwiEQ(sectionname, GLOBAL_NAME);
+	isglobal = config_name_equal(sectionname, GLOBAL_NAME, COMPARE_CONFIG_SYNTAX);
 
 	/* At the end of the global section, add any --dparam items. */
 	if (bInGlobalSection && !isglobal) {
