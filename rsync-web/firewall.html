@@ -139,7 +139,7 @@ perform a series of daemon rsync commands through the same middle host.)
 
 <p>This command takes advantage of the RSYNC_CONNECT_PROG environment
 variable, which tells rsync to pipe its socket data to an external program
-in place of making a direct socket connection.  The command specifed above
+in place of making a direct socket connection.  The command specified above
 uses ssh to run the nc (netcat) command on the middle host, which forwards
 all socket data to port 873 on the target host (%H).  The "%H" will be
 substituted with the target host from the rsync command as long as you're

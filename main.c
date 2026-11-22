@@ -253,7 +253,7 @@ void read_del_stats(int f)
 static void become_copy_as_user()
 {
 	char *gname;
-	struct passwd *pw = NULL;
+	const struct passwd *pw = NULL;
 	uid_t uid;
 	gid_t gid;
 
@@ -953,7 +953,7 @@ static void read_final_goodbye(int f_in, int f_out)
 
 static void do_server_sender(int f_in, int f_out, int argc, char *argv[])
 {
-	struct file_list *flist;
+	const struct file_list *flist;
 	char *dir;
 
 	if (DEBUG_GTE(SEND, 1))
@@ -1343,7 +1343,7 @@ void start_server(int f_in, int f_out, int argc, char *argv[])
  * for rsyncd, remote-shell, and local connections. */
 int client_run(int f_in, int f_out, pid_t pid, int argc, char *argv[])
 {
-	struct file_list *flist = NULL;
+	struct file_list *flist;
 	int exit_code = 0, exit_code2 = 0;
 	char *local_name = NULL;
 
