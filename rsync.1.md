@@ -631,6 +631,7 @@ has its own detailed description later in this manpage.
 --contimeout=SECONDS     set daemon connection timeout in seconds
 --ignore-times, -I       don't skip files that match size and time
 --size-only              skip files that match in size
+--time-only              skip existing regular files that match in mod-time
 --modify-window=NUM, -@  set the accuracy for mod-time comparisons
 --temp-dir=DIR, -T       create temporary files in directory DIR
 --fuzzy, -y              find similar file for basis if no dest file
@@ -908,6 +909,26 @@ sign) if you want the local shell to expand it.
     files that have changed in size.  This is useful when starting to use rsync
     after using another mirroring system which may not preserve timestamps
     exactly.
+
+0.  `--time-only`
+
+    For an existing regular destination file, compare only the modification
+    time when deciding whether to transfer its data. A matching time skips the
+    data even when the sizes differ. Files absent from the destination and
+    alternate `--link-dest`, `--copy-dest` or `--compare-dest` candidates are
+    not subject to this option; they keep their existing selection rules. This
+    can preserve a compressed local copy or a zero-byte marker that retains
+    the source's modification time.
+
+    Use this only when source modification times reliably identify changes:
+    different content with the same time will be skipped. The option applies
+    to local transfers and pulls. Remote pushes are refused because the option
+    is not sent to the remote receiver. For an existing destination, combining
+    it with [`--size-only`](#opt) requires both size and time to match.
+    `--time-only` cannot be combined with [`--checksum`](#opt),
+    [`--ignore-times`](#opt), [`--hard-links`](#opt),
+    [`--append`](#opt) or [`--remove-source-files`](#opt). A hard-link group
+    could otherwise copy a skipped marker into a missing destination member.
 
 0.  `--modify-window=NUM`, `-@`
 
@@ -2040,15 +2061,16 @@ sign) if you want the local shell to expand it.
     - `sha3-512`
     - `sha3-384`
     - `sha3-256`
+    - `sha256`
     - `md5`
     - `md4`
     - `sha1`
     - `none`
 
-    The `sha3-*` choices require an rsync built with OpenSSL support and
-    a libcrypto that provides SHA-3. They are not offered during default
-    negotiation. Use `--checksum-choice` or include them in both peers'
-    [`RSYNC_CHECKSUM_LIST`](#).
+    The `sha3-*` and `sha256` choices require an rsync built with OpenSSL
+    support and a libcrypto that provides the chosen digest. They are not
+    offered during default negotiation. Use `--checksum-choice` or include the
+    chosen digest in both peers' [`RSYNC_CHECKSUM_LIST`](#).
 
     Run `rsync --version` to see the checksum choices available in your build.
 

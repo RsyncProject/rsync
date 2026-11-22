@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
-# SHA-3 checksum support (sha3-256, sha3-384, sha3-512).
-#
+# Transfer checksums that require an explicit choice.
 import json
 import os
 from random import Random
@@ -15,10 +14,13 @@ from harness import metadata
 
 metadata(transports={'pipe'}, mutates={'environment', 'filesystem'}, tags={'transfer', 'regression'})
 
-ALGOS = ('sha3-256', 'sha3-384', 'sha3-512')
+ALGOS = ('sha3-256', 'sha3-384', 'sha3-512', 'sha256')
 
-choices = json.loads(run_rsync('-VV', capture_output=True).stdout)['checksum_list']
+version = json.loads(run_rsync('-VV', capture_output=True).stdout)
+choices = version['checksum_list']
 available = [algo for algo in ALGOS if algo in choices]
+if ('sha256' in choices) != ('sha256' in version['daemon_auth_list']):
+    test_fail('SHA-256 transfer availability does not match the linked EVP digest')
 os.environ.pop('RSYNC_CHECKSUM_LIST', None)
 protocol = forced_protocol()
 legacy_checksum = protocol is not None and protocol < 30
@@ -27,7 +29,7 @@ rmtree(FROMDIR)
 makepath(FROMDIR / 'sub')
 # Empty, small and chunk-spanning sizes (CHUNK_SIZE is 32k internally).
 (FROMDIR / 'empty').write_bytes(b'')
-(FROMDIR / 'small').write_text('hello sha-3\n')
+(FROMDIR / 'small').write_text('hello checksum\n')
 size = 70 * 1024
 (FROMDIR / 'sub' / 'big').write_bytes(Random(0).getrandbits(size * 8).to_bytes(size, 'big'))
 
@@ -73,7 +75,7 @@ def check_checksum_list(algo):
     if legacy_checksum:
         # Without negotiation the list may allow MD4 or refuse it, not replace it.
         if result.returncode != 4 or 'Failed to negotiate a checksum choice.' not in result.stderr:
-            test_fail(f'protocol {protocol}: expected a SHA-3-only list to be refused: {result}')
+            test_fail(f'protocol {protocol}: expected a {algo}-only list to be refused: {result}')
         rmtree(TODIR)
         result = transfer_with_checksum_list(f'{algo} md4')
         expected = 'Client checksum: md4'
@@ -108,8 +110,7 @@ for algo in ALGOS:
     run_rsync('-ac', f'--checksum-choice={algo},{algo}', src, dst)
     check_tree(f'{algo},{algo} -c')
 
-if available:
-    algo = available[0]
+for algo in available:
     check_checksum_list(algo)
     with (TODIR / 'sub' / 'big').open('r+b') as stream:
         stream.seek(32 * 1024)

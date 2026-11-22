@@ -507,29 +507,61 @@ else
     AC_MSG_RESULT(no)
 fi
 
-AC_MSG_CHECKING([whether to enable use of openssl crypto library])
 AC_ARG_ENABLE([openssl],
 	AS_HELP_STRING([--disable-openssl],[disable to omit openssl crypto library]))
+AC_ARG_VAR([PKG_CONFIG], [pkg-config for target libraries (set to : to disable)])
 AH_TEMPLATE([USE_OPENSSL],
 [Undefine if you do not want to use openssl crypto library.  By default this is defined.])
 if test x"$enable_openssl" != x"no"; then
-    if test x"$ac_cv_header_openssl_md4_h" = x"yes" && test x"$ac_cv_header_openssl_md5_h" = x"yes"; then
-      AC_MSG_RESULT(yes)
-      AC_SEARCH_LIBS(EVP_MD_CTX_copy, crypto,
-          [AC_DEFINE(USE_OPENSSL)
-	   enable_openssl=yes],
-          [err_msg="$err_msg$nl- Failed to find EVP_MD_CTX_copy function in openssl crypto lib.";
-	   no_lib="$no_lib openssl"])
+    if test -z "$PKG_CONFIG"; then
+	if test "$cross_compiling" != yes || test -n "$PKG_CONFIG_LIBDIR"; then
+	    AC_PATH_TOOL([PKG_CONFIG], [pkg-config], [:])
+	elif test -n "$ac_tool_prefix"; then
+	    AC_PATH_PROG([PKG_CONFIG], [${ac_tool_prefix}pkg-config], [:])
+	fi
+    fi
+
+    have_openssl=no
+    if test -n "$PKG_CONFIG" &&
+       openssl_cflags=$("$PKG_CONFIG" --cflags libcrypto 2>/dev/null) &&
+       openssl_libs=$("$PKG_CONFIG" --static --libs libcrypto 2>/dev/null) &&
+       test -n "$openssl_libs"; then
+	openssl_save_CPPFLAGS=$CPPFLAGS
+	openssl_save_LIBS=$LIBS
+	CPPFLAGS="$CPPFLAGS $openssl_cflags"
+	LIBS="$openssl_libs $LIBS"
+	AC_MSG_CHECKING([whether libcrypto links with its pkg-config dependencies])
+	AC_LINK_IFELSE([AC_LANG_PROGRAM([[
+#include <openssl/evp.h>
+#include <openssl/md4.h>
+#include <openssl/md5.h>
+	]], [[return EVP_MD_CTX_copy(0, 0);]])], [have_openssl=yes])
+	AC_MSG_RESULT([$have_openssl])
+	if test "$have_openssl" = no; then
+	    CPPFLAGS=$openssl_save_CPPFLAGS
+	    LIBS=$openssl_save_LIBS
+	fi
+    fi
+
+    if test "$have_openssl" = no; then
+	if test "$ac_cv_header_openssl_md4_h" = yes && test "$ac_cv_header_openssl_md5_h" = yes; then
+	    AC_SEARCH_LIBS(EVP_MD_CTX_copy, crypto, [have_openssl=yes],
+		[err_msg="$err_msg$nl- Failed to find EVP_MD_CTX_copy function in openssl crypto lib."])
+	else
+	    err_msg="$err_msg$nl- Failed to find openssl/md4.h and openssl/md5.h for openssl crypto lib support."
+	fi
+    fi
+    if test "$have_openssl" = yes; then
+	AC_DEFINE(USE_OPENSSL)
+	enable_openssl=yes
     else
-        AC_MSG_RESULT(no)
-	err_msg="$err_msg$nl- Failed to find openssl/md4.h and openssl/md5.h for openssl crypto lib support."
 	no_lib="$no_lib openssl"
     fi
     if test x"$enable_md5_asm" != x"yes"; then
 	enable_md5_asm=no
     fi
 else
-    AC_MSG_RESULT(no)
+    AC_MSG_NOTICE([OpenSSL crypto library disabled])
 fi
 
 MD5_ASM=

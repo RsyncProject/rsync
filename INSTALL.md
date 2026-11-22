@@ -107,6 +107,12 @@ The [openssl crypto library][4] provides some hardware accelerated checksum
 algorithms for MD4 and MD5. Installing this development library makes rsync use
 the (potentially) faster checksum routines when computing MD4 & MD5 checksums.
 
+When available, `pkg-config` supplies the OpenSSL compiler and linker flags,
+including private dependencies needed for static linking. It is optional:
+configure also supports finding the headers and library directly. For a cross
+build, set `PKG_CONFIG` to the target tool or set `PKG_CONFIG_LIBDIR` to the
+target package metadata directories.
+
 ## libidn2
 
 The [libidn2 library][5] converts an internationalized domain name into the
