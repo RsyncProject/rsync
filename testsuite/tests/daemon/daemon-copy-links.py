@@ -13,8 +13,9 @@ metadata(transports={'pipe', 'tcp'})
 base = SCRATCHDIR / 'daemon-copy-links'
 module = base / 'module'
 destination = base / 'destination'
+dirlinks = base / 'dirlinks'
 rmtree(base)
-makepath(module / 'real-dir', destination)
+makepath(module / 'real-dir', destination, dirlinks)
 (module / 'real-file').write_text('file target\n')
 (module / 'real-dir' / 'nested').write_text('directory target\n')
 (module / 'file-link').symlink_to('real-file')
@@ -30,4 +31,7 @@ for link, target in (('file-link', 'real-file'), ('dir-link/nested', 'real-dir/n
         test_fail(f'{link} was not copied as a regular file')
     assert_same(result, module / target, label=link)
 
-print('daemon --copy-links follows in-module file and directory symlinks')
+run_rsync('-ak', f'{url}module/', f'{dirlinks}/')
+if (dirlinks / 'dir-link').is_symlink() or not (dirlinks / 'file-link').is_symlink():
+    test_fail('--copy-dirlinks should replace only the directory symlink')
+assert_same(dirlinks / 'dir-link' / 'nested', module / 'real-dir' / 'nested', label='dir-link')
