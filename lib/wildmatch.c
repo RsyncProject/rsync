@@ -89,6 +89,11 @@ static int dowild(const uchar *p, const uchar *text, const uchar*const *a)
 	    p_ch = *++p;
 	    /* FALLTHROUGH */
 	  default:
+	    /* iwildmatch() folds the text to lower case above; fold the pattern
+	     * char too so matching is truly case-insensitive (not just text-side).
+	     * Without this an upper-case "hosts deny" token fails OPEN. */
+	    if (force_lower_case && ISUPPER(p_ch))
+		p_ch = tolower(p_ch);
 	    if (t_ch != p_ch)
 		return FALSE;
 	    continue;
@@ -150,6 +155,8 @@ static int dowild(const uchar *p, const uchar *text, const uchar*const *a)
 		    p_ch = *++p;
 		    if (!p_ch)
 			return ABORT_ALL;
+		    if (force_lower_case && ISUPPER(p_ch))
+			p_ch = tolower(p_ch);
 		    if (t_ch == p_ch)
 			matched = TRUE;
 		} else if (p_ch == '-' && prev_ch && p[1] && p[1] != ']') {
@@ -159,6 +166,8 @@ static int dowild(const uchar *p, const uchar *text, const uchar*const *a)
 			if (!p_ch)
 			    return ABORT_ALL;
 		    }
+		    if (force_lower_case && ISUPPER(p_ch))
+			p_ch = tolower(p_ch);
 		    if (t_ch <= p_ch && t_ch >= prev_ch)
 			matched = TRUE;
 		    p_ch = 0; /* This makes "prev_ch" get set to 0. */
@@ -216,8 +225,12 @@ static int dowild(const uchar *p, const uchar *text, const uchar*const *a)
 		    } else /* malformed [:class:] string */
 			return ABORT_ALL;
 		    p_ch = 0; /* This makes "prev_ch" get set to 0. */
-		} else if (t_ch == p_ch)
-		    matched = TRUE;
+		} else {
+		    if (force_lower_case && ISUPPER(p_ch))
+			p_ch = tolower(p_ch);
+		    if (t_ch == p_ch)
+			matched = TRUE;
+		}
 	    } while (prev_ch = p_ch, (p_ch = *++p) != ']');
 	    if (matched == special || t_ch == '/')
 		return FALSE;

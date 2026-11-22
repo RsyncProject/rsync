@@ -1,0 +1,33 @@
+name: Interoperability cleanup
+
+on:
+  workflow_run:
+    workflows: [Network controller]
+    types: [completed]
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  cleanup:
+    if: ${{ github.event.workflow_run.conclusion == 'failure' || github.event.workflow_run.conclusion == 'cancelled' || github.event.workflow_run.conclusion == 'timed_out' }}
+    name: Reconcile admission
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      actions: read
+      id-token: write
+      attestations: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+      INTEROP_RECOVER_RUN: ${{ github.event.workflow_run.id }}
+      INTEROP_RECOVER_ATTEMPT: ${{ github.event.workflow_run.run_attempt }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.workflow_sha }}
+          persist-credentials: false
+      - name: Verify lease and reconcile resources
+        run: python3 -B -S .github/scripts/interop-broker.py recover --root "$RUNNER_TEMP/interoperability-cleanup"

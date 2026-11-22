@@ -34,7 +34,9 @@
 #endif
 
 .text
-.align 16
+/* .balign = N bytes everywhere; bare .align means 2^N on Mach-O (would ask
+ * for 64KB alignment and trip a macOS linker warning). */
+.balign 16
 
 .globl md5_process_asm
 md5_process_asm:

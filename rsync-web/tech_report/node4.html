@@ -1,0 +1,145 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 3.2 Final//EN">
+<!--Converted with LaTeX2HTML 98.1p1 release (March 2nd, 1998)
+originally by Nikos Drakos (nikos@cbl.leeds.ac.uk), CBLU, University of Leeds
+* revised and updated by:  Marcus Hennecke, Ross Moore, Herb Swan
+* with significant contributions from:
+  Jens Lippmann, Marek Rouchal, Martin Wilck and others -->
+<HTML>
+<HEAD>
+<TITLE>Checksum searching</TITLE>
+<META NAME="description" CONTENT="Checksum searching">
+<META NAME="keywords" CONTENT="tech_report">
+<META NAME="resource-type" CONTENT="document">
+<META NAME="distribution" CONTENT="global">
+<META HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=iso-8859-1">
+<LINK REL="STYLESHEET" HREF="tech_report.css">
+<LINK REL="next" HREF="node5.html">
+<LINK REL="previous" HREF="node3.html">
+<LINK REL="up" HREF="tech_report.html">
+<LINK REL="next" HREF="node5.html">
+</HEAD>
+<BODY >
+<!--Navigation Panel-->
+<A NAME="tex2html52"
+ HREF="node5.html">
+<IMG WIDTH="37" HEIGHT="24" ALIGN="BOTTOM" BORDER="0" ALT="next"
+ SRC="next.gif"></A> 
+<A NAME="tex2html50"
+ HREF="tech_report.html">
+<IMG WIDTH="26" HEIGHT="24" ALIGN="BOTTOM" BORDER="0" ALT="up"
+ SRC="up.gif"></A> 
+<A NAME="tex2html44"
+ HREF="node3.html">
+<IMG WIDTH="63" HEIGHT="24" ALIGN="BOTTOM" BORDER="0" ALT="previous"
+ SRC="previous.gif"></A>   
+<BR>
+<B> Next:</B> <A NAME="tex2html53"
+ HREF="node5.html">Pipelining</A>
+<B> Up:</B> <A NAME="tex2html51"
+ HREF="tech_report.html">The rsync algorithm</A>
+<B> Previous:</B> <A NAME="tex2html45"
+ HREF="node3.html">Rolling checksum</A>
+<BR>
+<BR>
+<!--End of Navigation Panel-->
+
+<H1><A NAME="SECTION00040000000000000000">
+Checksum searching</A>
+</H1>
+
+<P>
+Once <IMG
+ WIDTH="15" HEIGHT="13" ALIGN="BOTTOM" BORDER="0"
+ SRC="img1.gif"
+ ALT="$\alpha$">
+has received the list of checksums of the blocks of <I>B</I>,
+it must search <I>A</I> for any blocks at any offset that match the
+checksum of some block of <I>B</I>.  The basic strategy is to compute the
+32-bit rolling checksum for a block of length <I>S</I> starting at each
+byte of <I>A</I> in turn, and for each checksum, search the list for a
+match.  To do this our implementation uses a
+simple 3 level searching scheme.
+
+<P>
+The first level uses a 16-bit hash of the 32-bit rolling checksum and
+a 2<SUP>16</SUP> entry hash table.  The list of checksum values (i.e., the
+checksums from the blocks of <I>B</I>) is sorted according to the 16-bit
+hash of the 32-bit rolling checksum.  Each entry in the hash table
+points to the first element of the list for that hash value, or
+contains a null value if no element of the list has that hash value.
+
+<P>
+At each offset in the file the 32-bit rolling checksum and its 16-bit
+hash are calculated.  If the hash table entry for that hash value is
+not a null value, the second level check is invoked.
+
+<P>
+The second level check involves scanning the sorted checksum list
+starting with the entry pointed to by the hash table entry, looking
+for an entry whose 32-bit rolling checksum matches the current value.
+The scan terminates when it reaches an entry whose 16-bit hash
+differs.  If this search finds a match, the third level check is
+invoked.
+
+<P>
+The third level check involves calculating the strong checksum for the
+current offset in the file and comparing it with the strong checksum
+value in the current list entry.  If the two strong checksums match,
+we assume that we have found a block of <I>A</I> which matches a block of
+<I>B</I>.  In fact the blocks could be different, but the probability of
+this is microscopic, and in practice this is a reasonable assumption.
+
+<P>
+When a match is found, <IMG
+ WIDTH="15" HEIGHT="13" ALIGN="BOTTOM" BORDER="0"
+ SRC="img1.gif"
+ ALT="$\alpha$">
+sends <IMG
+ WIDTH="14" HEIGHT="29" ALIGN="MIDDLE" BORDER="0"
+ SRC="img2.gif"
+ ALT="$\beta$">
+the data in <I>A</I> between
+the current file offset and the end of the previous match, followed by
+the index of the block in <I>B</I> that matched.  This data is sent
+immediately a match is found, which allows us to overlap the
+communication with further computation.
+
+<P>
+If no match is found at a given offset in the file, the rolling
+checksum is updated to the next offset and the search proceeds.  If a
+match is found, the search is restarted at the end of the matched
+block.  This strategy saves a considerable amount of computation for
+the common case where the two files are nearly identical.  In
+addition, it would be a simple matter to encode the block indexes as
+runs, for the common case where a portion of <I>A</I> matches a series of
+blocks of <I>B</I> in order.
+
+<P>
+<HR>
+<!--Navigation Panel-->
+<A NAME="tex2html52"
+ HREF="node5.html">
+<IMG WIDTH="37" HEIGHT="24" ALIGN="BOTTOM" BORDER="0" ALT="next"
+ SRC="next.gif"></A> 
+<A NAME="tex2html50"
+ HREF="tech_report.html">
+<IMG WIDTH="26" HEIGHT="24" ALIGN="BOTTOM" BORDER="0" ALT="up"
+ SRC="up.gif"></A> 
+<A NAME="tex2html44"
+ HREF="node3.html">
+<IMG WIDTH="63" HEIGHT="24" ALIGN="BOTTOM" BORDER="0" ALT="previous"
+ SRC="previous.gif"></A>   
+<BR>
+<B> Next:</B> <A NAME="tex2html53"
+ HREF="node5.html">Pipelining</A>
+<B> Up:</B> <A NAME="tex2html51"
+ HREF="tech_report.html">The rsync algorithm</A>
+<B> Previous:</B> <A NAME="tex2html45"
+ HREF="node3.html">Rolling checksum</A>
+<!--End of Navigation Panel-->
+<ADDRESS>
+<I>Andrew Tridgell</I>
+<BR><I>1998-11-09</I>
+</ADDRESS>
+</BODY>
+</HTML>
