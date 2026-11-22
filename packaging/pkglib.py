@@ -170,17 +170,6 @@ def get_patch_branches(base_branch):
     return branches
 
 
-def mandate_gensend_hook():
-    hook = '.git/hooks/pre-push'
-    if not os.path.exists(hook):
-        print('Creating hook file:', hook)
-        cmd_chk(['./rsync', '-a', 'packaging/pre-push', hook])
-    else:
-        ct = cmd_txt(['grep', 'make gensend', hook], discard='output')
-        if ct.rc:
-            die('Please add a "make gensend" into your', hook, 'script.')
-
-
 # Snag the GENFILES values out of the Makefile file and return them as a list.
 def get_gen_files(want_dir_plus_list=False):
     cont_re = re.compile(r'\\\n')
@@ -217,7 +206,14 @@ def get_rsync_version():
     die("Unable to find RSYNC_VERSION define in version.h")
 
 
-def get_NEWS_version_info():
+def get_NEWS_version_info(skip_version=None):
+    """Return (last_version, its protocol version, {version: protocol-change date}).
+
+    skip_version lets the caller exclude the version it is about to release.
+    Its NEWS entry may already carry a release date -- dated by hand, or by an
+    earlier run of --prepare-pr -- and would otherwise be reported as the
+    PREVIOUS release, which is both wrong and fatal when it has no table row yet.
+    """
     rel_re = re.compile(r'^\| \S{2} \w{3} \d{4}\s+\|\s+(?P<ver>\d+\.\d+\.\d+)\s+\|\s+(?P<pdate>\d{2} \w{3} \d{4})?\s+\|\s+(?P<pver>\d+)\s+\|')
     last_version = last_protocol_version = None
     pdate = { }
@@ -226,7 +222,7 @@ def get_NEWS_version_info():
         for line in fh:
             if not last_version: # Find the first non-dev|pre version with a release date.
                 m = re.search(r'rsync (\d+\.\d+\.\d+) .*\d\d\d\d', line)
-                if m:
+                if m and m[1] != skip_version:
                     last_version = m[1]
             m = rel_re.match(line)
             if m:

@@ -1,0 +1,11 @@
+root = true
+
+[*.{c,h}]
+indent_style = tab
+indent_size = 8
+tab_width = 8
+
+[{popt,zlib,rsync-web}/**]
+indent_style = unset
+indent_size = unset
+tab_width = unset

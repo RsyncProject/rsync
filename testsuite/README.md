@@ -1,0 +1,80 @@
+# Testing rsync
+
+The runner and harness use Python 3.7 or later and its standard library. Some tests also need platform tools for ACLs, extended attributes, SSH or privilege changes. CommonMark is needed to build manual pages rather than to run tests.
+
+## Running tests
+
+From a configured build directory:
+```sh
+make check
+make check29
+make check30
+```
+
+The first target runs the suite with the default protocol; the others force protocols 29 and 30. Make runs up to eight tests at once. Set CHECK_J to change that limit.
+
+For an in-tree build, individual tests and filename patterns can be selected after running `make check-progs`:
+```sh
+python3 -S testsuite/runtests.py -j8 chmod-temp-dir 'xattrs*'
+python3 -S testsuite/runtests.py --help
+python3 -S testsuite/runtests.py --describe-tests
+```
+
+The runner defaults to serial execution. For an out-of-tree build, invoke `$srcdir/testsuite/runtests.py` and pass `--srcdir`, `--tooldir` and `--rsync-bin`. The `installcheck` target uses the installed binary with the build directory's helpers.
+
+Scratch directories default to `testtmp/<name>/` and are retained after failures. Root and non-root runs need separate scratch directories. SIGTERM stops queued tests and terminates active test process groups; incomplete runs fail.
+
+Daemon tests normally use pipes. The --use-tcp option uses loopback listeners, some with unauthenticated writable modules or deliberately unsafe settings. Other local users can reach those listeners. Pipe transport is preferable on shared hosts. The --daemon-tests-only option selects tests which exercise the transport.
+
+## Tests and profiles
+
+Tests are grouped under tests/ by build, daemon, metadata, path, protocol, rrsync, selftests and transfer. Reusable code lives in harness/ and fixture programs and data in fixtures/. Test names are lowercase, hyphen-separated filenames and must be unique across groups. Selectors and results use the filename without its `.py` ending.
+
+Tests declare applicability with `@requires(...)` or a top-level `metadata(...)` call. Transports, protocol versions, peer-version limits and required capabilities determine selection. A min_peer value can set separate primary and secondary release limits. The --describe-tests output lists these declarations.
+
+A TCP declaration requires a test that uses the daemon's TCP transport. Local transfers and remote-shell tests belong in the pipe selection. The Ubuntu 24.04 X86-64 job runs the explicit protocol and transport combinations in addition to the default-protocol suites.
+
+Regression tests should fail against the faulty implementation and check the affected behaviour directly. Fixtures must keep their data inside the test's scratch directory, tolerate parallel execution and stop their child processes. Sleeps cannot establish ordering or prove that a race was exercised.
+
+Tests which build mutated executables may report unavailable build capabilities as unsupported. Missing or ambiguous source replacement targets, missing compiler-flag replacements and failed configured builds are test failures rather than unavailable capabilities.
+
+Profiles under profiles/ distinguish tests which do not apply from missing capabilities. Root and nonroot profiles must match the effective UID. Peer profiles identify the archived release and wire protocol. Historical binaries and their build records are under [old_versions](../old_versions/README.md); --rsync-bin2 selects the secondary executable and --archived-role identifies which side runs the archived release.
+
+The tools/check.py launcher takes a build directory, binary, profile list and fresh output directory followed by runner options. It saves run.log and receipt.json, then checks the receipt against the executable and profiles.
+
+Result | Meaning
+--- | ---
+N/A | Excluded by applicability metadata
+PASS | Assertions passed
+FAIL | An assertion failed
+ERROR | The test or harness failed unexpectedly
+SKIP | Skipped without a capability
+UNSUPPORTED | A required capability was unavailable
+PROFILE_ERROR | A result disagreed with the active profile
+
+With profiles active, an unsupported result is accepted only when the test declares the capability and the profile permits its absence. A generic skip fails the run. Without profiles, skips and unsupported results are accepted. Receipts record raw outcomes, profile verdicts, exclusions, executable hashes and the effective UID.
+
+## CI
+
+[ci.yml](../.github/workflows/ci.yml) defines the platform groups and required checks. Native jobs exercise root and non-root transfers where available. Historical peers run applicable tests in both executable roles over pipe and TCP. Diagnostics cover the minimum Python version, static analysis, sanitisers, coverage and Valgrind. Coverage reports omit daemon work after chroot because its counter files are outside the chroot.
+
+The minimum Python and workflow lint jobs use the same helper test roster. Run those checks from the repository root with:
+```sh
+python3 -B -S .github/scripts/diagnostics.py check-helpers
+```
+
+Linux jobs cover both xattr syscall paths, nested user namespaces, older libc and OpenSSL versions, musl and 32-bit behaviour. We pin one BSD and macOS release unless another release exercises distinct rsync behaviour. Check the workflow files for exact versions.
+
+The NetBSD guest requires xattrs in the build and runs the user xattr tests on its workspace filesystem. The guest's `/tmp` is tmpfs and does not support the fixture. The existing-file test requires NetBSD to refuse xattr growth without damaging neighbouring attributes. OpenBSD must report xattrs as unsupported in the build metadata.
+
+The Ubuntu 24.04 X86-64 non-root pipe run generates Turkish UTF-8 and ISO-8859-9 locale data alongside other legacy encodings. The test process uses `LOCPATH` to find that data without changing the host's default locale.
+
+On pull requests and pushes to master we choose jobs from the changed paths. Known documentation and static website files stop after Changes and Required. General tests and shared runner changes run the native platforms, version mixes and relevant diagnostics. We add Android, archive, Valgrind or interoperability only when their own files or shared code change. Production, build and packaging changes run everything. A path without a selection rule fails Changes. Scheduled and manual runs select the full matrix.
+
+Installed-binary checks exercise restricted SSH and local TLS with certificate and hostname verification. Archive qualification builds and tests the release source archive without Git or Autoconf, then checks installation and removal. Linux storage checks use disposable filesystems and loop devices for encrypted volumes, mount boundaries, space exhaustion, device transfers and --copy-as.
+
+Android jobs execute static Bionic binaries, then reuse the X86-64 binary in an emulator and the Termux application sandbox with SELinux enforcing. Interoperability jobs run directed transfers between Linux, FreeBSD, NetBSD, OpenBSD, macOS, Solaris and Cygwin. They compare data and metadata, check unsupported-feature refusals and restore fake-super backups on their originating platform. The separate [network document](../.github/INTEROPERABILITY.md) describes admission and cleanup.
+
+The Termux job allows one app reset after overlapping bootstrap installers lose staging files. It waits for the installers to finish before testing the binary in the app sandbox.
+
+Jobs retain logs and receipts. The Required check rejects failed or missing selected jobs.
