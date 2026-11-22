@@ -7,7 +7,7 @@ from harness.filesystem import assert_same, makepath
 from harness.rsync import run_rsync
 
 
-@requires(transports={'pipe', 'tcp'}, min_peer={'primary': '2.6.0', 'secondary': '3.5.0'},
+@requires(transports={'pipe', 'tcp'}, min_peer={'primary': '2.6.3', 'secondary': '3.5.0'},
           mutates={'environment', 'filesystem'}, tags={'regression', 'transfer', 'version-mix'})
 def test(context: TestContext):
     source = context.source
