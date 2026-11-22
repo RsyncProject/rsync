@@ -27,6 +27,7 @@
  */
 
 #include "rsync.h"
+#include "itypes.h"
 
 #ifdef SUPPORT_XXHASH
 #include <xxhash.h>
@@ -42,10 +43,6 @@ extern int protocol_version;
 extern int proper_seed_order;
 extern const char *checksum_choice;
 
-#define NNI_BUILTIN (1<<0)
-#define NNI_EVP (1<<1)
-#define NNI_EVP_OK (1<<2)
-
 struct name_num_item valid_checksums_items[] = {
 #ifdef SUPPORT_XXH3
 	{ CSUM_XXH3_128, 0, "xxh128", NULL },
@@ -54,6 +51,15 @@ struct name_num_item valid_checksums_items[] = {
 #ifdef SUPPORT_XXHASH
 	{ CSUM_XXH64, 0, "xxh64", NULL },
 	{ CSUM_XXH64, 0, "xxhash", NULL },
+#endif
+#ifdef USE_OPENSSL
+	/* SHA-3 is offered only via OpenSSL EVP (sha3-* digests, OpenSSL >= 1.1.1).
+	 * verify_digest() probes each entry at startup and disables any that the
+	 * linked libcrypto does not support, so listing them here is safe even
+	 * when the build environment is older. */
+	{ CSUM_SHA3_512, NNI_EVP|NNI_EXPLICIT_ONLY, "sha3-512", NULL },
+	{ CSUM_SHA3_384, NNI_EVP|NNI_EXPLICIT_ONLY, "sha3-384", NULL },
+	{ CSUM_SHA3_256, NNI_EVP|NNI_EXPLICIT_ONLY, "sha3-256", NULL },
 #endif
 	{ CSUM_MD5, NNI_BUILTIN|NNI_EVP, "md5", NULL },
 	{ CSUM_MD4, NNI_BUILTIN|NNI_EVP, "md4", NULL },
@@ -99,7 +105,7 @@ int auth_digest_rank(const char *name)
 	if (!name || !*name)
 		return -1;
 	for (nni = valid_auth_checksums_items; nni->name; nni++, rank++) {
-		if (strcasecmp(nni->name, name) == 0)
+		if (ascii_strcasecmp(nni->name, name) == 0)
 			return rank;
 	}
 	return -1;
@@ -133,7 +139,7 @@ struct name_num_item *parse_csum_name(const char *name, int len)
 
 	init_checksum_choices();
 
-	if (!name || (len == 4 && strncasecmp(name, "auto", 4) == 0)) {
+	if (!name || (len == 4 && ascii_strncasecmp(name, "auto", 4) == 0)) {
 		if (protocol_version >= 30) {
 			if (!proper_seed_order)
 				return &implied_checksum_md5;
@@ -256,6 +262,14 @@ int csum_len_for_type(int cst, BOOL flist_csum)
 	  case CSUM_SHA512:
 		return SHA512_DIGEST_LENGTH;
 #endif
+#ifdef USE_OPENSSL
+	  case CSUM_SHA3_256:
+		return SHA3_256_DIGEST_LEN;
+	  case CSUM_SHA3_384:
+		return SHA3_384_DIGEST_LEN;
+	  case CSUM_SHA3_512:
+		return SHA3_512_DIGEST_LEN;
+#endif
 	  case CSUM_XXH64:
 	  case CSUM_XXH3_64:
 		return 64/8;
@@ -284,6 +298,9 @@ int canonical_checksum(int csum_type)
 	  case CSUM_SHA1:
 	  case CSUM_SHA256:
 	  case CSUM_SHA512:
+	  case CSUM_SHA3_256:
+	  case CSUM_SHA3_384:
+	  case CSUM_SHA3_512:
 		return -1;
 	  case CSUM_XXH64:
 	  case CSUM_XXH3_64:
@@ -304,7 +321,7 @@ uint32 get_checksum1(char *buf1, int32 len)
 {
 	int32 i;
 	uint32 s1, s2;
-	schar *buf = (schar *)buf1;
+	const schar *buf = (schar *)buf1;
 
 	s1 = s2 = 0;
 	for (i = 0; i < (len-4); i+=4) {

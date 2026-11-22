@@ -1,5 +1,6 @@
 *.[oa]
 *~
+__pycache__/
 dummy
 ID
 Makefile
@@ -39,12 +40,14 @@ aclocal.m4
 /testdir
 /tests-dont-exist
 /testtmp
+/test-results/
 /tls
 /testrun
 /trimslash
 /t_unsafe
 /wildtest
 /getfsdev
+/dirfd-probe
 /simdtest
 /t_acl
 /t_chmod_secure
@@ -60,11 +63,6 @@ aclocal.m4
 /doc/rsync.pdf
 /doc/rsync.ps
 /support/savetransfer
-/testsuite/chown-fake.test
-/testsuite/devices-fake.test
-/testsuite/xattrs-hlink.test
-/testsuite/fleettest.json
-/fleettest-logs
 /patches
 /patches.gen
 /build

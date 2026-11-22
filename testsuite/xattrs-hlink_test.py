@@ -1,1 +1,0 @@
-xattrs_test.py

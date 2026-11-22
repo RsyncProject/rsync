@@ -19,6 +19,9 @@ modules.
 
 ## FILE FORMAT
 
+Configuration keywords use ASCII letters and are matched without regard to
+ASCII letter case. Locale settings do not change the meaning of a keyword.
+
 The file consists of modules and parameters. A module begins with the name of
 the module in square brackets and continues until the next module begins.
 Modules contain parameters of the form `name = value`.
@@ -63,6 +66,17 @@ daemon using `rsync --daemon --no-detach`, while `rsync.socket` and
 files may need local adjustment to match your installed rsync path, packaging
 layout, and module policy.
 
+The optional `50-rsync-hardening.conf` example restricts process execution.
+To opt in, copy it into `rsync.service.d/` or `rsync@.service.d/` under
+`/etc/systemd/system/` for the service in use. Reload systemd and restart
+the standalone daemon if it is running. Remove the drop-in and repeat these
+steps to return to the shipped defaults.
+
+The drop-in does not change module paths or network settings. It can affect
+programs started by daemon hooks, such as programs that need executable
+memory generated at runtime or invoke a non-native system call ABI. Verify
+the modules and hooks used by the installation before enabling it.
+
 When run via inetd you should add a line like this to /etc/services:
 
 >     rsync           873/tcp
@@ -75,8 +89,13 @@ Replace "@BINDIR@/rsync" with the path to where you have rsync installed on
 your system.  You will then need to send inetd a HUP signal to tell it to
 reread its config file.
 
-Note that you should **not** send the rsync daemon a HUP signal to force it to
-reread the `rsyncd.conf` file. The file is re-read on each client connection.
+A standalone rsync daemon reads global settings at startup and opens the
+configuration again for each client connection. Keep the file readable for
+as long as the daemon is running. A pipe, such as a pipe-backed process
+substitution, cannot supply a fresh configuration for each connection.
+Do not send the rsync daemon a HUP signal to reload this file. Changes to
+listener settings such as the port require a restart. A daemon started by
+inetd or a remote shell reads the configuration for its single connection.
 
 ## GLOBAL PARAMETERS
 
@@ -441,6 +460,10 @@ in the values of parameters.  See that section for details.
     is called, allowing it to be placed outside the transfer.  If this value is
     set on a per-module basis instead of globally, the global log will still
     contain any authorization failures or config-file error messages.
+
+    File logging uses the daemon's locale and follows the same byte escaping
+    and line termination rules as [`--log-file`](rsync.1#opt--log-file).
+    These rules do not change what the daemon sends to syslog.
 
     If the daemon fails to open the specified file, it will fall back to using
     syslog and output an error about the failure.  (Note that the failure to
@@ -1223,12 +1246,12 @@ in the values of parameters.  See that section for details.
 
     Specifies a directory that rsync should use for temporary files created
     during the transfer of updated files. If that directory is on a different
-    partition, after transfer file is being copied instead of unlinked. 
+    partition, after transfer file is being copied instead of unlinked.
 
     This parameter equals with `--temp-dir` option, so please consult rsync
-    manpage for further information. 
+    manpage for further information.
 
-    
+
 ## CONFIG DIRECTIVES
 
 There are currently two config directives available that allow a config file to

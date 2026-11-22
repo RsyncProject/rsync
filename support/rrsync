@@ -35,7 +35,8 @@ short_with_num = '@B' # DO NOT REMOVE ANY
 
 # To disable a long-named option, change its value to a -1.  The values mean:
 # 0 = the option has no arg; 1 = the arg doesn't need any checking; 2 = only
-# check the arg when receiving; and 3 = always check the arg.
+# check the path arg when receiving; 3 = always check the path arg; and 4 =
+# allow only a non-elevating --nice setting.
 long_opts = {
   'append': 0,
   'backup-dir': 2,
@@ -52,6 +53,7 @@ long_opts = {
   'copy-unsafe-links': 0,
   'daemon': -1,
   'debug': -1,
+  'delay-symlinks': 0,
   'delay-updates': 0,
   'delete': 0,
   'delete-after': 0,
@@ -92,6 +94,7 @@ long_opts = {
   'msgs2stderr': 0,
   'munge-links': 0,
   'new-compress': 0,
+  'nice': 4,
   'no-W': 0,
   'no-implied-dirs': 0,
   'no-msgs2stderr': 0,
@@ -149,6 +152,11 @@ pinned_dirs = {}
 # Whether the client asked for --relative/-R, which decides how much of a
 # sender arg rsync transmits as the file's name (see sender_pinned_arg).
 client_relative = False
+
+# Drop missing args instead of refusing if client sends --ignore-missing-args
+client_ignore_missing_args = False
+# if args are dropped and none are left, refuse (or rsync would send ".").
+dropped_missing_args = False
 
 # The inode-pin trick needs /proc/self/fd/N to be a Linux-style magic symlink
 # whose readlink yields the open file's real path. macOS/BSD lack the directory
@@ -375,7 +383,7 @@ def create_pinned_dir(path, orig_arg, mode):
     pinned_fds.append(fd)
     return '/proc/self/fd/%d' % fd
 
-# sender_pinned_arg() verdicts that are not a rewritten argument.
+# Pinned-argument verdicts that are not a rewritten argument.
 KEEP_LEAF_PIN = 'keep'          # hand rsync the leaf's own /proc/self/fd/N
 LEAF_PIN_UNUSABLE = 'unusable'  # no pin for this shape; keep the plain name
 
@@ -452,6 +460,22 @@ def sender_pinned_arg(fd, arg, orig_arg, has_slash, has_slash_dot):
         die('post-pin path changed (race?):', orig_arg, check)
     return pinned
 
+def receiver_pinned_arg(fd, arg, orig_arg):
+    """Keep existing file destinations writable beneath a pinned parent."""
+    leaf_st = os.fstat(fd)
+    if stat.S_ISDIR(leaf_st.st_mode):
+        return KEEP_LEAF_PIN
+
+    parent, leaf = os.path.split(arg)
+    dfd = pin_dir(parent, orig_arg)
+    try:
+        st = os.stat(leaf, dir_fd=dfd, follow_symlinks=False)
+    except OSError as e:
+        die('post-pin stat failed (race?):', orig_arg, e.strerror)
+    if (st.st_dev, st.st_ino) != (leaf_st.st_dev, leaf_st.st_ino):
+        die('post-pin path changed (race?):', orig_arg, leaf)
+    return '/proc/self/fd/%d/%s' % (dfd, leaf)
+
 def safe_open_logfile():
     nofollow = getattr(os, 'O_NOFOLLOW', 0)
     try:
@@ -519,7 +543,11 @@ def main():
         # backup onto a name that already exists deletes what is there
         # (backup.c make_backup()), and deletion backs files up as well
         # (delete.c), so an unrelated --delete can land on a protected name.
+        # --delay-symlinks creates its symlinks at the end of the transfer and
+        # replaces whatever has appeared at that name since the
+        # --ignore-existing check.
         long_opts['log-file'] = long_opts['partial-dir'] = long_opts['delay-updates'] = -1
+        long_opts['delay-symlinks'] = -1
         long_opts['backup-dir'] = -1
         short_disabled += 'b'   # must precede the short_no_arg_re build below
 
@@ -544,7 +572,7 @@ def main():
     except OSError as e:
         die('unable to chdir to restricted dir:', str(e))
 
-    global client_relative
+    global client_relative, client_ignore_missing_args
     rsync_opts = [ '--server' ]
     rsync_args = [ ]
     saw_the_dot_arg = False
@@ -591,6 +619,8 @@ def main():
                     client_relative = True
                 elif opt == 'no-relative':
                     client_relative = False
+                elif opt == 'ignore-missing-args':
+                    client_ignore_missing_args = True
                 if ct == 0:
                     continue
                 opt = '--' + opt
@@ -645,11 +675,13 @@ def main():
 
     if args.munge:
         rsync_opts.append('--munge-links')
-    
+
     if args.no_overwrite:
       rsync_opts.append('--ignore-existing')
 
     if not rsync_args:
+        if dropped_missing_args:
+            die('nothing to transfer: all source args are missing')
         rsync_args = [ '.' ]
 
     cmd = (RSYNC, *rsync_opts, '--', '.', *rsync_args)
@@ -679,8 +711,14 @@ def main():
 
 
 def validated_arg(opt, arg, typ=3, wild=False):
+    global dropped_missing_args
     if opt != 'arg': # arg values already have their backslashes removed.
         arg = DE_BACKSLASH_RE.sub(r'\1', arg)
+
+    if typ == 4:
+        if not re.fullmatch(r'(?i:local(?::(?:19(?:/idle)?|idle))?)', arg):
+            die('unsafe --nice setting:', arg)
+        return arg
 
     # "-" is rsync's read-the-list-from-stdin sentinel, not a pathname: a pull
     # with a local --files-from sends exactly "--files-from=-" to the server.
@@ -694,8 +732,13 @@ def validated_arg(opt, arg, typ=3, wild=False):
     if arg.startswith('./'):
         arg = arg[1:]
     arg = arg.replace('//', '/')
+    # One leading slash means the root of the restricted tree.
+    arg = re.sub(r'^/+', '/', arg)
     is_absolute_arg = args.absolute and opt == 'arg' and args.dir != '/' and (arg == args.dir or arg.startswith(args.dir_slash))
-    if not is_absolute_arg:
+    is_root_relative_arg = arg.startswith('/') and not is_absolute_arg
+    if is_root_relative_arg and args.dir != '/':
+        arg = args.dir + arg
+    elif not is_absolute_arg:
         arg = arg.lstrip('/')
     if args.dir != '/':
         if HAS_DOT_DOT_RE.search(arg):
@@ -711,6 +754,7 @@ def validated_arg(opt, arg, typ=3, wild=False):
     ret = [ ]
     for arg in got:
         if args.dir != '/' and arg != '.' and (typ == 3 or (typ == 2 and not am_sender)):
+            source_arg = arg
             arg_has_trailing_slash = arg.endswith('/')
             arg_has_trailing_slash_dot = False
             if arg_has_trailing_slash:
@@ -769,15 +813,30 @@ def validated_arg(opt, arg, typ=3, wild=False):
             # rsync does with the argument, not about whether we can pin it, so
             # it has to hold on the BSDs, macOS, Solaris and Cygwin too -- where
             # otherwise a dangling symlink still resolved to nothing and died.
-            if (am_sender and opt == 'arg'
-                    and not arg_has_trailing_slash
-                    and not arg_has_trailing_slash_dot):
+            if am_sender and opt == 'arg':
                 try:
                     lst = os.lstat(arg)
+                except FileNotFoundError:
+                    # Skip only an operand missing before the inode-pin attempt.
+                    # A later open failure may be a path replacement race.
+                    if client_ignore_missing_args:
+                        if client_relative:
+                            chdir = source_arg.partition('/./')[0] if '/./' in source_arg else ''
+                        elif arg_has_trailing_slash or arg_has_trailing_slash_dot:
+                            chdir = arg
+                        else:
+                            chdir = os.path.dirname(arg)
+                        if not os.path.isdir(chdir or '.'):
+                            die('bad arg (path does not exist):', orig_arg)
+                        dropped_missing_args = True
+                        continue
+                    lst = None
                 except OSError:
                     lst = None
-                if lst is not None and not (stat.S_ISREG(lst.st_mode)
-                                            or stat.S_ISDIR(lst.st_mode)):
+                if (lst is not None and not arg_has_trailing_slash
+                        and not arg_has_trailing_slash_dot
+                        and not (stat.S_ISREG(lst.st_mode)
+                                 or stat.S_ISDIR(lst.st_mode))):
                     sender_leaf_unopened = True
             try:
                 if sender_leaf_unopened:
@@ -918,6 +977,8 @@ def validated_arg(opt, arg, typ=3, wild=False):
                         pinned = sender_pinned_arg(fd, logical, orig_arg,
                                                    arg_has_trailing_slash,
                                                    arg_has_trailing_slash_dot)
+                    elif opt == 'arg':
+                        pinned = receiver_pinned_arg(fd, real_arg, orig_arg)
                     else:
                         pinned = KEEP_LEAF_PIN
                     if pinned == KEEP_LEAF_PIN:

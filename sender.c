@@ -53,9 +53,12 @@ extern int inplace;
 extern int inplace_partial;
 extern int batch_fd;
 extern char *module_dir;
+extern unsigned int module_dirlen;
+extern const char *orig_dir;
 extern int module_dirfd;
 extern int write_batch;
 extern int file_old_total;
+extern char *files_from;
 extern BOOL want_progress_now;
 extern struct stats stats;
 extern struct file_list *cur_flist, *first_flist, *dir_flist;
@@ -71,9 +74,15 @@ BOOL extra_flist_sending_enabled;
  * machine holding the source files.
  **/
 
+/* The module subdir (orig_dir) that a relative F_PATHNAME is under, or "" if absolute. */
+static const char *orig_subdir(const char *path)
+{
+	return *path == '/' ? "" : orig_dir + module_dirlen;
+}
+
 static int secure_sender_parent_fd(struct file_struct *file, const char *fname, const char **bname_p)
 {
-#ifdef AT_FDCWD
+#if defined AT_FDCWD && defined O_NOFOLLOW && defined O_DIRECTORY
 	const char *path, *slash, *relp, *bslash, *fslash;
 	char secure_path[MAXPATHLEN];
 	int dfd, fl, slen;
@@ -89,6 +98,9 @@ static int secure_sender_parent_fd(struct file_struct *file, const char *fname, 
 		errno = 0;
 		return -1;
 	}
+
+	if (filesfrom_owner_walk_active())
+		return owner_walk_parent(fname, bname_p);
 
 	if (!am_daemon || !module_dir || module_dir[0] != '/') {
 		/* Local (non-daemon) sender: there is no module root to anchor at, but
@@ -127,8 +139,7 @@ static int secure_sender_parent_fd(struct file_struct *file, const char *fname, 
 #endif
 				while (*rel == '/')
 					rel++;
-				return secure_relative_open("/", rel,
-					O_RDONLY | O_DIRECTORY, 0);
+				return secure_relative_dirfd("/", rel);
 			}
 			/* held_dir_path_fd returns a cache-OWNED fd; the caller closes
 			 * what we return, so hand back an owned dup and leave the cache's
@@ -141,7 +152,7 @@ static int secure_sender_parent_fd(struct file_struct *file, const char *fname, 
 				return dup(dfd);
 			if (errno != 0)
 				return -1;
-			return secure_relative_open(NULL, dir, O_RDONLY | O_DIRECTORY, 0);
+			return secure_relative_dirfd(NULL, dir);
 		}
 		errno = 0;	/* top-level file: no parent component to confine */
 		return -1;
@@ -157,7 +168,7 @@ static int secure_sender_parent_fd(struct file_struct *file, const char *fname, 
 	if (!path)
 		path = "";
 	slash = *path ? "/" : "";
-	slen = snprintf(secure_path, sizeof secure_path, "%s%s%s", path, slash, fname);
+	slen = snprintf(secure_path, sizeof secure_path, "%s/%s%s%s", orig_subdir(path), path, slash, fname);
 	if (slen < 0 || slen >= (int)sizeof secure_path) {
 		errno = ENAMETOOLONG;
 		return -1;
@@ -176,9 +187,9 @@ static int secure_sender_parent_fd(struct file_struct *file, const char *fname, 
 		}
 		memcpy(dir, relp, dlen);
 		dir[dlen] = '\0';
-		dfd = secure_relative_open(module_dir, dir, O_RDONLY | O_DIRECTORY, 0);
+		dfd = secure_relative_dirfd(module_dir, dir);
 	} else
-		dfd = secure_relative_open(module_dir, "", O_RDONLY | O_DIRECTORY, 0);
+		dfd = secure_relative_dirfd(module_dir, "");
 
 	/* The leaf is the same last component either way; take it from the caller's
 	 * persistent fname buffer, not the local secure_path. */
@@ -292,11 +303,9 @@ static int sender_open_copylinks_confined(const char *anchor, const char *relpat
 		 * only this branch would hand it to strcmp(). */
 		if (am_daemon && module_dirfd >= 0 && module_dir && anchor
 		 && strcmp(anchor, module_dir) == 0)
-			pdfd = secure_relative_open_at_beneath(module_dirfd, dir,
-					O_RDONLY | O_DIRECTORY, 0);
+			pdfd = secure_relative_dirfd_at_beneath(module_dirfd, dir);
 		else
-			pdfd = secure_relative_open(anchor, dir,
-					O_RDONLY | O_DIRECTORY, 0);
+			pdfd = secure_relative_dirfd(anchor, dir);
 		if (pdfd < 0)
 			return -1;
 		n = do_readlink_atfd(pdfd, bname, tgt, sizeof tgt - 1);
@@ -304,11 +313,13 @@ static int sender_open_copylinks_confined(const char *anchor, const char *relpat
 		if (n < 0) {
 			/* EINVAL: not a symlink -> the resolved target file.  Open it
 			 * O_NOFOLLOW (a raced symlink flip is still refused). */
-			fd = e == EINVAL
-			   ? openat(pdfd, bname, O_RDONLY | O_NOFOLLOW | O_BINARY | extra, 0)
-			   : -1;
+			if (e == EINVAL) {
+				fd = openat(pdfd, bname, O_RDONLY | O_NOFOLLOW | O_BINARY | extra, 0);
+				e = fd < 0 ? errno : 0;
+			} else
+				fd = -1;
 			close(pdfd);
-			if (n < 0 && e != EINVAL)
+			if (fd < 0)
 				errno = e;
 			return fd;
 		}
@@ -660,7 +671,7 @@ void send_files(int f_in, int f_out)
 			 * from F_PATHNAME (path) and f_name (fname). */
 			char secure_path[MAXPATHLEN];
 			const char *relp;
-			int slen = snprintf(secure_path, sizeof secure_path, "%s%s%s", path, slash, fname);
+			int slen = snprintf(secure_path, sizeof secure_path, "%s/%s%s%s", orig_subdir(path), path, slash, fname);
 			if (slen >= (int)sizeof secure_path) {
 				io_error |= IOERR_GENERAL;
 				rprintf(FERROR_XFER, "path too long: %s%s%s\n", path, slash, fname);
@@ -683,26 +694,27 @@ void send_files(int f_in, int f_out)
 			else
 				fd = sender_open_confined(module_dir, relp, O_RDONLY);
 		} else if (!copy_links && !copy_unsafe_links && !copy_dirlinks && !insecure_links) {
-			/* Default symlink handling (no dir-link following): the scan
-			 * recorded this as a regular file.  Open it confined beneath the
-			 * transfer root: an in-tree symlinked parent (e.g. -R keeps one in
-			 * the path) is followed beneath the root, a parent raced into a
-			 * symlink pointing out of the tree is refused, and O_NOFOLLOW
-			 * governs the leaf so a raced leaf symlink is refused.  A
-			 * symlink-following mode (-L/--copy-unsafe-links/-k) or
-			 * --insecure-links keeps the legacy open below. */
-			if (fname[0] == '/') {
-				/* --relative (or a --files-from absolute name) keeps the
-				 * full absolute path as fname; the transfer root is then "/",
-				 * so anchor the confined open there and strip the leading
-				 * slash to the module-relative path the resolver wants -- it
-				 * rejects an absolute relpath outright. */
-				const char *relp = fname;
-				while (*relp == '/')
-					relp++;
-				fd = sender_open_confined("/", relp, O_RDONLY);
-			} else
-				fd = sender_open_confined(NULL, fname, O_RDONLY);
+			int matched;
+			/* A files-from entry follows only trusted-owned ancestors because
+			 * its source base is operator-selected but the entry itself may not
+			 * be. Other paths stay confined beneath their explicit transfer root.
+			 * Every file leaf remains O_NOFOLLOW. */
+			if (files_from) {
+				fd = do_open_checklinks(fname);
+			} else {
+				fd = open_sender_source_path(fname, O_RDONLY | O_NOFOLLOW, &matched);
+				if (!matched) {
+					if (fname[0] == '/') {
+						/* --relative keeps the full absolute path as fname;
+						 * anchor at "/" and pass the resolver a relative path. */
+						const char *relp = fname;
+						while (*relp == '/')
+							relp++;
+						fd = sender_open_confined("/", relp, O_RDONLY);
+					} else
+						fd = sender_open_confined(NULL, fname, O_RDONLY);
+				}
+			}
 		} else {
 			fd = do_open_checklinks(fname);
 		}
@@ -812,6 +824,7 @@ void send_files(int f_in, int f_out)
 	if (DEBUG_GTE(SEND, 1))
 		rprintf(FINFO, "send files finished\n");
 
+	clear_sender_source_roots();
 	match_report();
 
 	write_ndx(f_out, NDX_DONE);

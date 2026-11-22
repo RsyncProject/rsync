@@ -68,26 +68,26 @@ extern char *iconv_opt;
 #define UPDATED_MODE  (1<<5)
 #define UPDATED_CRTIME (1<<6)
 
+const char *get_locale_charset(void)
+{
+#if defined HAVE_LIBCHARSET_H && defined HAVE_LOCALE_CHARSET
+	return locale_charset();
+#elif defined HAVE_LANGINFO_H && defined HAVE_NL_LANGINFO
+	return nl_langinfo(CODESET);
+#else
+	return ""; /* Works with (at the very least) gnu iconv... */
+#endif
+}
+
 #ifdef ICONV_CONST
 iconv_t ic_chck = (iconv_t)-1;
 # ifdef ICONV_OPTION
 iconv_t ic_send = (iconv_t)-1, ic_recv = (iconv_t)-1;
 # endif
 
-static const char *default_charset(void)
-{
-# if defined HAVE_LIBCHARSET_H && defined HAVE_LOCALE_CHARSET
-	return locale_charset();
-# elif defined HAVE_LANGINFO_H && defined HAVE_NL_LANGINFO
-	return nl_langinfo(CODESET);
-# else
-	return ""; /* Works with (at the very least) gnu iconv... */
-# endif
-}
-
 void setup_iconv(void)
 {
-	const char *defset = default_charset();
+	const char *defset = get_locale_charset();
 # ifdef ICONV_OPTION
 	const char *charset;
 	char *cp;
@@ -505,6 +505,7 @@ int set_file_attrs(const char *fname, struct file_struct *file, stat_x *sxp,
 		   const char *fnamecmp, int flags)
 {
 	int updated = 0;
+	int mtime_stale = 0;
 	stat_x sx2;
 	int change_uid, change_gid;
 	mode_t new_mode = file->mode;
@@ -711,7 +712,8 @@ int set_file_attrs(const char *fname, struct file_struct *file, stat_x *sxp,
 
 #ifdef SUPPORT_XATTRS
 	if (am_root < 0 && !op_refuse && !xattr_refuse)
-		set_stat_xattr(fname, file, new_mode, held_fd);
+		/* Changing the fake stat xattr can change mtime on disk. */
+		mtime_stale = set_stat_xattr(fname, file, new_mode, held_fd) > 0;
 	if (preserve_xattrs && fnamecmp && !op_refuse && !xattr_refuse)
 		set_xattr(fname, file, fnamecmp, sxp, held_fd);
 #endif
@@ -730,7 +732,8 @@ int set_file_attrs(const char *fname, struct file_struct *file, stat_x *sxp,
 	}
 	if (sxp != &sx2)
 		memcpy(&sx2.st, &sxp->st, sizeof sx2.st);
-	if (!(flags & ATTRS_SKIP_MTIME) && !same_mtime(file, &sxp->st, flags & ATTRS_ACCURATE_TIME)) {
+	if (!(flags & ATTRS_SKIP_MTIME)
+	 && (mtime_stale || !same_mtime(file, &sxp->st, flags & ATTRS_ACCURATE_TIME))) {
 		sx2.st.st_mtime = file->modtime;
 #ifdef ST_MTIME_NSEC
 		sx2.st.ST_MTIME_NSEC = F_MOD_NSEC_or_0(file);
@@ -805,18 +808,18 @@ int set_file_attrs(const char *fname, struct file_struct *file, stat_x *sxp,
 
 #ifdef HAVE_CHMOD
 	if (!BITS_EQUAL(sxp->st.st_mode, new_mode, CHMOD_BITS)) {
+		BOOL best_effort = !preserve_perms && !preserve_executability
+			       && !preserve_acls && !daemon_chmod_modes;
 		int ret = am_root < 0 ? 0
-			: op_leaf_fd >= 0 ? do_fchmod(op_leaf_fd, new_mode)
 			: op_refuse ? (errno = ELOOP, -1)
-			: dfd >= 0 && !S_ISLNK(new_mode) ? do_chmod_atfd(dfd, leaf, new_mode)
-			: do_chmod_at(fname, new_mode);
+			: do_chmod_attrs(fname, new_mode, op_leaf_fd, dfd, leaf, best_effort);
 		if (ret < 0) {
 			rsyserr(FERROR_XFER, errno,
 				"failed to set permissions on %s",
 				full_fname(fname));
 			goto cleanup;
 		}
-		if (ret == 0) /* ret == 1 if symlink could not be set */
+		if (ret == 0)
 			updated |= UPDATED_MODE;
 	}
 #endif

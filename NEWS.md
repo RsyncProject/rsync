@@ -1,3 +1,149 @@
+# NEWS for rsync 4.0.0 (UNRELEASED)
+
+## Enhancements
+
+- Added SHA-3 (FIPS 202) transfer checksum choices `sha3-256`,
+  `sha3-384` and `sha3-512` for builds with OpenSSL SHA-3 support.
+  Default negotiation is unchanged. Select SHA-3 with
+  `--checksum-choice` or include it in both peers' `RSYNC_CHECKSUM_LIST`.
+
+## Bug fixes
+
+- Fixed `-X` transfers of user xattrs on NetBSD by using the native BSD
+  extended attribute interface. Retain the requested modification time when
+  writing fake-super metadata. Refuse to grow an existing xattr on NetBSD
+  because FFS can corrupt other attributes during that operation.
+- Fixed silent loss of xattrs on Cygwin when the name list did not fit the
+  initial buffer.
+
+## 3.5 maintenance line
+
+Release notes for compatible fixes and incremental improvements are maintained
+in the [stable/3.5 NEWS](https://github.com/RsyncProject/rsync/blob/stable/3.5/NEWS.md).
+
+### Pending 3.5.3 backports
+
+- Fix locale-dependent option and daemon keyword matching and parse fractional
+  sizes exactly.
+- Preserve complete logfile records and escape undecodable bytes (#1162).
+
+# NEWS for rsync 3.5.2 (4 Nov 2026)
+
+## Changes in this version:
+
+### BUG FIXES:
+- Fixed interrupted `--append` and `--inplace` transfers writing the final
+  256 KiB buffer twice. An interrupted destination now remains a clean prefix
+  which the next transfer can resume or repair.
+- Fixed uploads through `rrsync` when the destination file already exists.
+  Existing files are now reached beneath a pinned parent directory instead of
+  being passed as an unwritable `/proc/self/fd/N` destination.
+- Fixed poor matching performance on large sparse and repeated-block files
+  when duplicate checksum chains exhausted the search limit. Valid basis
+  blocks are no longer hidden behind duplicate entries.
+- Bounded strong-checksum work when a malicious receiver supplies weak
+  checksums that collide with consecutive rolling windows
+  (CVE-2026-119741).
+- Prevented the `--inplace` matcher from advancing its aligned basis index
+  beyond the available checksum entries. This avoids signed overflow on large
+  source files when the peer supplies a small block count.
+- Recovered from failed hard-link creation without aborting or hanging the
+  generator. Remaining members fall back to a fresh hard-link group when the
+  original destination inode cannot accept another link.
+- Prevented an out-of-bounds write while invalidating a sender checksum after
+  a file read error when the negotiated checksum length is zero.
+- Fixed a daemon receiver stack overflow when queued deletion output reached
+  `--max-alloc`. Quiet daemon transfers no longer queue deletion messages
+  unless the client requested them.
+- Fixed a `--files-from` pull from a subdirectory of a daemon module, which
+  read each listed file from the module root instead.  It could send, and with
+  `--remove-source-files` delete, a same-named file the module's filter
+  excludes.
+- Fixed password files whose first line is empty. The parser no longer skips
+  the empty line and uses a later password.
+- Escaped terminal control characters in filenames and diagnostics written to
+  standard output, standard error and log files while preserving printable
+  text in the active locale.
+- Preserved Cygwin and MSYS2 UNC roots during ownership-checked path walks.
+- Restored daemon startup from accepted named Unix sockets on standard input,
+  including filesystem and Linux abstract sockets used for socket activation.
+  Unnamed local socket pairs remain non-daemon channels.
+- Fixed forward-DNS hostname entries in daemon `hosts allow` and `hosts deny`
+  lists for IPv6 peers. Address comparison is now binary and family-aware.
+- Preserved Unix symlink permissions on systems which require `fchmodat()` to
+  change the mode of a symlink rather than its target.
+- Restored builds on systems without `O_CLOEXEC` or `O_DIRECTORY`, including
+  Solaris 10.
+
+### ENHANCEMENTS:
+- Added `--nice` to adjust CPU and I/O scheduling priorities for local and
+  remote rsync processes. Daemon clients and rrsync cannot raise server-side
+  priorities.
+- Human-readable output now uses dynamic precision to show three significant
+  digits and appends `i` to binary unit suffixes. `--progress` uses the same
+  formatter for transfer rates and labels byte counts and rates with `B` and
+  `B/s`. Example output includes `46.7M`, `48.8Mi`, `782,448B` and
+  `113,295B/s`. File-list, created-directory and skipped-deletion counts also
+  use thousands separators.
+- Added `--delay-symlinks` to defer creating new and changed symlinks until
+  other transferred files are in place. It implies `--no-inc-recursive` and
+  requires protocol 29 or newer with support on the receiving side. It cannot
+  be combined with `--remove-source-files`, `--hard-links`, `--compare-dest`,
+  `--copy-dest` or `--link-dest`.
+
+------------------------------------------------------------------------------
+
+# NEWS for rsync 3.5.1 (21 Sep 2026)
+
+## Changes in this version:
+
+### PROTOCOL NUMBER:
+
+- The protocol number was changed to 33.
+
+### MAINTAINERS AND CONTRIBUTORS:
+
+Zen Dodd (@steadytao) now has release authority as an rsync maintainer.
+
+Thanks to Omar Elsayed (@seks99x) for the path-handling fixes and new block
+statistics and to Samuel Henrique (@samueloph) for the `--max-alloc=0` fix and
+test improvements.
+
+### BUG FIXES:
+- Fixed several path-handling regressions from 3.5.0. Explicit sender paths
+  can again traverse symlinked ancestors without weakening confinement of
+  paths found during recursive scans. Local and remote-shell `--files-from`
+  paths are handled as operator-supplied paths rather than paths beneath the
+  transfer root.
+- Fixed access to `/dev/stdin`, `/dev/stdout`, `/dev/stderr` and `/dev/fd/N`
+  when they refer to pipes or descriptors inside user namespaces. Reading
+  batch data from a FIFO or process substitution works again.
+- Restored `--max-alloc=0` as a spelling for the parser's maximum allocation
+  limit rather than disabling that limit.
+- Fixed restricted-root paths in `rrsync` and detection of an inetd connection
+  when a daemon is started with a local socket on standard input, as can
+  happen under ADB without a PTY.
+- Allowed `--contimeout` for daemon connections made through `--rsh` without
+  applying it to ordinary remote-shell transfers.
+- Tightened validation of partial-directory state and alternate-destination
+  paths on the receiver. An alternate-destination leaf symlink is no longer
+  followed as a basis file.
+- Fixed undefined shifts in the bundled zlib code and a FreeBSD amd64 build
+  failure involving the assembly and SIMD objects.
+
+### ENHANCEMENTS:
+- Added support for internationalised domain names when the required library
+  is available at build time.
+- Added the number of 4 KiB logical blocks touched to `--stats`. This counts
+  distinct logical file regions written by the receiver, not physical disk
+  blocks or disk I/O. It is reported when both peers negotiate protocol 33.
+
+### BUILD AND TESTS:
+- `install-strip` now honours `STRIP` including during cross-compilation.
+- Updated platform tests and fleet-test coverage for the 3.5.0 fixes.
+
+------------------------------------------------------------------------------
+
 # NEWS for rsync 3.5.0 (13 Aug 2026)
 
 ## Changes in this version:
@@ -925,7 +1071,7 @@ to develop and test fixes.
 - CVE-2024-12084 - Heap Buffer Overflow in Checksum Parsing.
 
 - CVE-2024-12085 - Info Leak via uninitialized Stack contents defeats ASLR.
-  
+
 - CVE-2024-12086 - Server leaks arbitrary client files.
 
 - CVE-2024-12087 - Server can make client write files outside of destination directory using symbolic links.
@@ -5720,6 +5866,8 @@ to develop and test fixes.
 
 | RELEASE DATE | VER.   | DATE OF COMMIT\* | PROTOCOL    |
 |--------------|--------|------------------|-------------|
+| 04 Nov 2026  | 3.5.2  |                  | 33          |
+| 21 Sep 2026  | 3.5.1  | 21 Sep 2026      | 33          |
 | 13 Aug 2026  | 3.5.0  |                  | 32          |
 | 08 Jun 2026  | 3.4.4  |                  | 32          |
 | 20 May 2026  | 3.4.3  |                  | 32          |

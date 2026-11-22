@@ -34,11 +34,15 @@
 #define ALIGNED_LENGTH(len) ((((len) - 1) | (ALIGN_BOUNDARY-1)) + 1)
 
 extern int sparse_files;
+extern struct stats stats;
 
 OFF_T preallocated_len = 0;
 
 static OFF_T sparse_seek = 0;
 static OFF_T sparse_past_write = 0;
+
+static int last_tracked_fd = -1;
+static int64 last_touched_blk = -1;
 
 int sparse_end(int f, OFF_T size, int updating_basis_or_equiv)
 {
@@ -161,6 +165,8 @@ static int write_sparse(int f, int use_seek, OFF_T offset, const char *buf, int 
 			continue;
 		}
 		if (i > start) {
+			if (!use_seek)
+				track_block_touches(f, offset + start, i - start);
 			if (emit_sparse_span(f, use_seek, buf + start, i - start) < 0)
 				return -1;
 			sparse_past_write = offset + i;
@@ -170,6 +176,8 @@ static int write_sparse(int f, int use_seek, OFF_T offset, const char *buf, int 
 		start = i;
 	}
 	if (end > start) {
+		if (!use_seek)
+			track_block_touches(f, offset + start, end - start);
 		if (emit_sparse_span(f, use_seek, buf + start, end - start) < 0)
 			return -1;
 	}
@@ -201,6 +209,38 @@ int flush_write_file(int f)
 	return ret;
 }
 
+void reset_block_tracker(void)
+{
+	last_tracked_fd = -1;
+	last_touched_blk = -1;
+}
+
+void track_block_touches(int f, OFF_T offset, int32 len)
+{
+	int64 start_blk, end_blk, blocks_to_add = 0;
+
+	if (len <= 0)
+		return;
+	if (f != last_tracked_fd) {
+		last_tracked_fd = f;
+		last_touched_blk = -1;
+	}
+	start_blk = offset / 4096;
+	end_blk = start_blk + (((offset % 4096) + len - 1) / 4096);
+	if (start_blk > last_touched_blk)
+		blocks_to_add = end_blk - start_blk + 1;
+	else if (end_blk > last_touched_blk)
+		blocks_to_add = end_blk - last_touched_blk;
+	if (blocks_to_add > 0) {
+		if (INT64_MAX - stats.touched_blocks_4k < blocks_to_add)
+			stats.touched_blocks_4k = INT64_MAX;
+		else
+			stats.touched_blocks_4k += blocks_to_add;
+	}
+	if (end_blk > last_touched_blk)
+		last_touched_blk = end_blk;
+}
+
 /* write_file does not allow incomplete writes.  It loops internally
  * until len bytes are written or errno is set.  Note that use_seek and
  * offset are only used in sparse processing (see write_sparse()). */
@@ -208,6 +248,8 @@ int write_file(int f, int use_seek, OFF_T offset, const char *buf, int len)
 {
 	int ret = 0;
 
+	if (!use_seek && sparse_files == 0)
+		track_block_touches(f, offset, len);
 	while (len > 0) {
 		int r1;
 		if (sparse_files > 0) {
