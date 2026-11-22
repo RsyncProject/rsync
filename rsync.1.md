@@ -4,7 +4,7 @@ rsync - a fast, versatile, local/remote file-copying tool
 
 ## SYNOPSIS
 
-```
+```plaintext
 Local:
     rsync [OPTION...] SRC... [DEST]
 
@@ -531,7 +531,7 @@ has its own detailed description later in this manpage.
 [comment]: # (help-rsync.h)
 [comment]: # (Keep these short enough that they'll be under 80 chars when indented by 7 chars.)
 
-```
+```plaintext
 --verbose, -v            increase verbosity
 --info=FLAGS             fine-grained informational verbosity
 --debug=FLAGS            fine-grained debug verbosity
@@ -697,7 +697,7 @@ accepted:
 
 [comment]: # (help-rsyncd.h)
 
-```
+```plaintext
 --daemon                 run as an rsync daemon
 --address=ADDRESS        bind to the specified address
 --bwlimit=RATE           limit socket I/O bandwidth
@@ -4728,7 +4728,7 @@ like in your filter rules.  Without this, rsync would add the dir-merge rule
 for the .cvsignore file at the end of all your other rules (giving it a lower
 priority than your command-line rules).  For example:
 
-> ```
+> ```bash
 > cat <<EOT | rsync -avC --filter='. -' a/ b
 > + foo.o
 > :C
@@ -4773,7 +4773,7 @@ Let's say that we want to match two source files, one with an absolute
 path of "/home/me/foo/bar", and one with a path of "/home/you/bar/baz".
 Here is how the various command choices differ for a 2-source transfer:
 
-> ```
+> ```plaintext
 > Example cmd: rsync -a /home/me /home/you /dest
 > +/- pattern: /me/foo/bar
 > +/- pattern: /you/bar/baz
@@ -4781,7 +4781,7 @@ Here is how the various command choices differ for a 2-source transfer:
 > Target file: /dest/you/bar/baz
 > ```
 
-> ```
+> ```plaintext
 > Example cmd: rsync -a /home/me/ /home/you/ /dest
 > +/- pattern: /foo/bar               (note missing "me")
 > +/- pattern: /bar/baz               (note missing "you")
@@ -4789,7 +4789,7 @@ Here is how the various command choices differ for a 2-source transfer:
 > Target file: /dest/bar/baz
 > ```
 
-> ```
+> ```plaintext
 > Example cmd: rsync -a --relative /home/me/ /home/you /dest
 > +/- pattern: /home/me/foo/bar       (note full path)
 > +/- pattern: /home/you/bar/baz      (ditto)
@@ -4797,7 +4797,7 @@ Here is how the various command choices differ for a 2-source transfer:
 > Target file: /dest/home/you/bar/baz
 > ```
 
-> ```
+> ```plaintext
 > Example cmd: cd /home; rsync -a --relative me/foo you/ /dest
 > +/- pattern: /me/foo/bar      (starts at specified path)
 > +/- pattern: /you/bar/baz     (ditto)
@@ -4849,7 +4849,7 @@ the per-directory merge files (so that they don't get deleted) and then put
 rules into the local files to control what else should not get deleted.  Like
 one of these commands:
 
-> ```
+> ```bash
 > rsync -av --filter=':e /.rsync-filter' --delete \
 >     host:src/dir /dest
 > rsync -avFF --delete host:src/dir /dest
