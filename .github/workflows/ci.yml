@@ -21,7 +21,7 @@ defaults:
     shell: sh
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
+  group: ${{ github.workflow }}-${{ github.event_name == 'push' && 'master' || github.event.pull_request.number || github.run_id }}
   cancel-in-progress: true
 
 jobs:
@@ -83,28 +83,22 @@ jobs:
       cygwin: *daily_schedule
       solaris: *weekly_schedule
 
-  versions:
-    name: Versions
-    needs: changes
-    if: &versions_selected ${{ needs.changes.outputs.versions == 'true' && (github.event_name != 'schedule' || github.event.schedule == '52 8 * * 1') }}
-    uses: ./.github/workflows/versions.yml
-
   android:
     name: Android
-    needs: changes
-    if: &android_selected ${{ needs.changes.outputs.android == 'true' && (github.event_name != 'schedule' || github.event.schedule == '42 8 * * 1') }}
+    needs: [changes, macos]
+    if: ${{ !cancelled() && needs.changes.outputs.android == 'true' && (github.event_name != 'schedule' || github.event.schedule == '42 8 * * 1') }}
     uses: ./.github/workflows/android.yml
 
   archive:
     name: Archive
-    needs: changes
-    if: &archive_selected ${{ needs.changes.outputs.archive == 'true' && (github.event_name != 'schedule' || github.event.schedule == '42 8 * * 1') }}
+    needs: [changes, macos]
+    if: ${{ !cancelled() && needs.changes.outputs.archive == 'true' && (github.event_name != 'schedule' || github.event.schedule == '42 8 * * 1') }}
     uses: ./.github/workflows/archive.yml
 
   diagnostics:
     name: Diagnostics
     needs: changes
-    if: &diagnostics_selected ${{ needs.changes.outputs.diagnostics == 'true' && (github.event_name != 'schedule' || github.event.schedule == '42 9 * * 1') }}
+    if: &diagnostics_selected ${{ needs.changes.outputs.diagnostics == 'true' && (github.event_name != 'schedule' || github.event.schedule == '42 9 * * 1' || github.event.schedule == '52 8 * * 1') }}
     uses: ./.github/workflows/diagnostics.yml
     with:
       lint: &regular ${{ github.event_name != 'schedule' }}
@@ -112,6 +106,7 @@ jobs:
       asan: ${{ needs.changes.outputs.asan == 'true' && (github.event_name != 'schedule' || github.event.schedule == '42 9 * * 1') }}
       coverage: ${{ needs.changes.outputs.coverage == 'true' && (github.event_name != 'schedule' || github.event.schedule == '42 9 * * 1') }}
       clang_21: ${{ needs.changes.outputs.clang == 'true' && (github.event_name != 'schedule' || github.event.schedule == '42 9 * * 1') }}
+      versions: &versions_selected ${{ needs.changes.outputs.versions == 'true' && (github.event_name != 'schedule' || github.event.schedule == '52 8 * * 1') }}
 
   valgrind:
     name: Valgrind
@@ -131,7 +126,7 @@ jobs:
   required:
     name: Required
     if: always()
-    needs: [changes, linux, bsd, macos, other, versions, android, archive, diagnostics, valgrind, interoperability]
+    needs: [changes, linux, bsd, macos, other, android, archive, diagnostics, valgrind, interoperability]
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     env:
@@ -139,9 +134,9 @@ jobs:
       CI_EXPECT_BSD: *bsd_selected
       CI_EXPECT_MACOS: *macos_selected
       CI_EXPECT_OTHER: *other_selected
-      CI_EXPECT_VERSIONS: *versions_selected
-      CI_EXPECT_ANDROID: *android_selected
-      CI_EXPECT_ARCHIVE: *archive_selected
+      CI_VERSIONS_SELECTED: *versions_selected
+      CI_EXPECT_ANDROID: ${{ needs.changes.outputs.android == 'true' && (github.event_name != 'schedule' || github.event.schedule == '42 8 * * 1') }}
+      CI_EXPECT_ARCHIVE: ${{ needs.changes.outputs.archive == 'true' && (github.event_name != 'schedule' || github.event.schedule == '42 8 * * 1') }}
       CI_EXPECT_DIAGNOSTICS: *diagnostics_selected
       CI_EXPECT_VALGRIND: *valgrind_selected
       CI_EXPECT_INTEROPERABILITY: *interoperability_selected
