@@ -120,7 +120,9 @@ static void rprint_progress(OFF_T ofs, OFF_T size, struct timeval *now,
 	}
 
 	output_needs_newline = 0;
-	pct = ofs == size ? 100 : (int) (100.0 * ofs / size);
+	/* The total can be zero while data is in transit: a file that was
+	 * empty when the file list was built may have grown since. */
+	pct = ofs == size ? 100 : size ? (int) (100.0 * ofs / size) : 0;
 	/* Keep progress rates scaled while byte counts retain the level-1 default. */
 	rate_human_level = human_readable == 1 ? 2 : human_readable;
 	rate_str = rate >= (double)INT64_MAX ? ">MAX "

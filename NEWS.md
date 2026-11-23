@@ -31,6 +31,9 @@
   because FFS can corrupt other attributes during that operation.
 - Fixed silent loss of xattrs on Cygwin when the name list did not fit the
   initial buffer.
+- Fixed `--progress` showing a meaningless percentage such as 2147483647% for
+  a file that was empty when the file list was built and had grown by the
+  time it was transferred.
 - Report buffered diagnostic and logfile write failures instead of returning
   success after dropping output.
 - Send keepalives during file-list checksumming on multiplexed streams.
