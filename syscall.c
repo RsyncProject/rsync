@@ -439,6 +439,16 @@ static int open_operator_leaf(int dfd, const char *name, int flags, mode_t mode)
 		fd = openat(dfd, name, (flags & ~O_CREAT) | O_NOFOLLOW, mode);
 	return fd;
 }
+
+/* rrsync starts the server in DIR, so its cwd pins DIR even if it is renamed. */
+static int is_restricted_directory(int fd, const STRUCT_STAT *restricted)
+{
+	STRUCT_STAT st;
+
+	if (fstat(fd, &st) < 0)
+		return -1;
+	return st.st_dev == restricted->st_dev && st.st_ino == restricted->st_ino;
+}
 #endif
 
 /* Open an operator-supplied path, refusing to traverse any symlink (parent or
@@ -456,8 +466,10 @@ static int open_operator_leaf(int dfd, const char *name, int flags, mode_t mode)
  * unavailable. */
 /* Core walk.  When out_abs is non-NULL and the path resolves to a directory
  * (O_DIRECTORY), the resolved absolute path is copied there -- owner_walk_parent
- * uses it to filter-check the (otherwise unchecked) leaf basename. */
-static int ona_open(const char *path, int flags, mode_t mode, char *out_abs, size_t out_cap)
+ * uses it to filter-check the (otherwise unchecked) leaf basename.  A non-NULL
+ * restricted root excludes that directory from the walk for a required log. */
+static int ona_open(const char *path, int flags, mode_t mode, char *out_abs, size_t out_cap,
+		    const STRUCT_STAT *restricted)
 {
 #if defined AT_FDCWD && defined O_NOFOLLOW && defined O_DIRECTORY
 	const int dir_traverse_flags = directory_traverse_flags() | O_CLOEXEC;
@@ -468,7 +480,7 @@ static int ona_open(const char *path, int flags, mode_t mode, char *out_abs, siz
 
 	/* Opted out (local --insecure-links, or a daemon module with "insecure
 	 * links = yes"): restore the legacy symlink-following open. */
-	if (symlink_optout_allowed())
+	if (symlink_optout_allowed() && !restricted)
 		return open(path, flags, mode);
 
 	const uid_t trusted_uid = geteuid();
@@ -547,6 +559,14 @@ static int ona_open(const char *path, int flags, mode_t mode, char *out_abs, siz
 	int saved_errno = 0;
 
 	while (*remaining) {
+		if (restricted) {
+			int enters_root = is_restricted_directory(dfd, restricted);
+			if (enters_root != 0) {
+				saved_errno = enters_root < 0 ? errno : EPERM;
+				goto out;
+			}
+		}
+
 		/* Peel one component off the front of `remaining`. */
 		char *slash = strchr(remaining, '/');
 		size_t comp_len = slash ? (size_t)(slash - remaining) : strlen(remaining);
@@ -584,7 +604,7 @@ static int ona_open(const char *path, int flags, mode_t mode, char *out_abs, siz
 					saved_errno = errno;
 					goto out;
 				}
-				if (!pin_transit && abspath_outside_confinement(abspath, 1)) {
+				if (!restricted && !pin_transit && abspath_outside_confinement(abspath, 1)) {
 					saved_errno = ELOOP;
 					goto out;
 				}
@@ -713,11 +733,15 @@ static int ona_open(const char *path, int flags, mode_t mode, char *out_abs, siz
 
 		/* Non-symlink. */
 		if (is_last) {
+			if (restricted && !S_ISREG(comp_mode)) {
+				saved_errno = EINVAL;
+				goto out;
+			}
 			if (abspath_step(abspath, sizeof abspath, comp, comp_len) < 0) {
 				saved_errno = errno;
 				goto out;
 			}
-			if (!pin_transit && abspath_outside_confinement(abspath, 1)) {
+			if (!restricted && !pin_transit && abspath_outside_confinement(abspath, 1)) {
 				saved_errno = ELOOP;
 				goto out;
 			}
@@ -742,7 +766,7 @@ static int ona_open(const char *path, int flags, mode_t mode, char *out_abs, siz
 			if (next >= 0) close(next);
 			goto out;
 		}
-		if (!pin_transit && abspath_outside_confinement(abspath, 0)) {
+		if (!restricted && !pin_transit && abspath_outside_confinement(abspath, 0)) {
 			saved_errno = ELOOP;
 			if (next >= 0) close(next);
 			goto out;
@@ -773,7 +797,7 @@ static int ona_open(const char *path, int flags, mode_t mode, char *out_abs, siz
 	 * an O_PATH fd is sufficient for traversal and fchdir but not operations
 	 * such as fchmod. */
 	if (flags & O_DIRECTORY) {
-		if (!pin_transit && abspath_outside_confinement(abspath, 1)) {
+		if (!restricted && !pin_transit && abspath_outside_confinement(abspath, 1)) {
 			saved_errno = ELOOP;
 			goto out;
 		}
@@ -794,13 +818,51 @@ out:
 #else
 	/* Pre-AT_FDCWD / no O_NOFOLLOW systems: best-effort fallback. */
 	(void)out_abs; (void)out_cap;
+	if (restricted) {
+		errno = ENOTSUP;
+		return -1;
+	}
 	return open(path, flags, mode);
 #endif
 }
 
 int open_no_attacker_symlinks(const char *path, int flags, mode_t mode)
 {
-	return ona_open(path, flags, mode, NULL, 0);
+	return ona_open(path, flags, mode, NULL, 0, NULL);
+}
+
+int open_rrsync_logfile(const char *path)
+{
+#if defined AT_FDCWD && defined O_NOFOLLOW && defined O_DIRECTORY
+	STRUCT_STAT restricted, log_stat;
+	char cwd[MAXPATHLEN];
+	int fd;
+
+	if (!path || *path != '/' || !confine_root || confine_rootlen <= 1
+	 || !getcwd(cwd, sizeof cwd) || strcmp(cwd, confine_root) != 0) {
+		errno = EINVAL;
+		return -1;
+	}
+	if (fstatat(AT_FDCWD, ".", &restricted, 0) < 0)
+		return -1;
+	fd = ona_open(path, O_WRONLY | O_APPEND | O_CREAT | O_NONBLOCK | O_NOCTTY | O_CLOEXEC,
+		      0600, NULL, 0, &restricted);
+	if (fd < 0)
+		return -1;
+	if (fstat(fd, &log_stat) == 0) {
+		if (S_ISREG(log_stat.st_mode))
+			return fd;
+		errno = EINVAL;
+	}
+	int saved_errno = errno;
+	close(fd);
+	errno = saved_errno;
+	return -1;
+#else
+	(void)path;
+	errno = ENOTSUP;
+	return -1;
+#endif
 }
 
 /* Open a directory for traversal or as *at()/fchdir() authority.  Unlike an
@@ -808,7 +870,7 @@ int open_no_attacker_symlinks(const char *path, int flags, mode_t mode)
  * directory when the kernel provides a safe search-only descriptor. */
 int open_no_attacker_symlinks_dirfd(const char *path)
 {
-	return ona_open(path, directory_traverse_flags(), 0, NULL, 0);
+	return ona_open(path, directory_traverse_flags(), 0, NULL, 0, NULL);
 }
 
 /* When set, the do_*_at() wrappers resolve their path as an OPERATOR-supplied
@@ -839,7 +901,7 @@ static int owner_walk_parent_with_length(const char *path, const char **bname,
 	*bname = slash ? slash + 1 : path;
 	pabs[0] = '\0';
 	if (!slash)
-		dfd = ona_open(".", flags, 0, pabs, sizeof pabs);
+		dfd = ona_open(".", flags, 0, pabs, sizeof pabs, NULL);
 	else {
 		dlen = slash == path ? 1 : (size_t)(slash - path); /* "/x" -> parent "/" */
 		if (dlen >= sizeof dir) {
@@ -848,7 +910,7 @@ static int owner_walk_parent_with_length(const char *path, const char **bname,
 		}
 		memcpy(dir, path, dlen);
 		dir[dlen] = '\0';
-		dfd = ona_open(dir, flags, 0, pabs, sizeof pabs);
+		dfd = ona_open(dir, flags, 0, pabs, sizeof pabs, NULL);
 	}
 	if (dfd < 0)
 		return -1;
@@ -1008,7 +1070,7 @@ static void retain_basis_root(const char *basis, const char *path, size_t path_l
 	if (basis_parents[0].fd >= 0 && basis_parents[1].fd >= 0)
 		return;
 	resolved[0] = '\0';
-	fd = ona_open(basis, directory_traverse_flags() | O_CLOEXEC, 0, resolved, sizeof resolved);
+	fd = ona_open(basis, directory_traverse_flags() | O_CLOEXEC, 0, resolved, sizeof resolved, NULL);
 	if (fd < 0)
 		return;
 	if (*resolved && basis_fd_cacheable(fd))
