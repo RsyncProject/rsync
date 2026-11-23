@@ -4,6 +4,13 @@
 
 - Accept `TCP_CONGESTION=NAME` in socket options on supported Linux builds.
   Distinguish unknown names, unavailable options and malformed values.
+- Add `--update-links` to skip newer destination symlinks independently
+  of `--update`.
+- Allow daemon modules to apply PAM account policy after rsync authentication.
+  Both build-time support and the module setting are disabled by default.
+- Let rrsync administrators require a server-side transfer log outside the
+  restricted directory with `-log FILE`. Refuse transfers when the log cannot
+  be opened and report later log write failures.
 - Reduce directory lookups when linking unchanged regular files with non-daemon
   `--link-dest` transfers. Reuse checked receiver and basis directories.
 - Reuse checked directories for ordinary scans and file reads beneath a
@@ -33,6 +40,8 @@
   initial buffer.
 - Report buffered diagnostic and logfile write failures instead of returning
   success after dropping output.
+- Send keepalives during file-list checksumming on multiplexed streams.
+  Client uploads using protocols below 30 cannot send these keepalives.
 
 ## 3.5 maintenance line
 

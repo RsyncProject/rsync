@@ -38,6 +38,7 @@
 
 extern int am_server;
 extern int whole_file;
+extern int allowed_lull;
 extern int checksum_seed;
 extern int protocol_version;
 extern int proper_seed_order;
@@ -436,6 +437,29 @@ void get_checksum2(char *buf, int32 len, char *sum)
 	}
 }
 
+/* File-list hashing can leave the peer waiting for data.  Check the clock
+ * once per CHUNK_SIZE bytes rather than once per 64-byte MD4 block. */
+static void checksum_keepalive(int32 n)
+{
+	static int32 until_tick = CHUNK_SIZE;
+
+	if (!allowed_lull)
+		return;
+	if ((until_tick -= n) > 0)
+		return;
+	until_tick = CHUNK_SIZE;
+	maybe_send_keepalive(time(NULL), MSK_ALLOW_FLUSH);
+}
+
+/* Digest updates have different signatures and tail rules. */
+#define CHECKSUM_FEED(chunk, UPDATE) \
+	for (i = 0; len - i >= (chunk); i += (chunk)) { \
+		const char *_p = map_ptr(buf, i, (chunk)); \
+		int32 _n = (chunk); \
+		UPDATE; \
+		checksum_keepalive(_n); \
+	}
+
 void file_checksum(const char *fname, const STRUCT_STAT *st_p, char *sum)
 {
 	struct map_struct *buf;
@@ -459,8 +483,7 @@ void file_checksum(const char *fname, const STRUCT_STAT *st_p, char *sum)
 
 		EVP_DigestInit_ex(evp, file_sum_evp_md, NULL);
 
-		for (i = 0; i + CHUNK_SIZE <= len; i += CHUNK_SIZE)
-			EVP_DigestUpdate(evp, (uchar *)map_ptr(buf, i, CHUNK_SIZE), CHUNK_SIZE);
+		CHECKSUM_FEED(CHUNK_SIZE, EVP_DigestUpdate(evp, (uchar *)_p, _n));
 
 		remainder = (int32)(len - i);
 		if (remainder > 0)
@@ -478,8 +501,7 @@ void file_checksum(const char *fname, const STRUCT_STAT *st_p, char *sum)
 
 		XXH64_reset(state, 0);
 
-		for (i = 0; i + CHUNK_SIZE <= len; i += CHUNK_SIZE)
-			XXH64_update(state, (uchar *)map_ptr(buf, i, CHUNK_SIZE), CHUNK_SIZE);
+		CHECKSUM_FEED(CHUNK_SIZE, XXH64_update(state, (uchar *)_p, _n));
 
 		remainder = (int32)(len - i);
 		if (remainder > 0)
@@ -497,8 +519,7 @@ void file_checksum(const char *fname, const STRUCT_STAT *st_p, char *sum)
 
 		XXH3_64bits_reset(state);
 
-		for (i = 0; i + CHUNK_SIZE <= len; i += CHUNK_SIZE)
-			XXH3_64bits_update(state, (uchar *)map_ptr(buf, i, CHUNK_SIZE), CHUNK_SIZE);
+		CHECKSUM_FEED(CHUNK_SIZE, XXH3_64bits_update(state, (uchar *)_p, _n));
 
 		remainder = (int32)(len - i);
 		if (remainder > 0)
@@ -515,8 +536,7 @@ void file_checksum(const char *fname, const STRUCT_STAT *st_p, char *sum)
 
 		XXH3_128bits_reset(state);
 
-		for (i = 0; i + CHUNK_SIZE <= len; i += CHUNK_SIZE)
-			XXH3_128bits_update(state, (uchar *)map_ptr(buf, i, CHUNK_SIZE), CHUNK_SIZE);
+		CHECKSUM_FEED(CHUNK_SIZE, XXH3_128bits_update(state, (uchar *)_p, _n));
 
 		remainder = (int32)(len - i);
 		if (remainder > 0)
@@ -533,8 +553,7 @@ void file_checksum(const char *fname, const STRUCT_STAT *st_p, char *sum)
 
 		md5_begin(&m5);
 
-		for (i = 0; i + CHUNK_SIZE <= len; i += CHUNK_SIZE)
-			md5_update(&m5, (uchar *)map_ptr(buf, i, CHUNK_SIZE), CHUNK_SIZE);
+		CHECKSUM_FEED(CHUNK_SIZE, md5_update(&m5, (uchar *)_p, _n));
 
 		remainder = (int32)(len - i);
 		if (remainder > 0)
@@ -551,8 +570,7 @@ void file_checksum(const char *fname, const STRUCT_STAT *st_p, char *sum)
 
 		mdfour_begin(&m);
 
-		for (i = 0; i + CSUM_CHUNK <= len; i += CSUM_CHUNK)
-			mdfour_update(&m, (uchar *)map_ptr(buf, i, CSUM_CHUNK), CSUM_CHUNK);
+		CHECKSUM_FEED(CSUM_CHUNK, mdfour_update(&m, (uchar *)_p, _n));
 
 		/* Prior to version 27 an incorrect MD4 checksum was computed
 		 * by failing to call mdfour_tail() for block sizes that

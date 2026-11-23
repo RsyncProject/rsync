@@ -61,6 +61,7 @@ extern int remove_source_files;
 extern int delay_updates;
 extern int delay_symlinks;
 extern int update_only;
+extern int update_links;
 extern int human_readable;
 extern int ignore_existing;
 extern int ignore_non_existing;
@@ -448,6 +449,21 @@ static inline int mtime_differs(STRUCT_STAT *stp, struct file_struct *file)
 	return !same_time(stp->st_mtime, 0, file->modtime, 0);
 #endif
 }
+
+#ifdef SUPPORT_LINKS
+static BOOL destination_link_is_newer(const STRUCT_STAT *dest, const struct file_struct *source)
+{
+	if (dest->st_mtime > source->modtime) {
+		uint64_t difference = (uint64_t)dest->st_mtime - (uint64_t)source->modtime;
+		return difference > (uint64_t)MAX(modify_window, 0);
+	}
+#ifdef ST_MTIME_NSEC
+	if (dest->st_mtime == source->modtime && modify_window < 0 && protocol_version >= 31)
+		return dest->ST_MTIME_NSEC > F_MOD_NSEC_or_0(source);
+#endif
+	return False;
+}
+#endif
 
 static inline int any_time_differs(stat_x *sxp, struct file_struct *file, UNUSED(const char *fname))
 {
@@ -2092,6 +2108,19 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 #endif
 		goto cleanup;
 	}
+
+#ifdef SUPPORT_LINKS
+	if (update_links && preserve_links && statret == 0
+	 && ftype == FT_SYMLINK && stype == FT_SYMLINK && destination_link_is_newer(&sx.st, file)) {
+		if (INFO_GTE(SKIP, 1))
+			rprintf(FINFO, "%s is newer\n", fname);
+#ifdef SUPPORT_HARD_LINKS
+		if (!replacing_hlink && F_IS_HLINKED(file))
+			handle_skipped_hlink(file, itemizing, code, f_out);
+#endif
+		goto cleanup;
+	}
+#endif
 
 	fnamecmp = fname;
 

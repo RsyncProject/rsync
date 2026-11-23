@@ -551,6 +551,7 @@ has its own detailed description later in this manpage.
 --backup-dir=DIR         make backups into hierarchy based in DIR
 --suffix=SUFFIX          backup suffix (default ~ w/o --backup-dir)
 --update, -u             skip files that are newer on the receiver
+--update-links           skip newer destination symlinks
 --inplace                update destination files in-place
 --append                 append data onto shorter files
 --append-verify          --append w/old data in file checksum
@@ -1215,6 +1216,19 @@ sign) if you want the local shell to expand it.
     transfer will probably **not** continue the interrupted file.  As such, it
     is usually best to avoid combining this with[ `--inplace`](#opt) unless you
     have implemented manual steps to handle any interrupted in-progress files.
+
+0.  `--update-links`
+
+    Skip an existing destination symlink if it is newer than the source
+    symlink. The comparison uses the links' own modification times and
+    respects [`--modify-window`](#opt). Subsecond comparison also requires
+    protocol 31 or higher.
+
+    This [transfer rule](#TRANSFER_RULES) applies only to matching symlink
+    types. It does not enable [`--links`](#opt), change how
+    [`--copy-links`](#opt) reads the source or alter file-type replacement.
+    It can be used independently of [`--update`](#opt). The receiving rsync
+    must support this option.
 
 0.  `--inplace`
 
