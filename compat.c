@@ -33,6 +33,9 @@ extern int allow_inc_recurse;
 extern int preallocate_files;
 extern int append_mode;
 extern int fuzzy_basis;
+extern int relative_paths;
+extern int implied_dirs;
+extern int ignore_non_existing_dirs;
 extern int read_batch;
 extern int write_batch;
 extern int delay_updates;
@@ -664,6 +667,14 @@ void setup_protocol(int f_out,int f_in)
 #endif
 
 	if (protocol_version < 30) {
+		/* Older senders omit implied parents instead of marking them. */
+		if (ignore_non_existing_dirs && relative_paths && !implied_dirs) {
+			rprintf(FERROR,
+				"--ignore-non-existing-directory with --relative --no-implied-dirs"
+				" requires protocol 30 or higher (negotiated %d).\n",
+				protocol_version);
+			exit_cleanup(RERR_PROTOCOL);
+		}
 		if (append_mode == 1)
 			append_mode = 2;
 		if (preserve_acls && !local_server) {

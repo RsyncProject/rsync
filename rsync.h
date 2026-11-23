@@ -836,11 +836,13 @@ struct ht_int64_node {
 
 #if defined __STDC_VERSION__ && __STDC_VERSION__ >= 199901L
 #define USE_FLEXIBLE_ARRAY 1
-#define SIZE_T_FMT_MOD "z" /* printf supports %zd */
+#define SIZE_T_FMT_MOD "z" /* printf has a size_t length modifier */
 #define SIZE_T_FMT_CAST size_t
+#define SSIZE_T_FMT_CAST ssize_t
 #else
-#define SIZE_T_FMT_MOD "l" /* printf supports %ld */
-#define SIZE_T_FMT_CAST long
+#define SIZE_T_FMT_MOD "l"
+#define SIZE_T_FMT_CAST unsigned long
+#define SSIZE_T_FMT_CAST long
 #endif
 
 union file_extras {

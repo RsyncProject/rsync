@@ -56,6 +56,18 @@ def check_shell_scripts(directory):
     return subprocess.call(['shellcheck', '--', *scripts], cwd=directory)
 
 
+def check_cppcheck(build):
+    # Cppcheck 2.19 loses the build-root include path if run from that directory.
+    # The rounding probe deliberately compiles invalid array sizes.
+    command = ['cppcheck', '--project=' + str(build / 'compile_commands.json'),
+               '-i' + str(build / 'rounding.c'), '--platform=unix64',
+               '--library=' + str(Path(__file__).resolve().with_name('cppcheck.cfg')),
+               '--enable=warning,performance,portability,missingInclude',
+               '--suppress=missingIncludeSystem',
+               '--error-exitcode=1', '--quiet', f'-j{len(os.sched_getaffinity(0))}']
+    return subprocess.call(command, cwd=build.parent)
+
+
 def logged(command, path):
     with path.open('w') as log, subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                                                text=True, errors='replace') as proc:
@@ -127,7 +139,9 @@ def main():
     coverage = sub.add_parser('coverage')
     coverage.add_argument('transport', choices=['pipe', 'tcp'])
     sub.add_parser('coverage-summary')
-    sub.add_parser('scan')
+    scan = sub.add_parser('scan')
+    scan.add_argument('llvm_major', type=int)
+    sub.add_parser('cppcheck')
     for name in ('valgrind', 'valgrind-results'):
         command = sub.add_parser(name)
         command.add_argument('--privilege', choices=['root', 'non-root'], required=True)
@@ -151,11 +165,16 @@ def main():
             summary(f'Coverage ({transport})', Path(f'cov-{transport}.log'), r'^(lines|functions|branches|decisions):')
         return 0
     if args.task == 'scan':
-        command = ['scan-build-21', '--status-bugs', '-o', str(Path('scan-report').resolve()),
+        version = args.llvm_major
+        command = [f'intercept-build-{version}', f'scan-build-{version}',
+                   f'--use-cc=clang-{version}', f'--use-c++=clang++-{version}',
+                   '--status-bugs', '-o', str(Path('scan-report').resolve()),
                    'make', 'check-progs', f'-j{len(os.sched_getaffinity(0))}']
         result = logged(command, Path('scan-build.out'))
-        summary('Clang 21', Path('scan-build.out'), r'scan-build: .* bugs? found|scan-build: No bugs found')
+        summary(f'Clang {version}', Path('scan-build.out'), r'scan-build: .* bugs? found|scan-build: No bugs found')
         return result
+    if args.task == 'cppcheck':
+        return check_cppcheck(Path.cwd())
     output = Path(os.environ['VALGRIND_SCRATCH'])
     evidence = Path('test-results')
     evidence.mkdir(exist_ok=True)

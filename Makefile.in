@@ -60,6 +60,7 @@ TLS_OBJ = tls.o syscall.o util2.o t_stub.o lib/compat.o lib/snprintf.o lib/perms
 # Programs we must have to run the test cases
 CHECK_PROGS = rsync$(EXEEXT) tls$(EXEEXT) getgroups$(EXEEXT) getfsdev$(EXEEXT) \
 	testrun$(EXEEXT) trimslash$(EXEEXT) t_unsafe$(EXEEXT) t_chmod_secure$(EXEEXT) \
+	t_byteorder$(EXEEXT) t_byteorder_portable$(EXEEXT) \
 	t_rename_secure$(EXEEXT) t_symlink_secure$(EXEEXT) t_secure_relpath$(EXEEXT) t_acl$(EXEEXT) t_hashtable_overflow$(EXEEXT) t_iwildmatch$(EXEEXT) t_clean_fname$(EXEEXT) t_safe_arg$(EXEEXT) wildtest$(EXEEXT) simdtest$(EXEEXT)
 
 CHECK_SYMLINKS = testsuite/tests/metadata/chown-fake.py \
@@ -68,7 +69,7 @@ CHECK_SYMLINKS = testsuite/tests/metadata/chown-fake.py \
 	testsuite/tests/transfer/exclude-remote-shell.py
 
 # Objects for CHECK_PROGS to clean
-CHECK_OBJS=tls.o testrun.o getgroups.o getfsdev.o t_stub.o t_unsafe.o t_chmod_secure.o t_rename_secure.o t_symlink_secure.o t_secure_relpath.o t_acl.o t_hashtable_overflow.o t_iwildmatch.o t_clean_fname.o t_safe_arg.o trimslash.o wildtest.o
+CHECK_OBJS=tls.o testrun.o getgroups.o getfsdev.o t_stub.o t_unsafe.o t_chmod_secure.o t_rename_secure.o t_symlink_secure.o t_secure_relpath.o t_acl.o t_hashtable_overflow.o t_iwildmatch.o t_clean_fname.o t_safe_arg.o t_byteorder.o t_byteorder_portable.o trimslash.o wildtest.o
 # Compile-only feature-shape checks.
 CHECK_COMPILE_OBJS=syscall-no-at-fdcwd.o syscall-no-o-directory.o \
 	authenticate-no-o-cloexec.o rsync-no-o-cloexec.o clientserver-no-o-directory.o \
@@ -262,6 +263,15 @@ trimslash$(EXEEXT): $(TRIMSLASH_OBJ)
 T_UNSAFE_OBJ = t_unsafe.o syscall.o util1.o util2.o t_stub.o lib/compat.o lib/snprintf.o lib/wildmatch.o
 t_unsafe$(EXEEXT): $(T_UNSAFE_OBJ)
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(T_UNSAFE_OBJ) $(LIBS)
+
+t_byteorder$(EXEEXT): t_byteorder.o
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ t_byteorder.o
+
+t_byteorder_portable.o: $(srcdir)/t_byteorder.c $(HEADERS)
+	$(CC) -I. -I$(srcdir) $(CFLAGS) $(CPPFLAGS) -DRSYNC_TEST_PORTABLE_BYTEORDER -c $(srcdir)/t_byteorder.c -o $@
+
+t_byteorder_portable$(EXEEXT): t_byteorder_portable.o
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ t_byteorder_portable.o
 
 T_HASHTABLE_OVERFLOW_OBJ = t_hashtable_overflow.o hashtable.o util2.o t_stub.o lib/compat.o lib/snprintf.o lib/wildmatch.o
 t_hashtable_overflow$(EXEEXT): $(T_HASHTABLE_OVERFLOW_OBJ)
