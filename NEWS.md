@@ -2,6 +2,8 @@
 
 ## Enhancements
 
+- Add `--update-links` to skip newer destination symlinks independently
+  of `--update`.
 - Allow daemon modules to apply PAM account policy after rsync authentication.
   Both build-time support and the module setting are disabled by default.
 - Let rrsync administrators require a server-side transfer log outside the
