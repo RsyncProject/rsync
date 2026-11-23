@@ -2,6 +2,8 @@
 
 ## Enhancements
 
+- Allow daemon modules to apply PAM account policy after rsync authentication.
+  Both build-time support and the module setting are disabled by default.
 - Reduce directory lookups when linking unchanged regular files with non-daemon
   `--link-dest` transfers. Reuse checked receiver and basis directories.
 - Reuse checked directories for ordinary scans and file reads beneath a

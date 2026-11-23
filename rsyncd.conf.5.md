@@ -797,6 +797,18 @@ in the values of parameters.  See that section for details.
     the exact check.  If the file is not found or is rejected, no logins for an
     "[auth users](#)" module will be possible.
 
+0.  `use pam`
+
+    Apply the PAM account policy for the `rsync` service after the normal rsync
+    challenge-response check succeeds. The daemon passes the connection address
+    to PAM as the remote host. A refused or expired account cannot access the
+    module. Rsync does not use PAM to verify the password, change passwords,
+    open a PAM session or answer interactive prompts.
+
+    The default is false. A module with this option enabled requires
+    "[auth users](#)" and a build configured with `--enable-pam`. The daemon
+    refuses access to the module if either is missing.
+
 0.  `auth digest`
 
     This parameter sets the *minimum* message digest that the daemon will accept

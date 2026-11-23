@@ -702,6 +702,19 @@ else
     AC_MSG_RESULT(no)
 fi
 
+AC_ARG_ENABLE([pam],
+    AS_HELP_STRING([--enable-pam], [enable daemon PAM account checks (default is no)]))
+if test x"$enable_pam" = x"yes"; then
+    AC_CHECK_HEADERS([security/pam_appl.h pam/pam_appl.h])
+    if test x"$ac_cv_header_security_pam_appl_h" != x"yes" &&
+       test x"$ac_cv_header_pam_pam_appl_h" != x"yes"; then
+        AC_MSG_ERROR([PAM development headers are required for --enable-pam])
+    fi
+    AC_SEARCH_LIBS([pam_start], [pam],
+        [AC_DEFINE([SUPPORT_PAM], [1], [Define if daemon PAM account checks are enabled.])],
+        [AC_MSG_ERROR([libpam is required for --enable-pam])])
+fi
+
 if test x"$no_lib" != x; then
     echo ""
     echo "Configure found the following issues:"
