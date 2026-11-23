@@ -550,6 +550,10 @@ static int ona_open(const char *path, int flags, mode_t mode, char *out_abs, siz
 		memmove(remaining, p, strlen(p) + 1);
 #endif
 		is_anchored = 1;
+	} else if (restricted) {
+		/* A required log must start from an opened absolute root. */
+		errno = EINVAL;
+		return -1;
 	}
 
 	int loops = 40;	/* SYMLOOP_MAX-ish; breaks symlink cycles. Counts symlink

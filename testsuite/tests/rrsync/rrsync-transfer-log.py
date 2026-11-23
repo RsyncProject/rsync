@@ -9,7 +9,7 @@ import sys
 from fixtures.rrsync import patched_rrsync, rrsync_shell, rsync_wrapper
 from harness import TestContext, requires, run
 from harness.results import test_fail
-from harness.rsync import rsync_argv
+from harness.rsync import forced_protocol, rsync_argv
 
 
 def check_record(path, tag, name):
@@ -77,15 +77,22 @@ def test(context: TestContext):
         import resource
         import signal
 
-        log_size = log.stat().st_size
+        previous_log = log.read_bytes()
+        log_size = len(previous_log)
 
         def exhaust_log():
             signal.signal(signal.SIGXFSZ, signal.SIG_IGN)
             resource.setrlimit(resource.RLIMIT_FSIZE, (log_size, log_size))
 
         failed = transfer('-q', expect='write to log file failed', preexec_fn=exhaust_log)
-        if failed.returncode != 13 or log.stat().st_size != log_size:
-            test_fail('required log write failure did not stop the transfer with status 13')
+        # Before protocol 31, the client can see EOF before the remote shell exits.
+        protocol = forced_protocol()
+        expected_statuses = (12, 13) if protocol is not None and protocol < 31 else (13,)
+        if failed.returncode not in expected_statuses:
+            expected = ' or '.join(map(str, expected_statuses))
+            test_fail(f'required log write failure returned {failed.returncode}, expected {expected}: {failed.stderr}')
+        if log.read_bytes() != previous_log:
+            test_fail('required log write failure altered the log')
 
     alias = base / 'log-directory'
     alias.symlink_to(base, target_is_directory=True)
