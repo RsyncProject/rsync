@@ -92,6 +92,8 @@ def script(selected, name):
         enable(selected, 'diagnostics')
         if not test:
             enable(selected, 'valgrind', 'asan', 'coverage', 'static_analysis')
+    elif name == 'cppcheck.cfg':
+        enable(selected, 'diagnostics', 'static_analysis')
     elif base == 'changes' and not test:
         enable(selected, *OUTPUTS)
     elif base == 'check-results' and not test:

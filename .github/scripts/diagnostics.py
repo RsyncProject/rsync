@@ -61,7 +61,9 @@ def check_cppcheck(build):
     # The rounding probe deliberately compiles invalid array sizes.
     command = ['cppcheck', '--project=' + str(build / 'compile_commands.json'),
                '-i' + str(build / 'rounding.c'), '--platform=unix64',
-               '--enable=missingInclude', '--suppress=missingIncludeSystem',
+               '--library=' + str(Path(__file__).resolve().with_name('cppcheck.cfg')),
+               '--enable=warning,performance,portability,missingInclude',
+               '--suppress=missingIncludeSystem',
                '--error-exitcode=1', '--quiet', f'-j{len(os.sched_getaffinity(0))}']
     return subprocess.call(command, cwd=build.parent)
 

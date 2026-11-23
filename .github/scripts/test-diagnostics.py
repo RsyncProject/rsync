@@ -116,6 +116,8 @@ class Diagnostics(unittest.TestCase):
         self.assertEqual(command[0], 'cppcheck')
         self.assertIn('--project=' + str(build / 'compile_commands.json'), command)
         self.assertIn('-i' + str(build / 'rounding.c'), command)
+        self.assertIn('--library=' + str(Path(__file__).resolve().with_name('cppcheck.cfg')), command)
+        self.assertIn('--enable=warning,performance,portability,missingInclude', command)
         self.assertIn('--error-exitcode=1', command)
         self.assertEqual(run.call_args[1]['cwd'], build.parent)
 

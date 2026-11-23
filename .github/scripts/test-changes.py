@@ -83,6 +83,7 @@ class Changes(unittest.TestCase):
             '.github/scripts/test-archive.py': {'archive', 'diagnostics'},
             '.github/scripts/guest.py': {'linux', 'bsd', 'other', 'diagnostics'},
             '.github/scripts/diagnostics.py': {'diagnostics', 'valgrind', 'asan', 'coverage', 'static_analysis'},
+            '.github/scripts/cppcheck.cfg': {'diagnostics', 'static_analysis'},
             '.github/scripts/test-diagnostics.py': {'diagnostics'},
             '.github/scripts/check-results.py': full_selection,
             '.github/scripts/test-results.py': {'diagnostics'},

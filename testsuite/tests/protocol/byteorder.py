@@ -8,9 +8,10 @@ from harness.results import test_fail
 
 metadata(transports={'pipe'})
 
-helper = TOOLDIR / 't_byteorder'
-if not helper.is_file():
-    test_fail('Missing test helper: t_byteorder')
-result = subprocess.run([str(helper)], capture_output=True, text=True, timeout=30)
-if result.returncode:
-    test_fail(f'Byte-order check returned {result.returncode}:\n{result.stderr}')
+for name in ('t_byteorder', 't_byteorder_portable'):
+    helper = TOOLDIR / name
+    if not helper.is_file():
+        test_fail(f'Missing test helper: {name}')
+    result = subprocess.run([str(helper)], capture_output=True, text=True, timeout=30)
+    if result.returncode:
+        test_fail(f'{name} returned {result.returncode}:\n{result.stderr}')
