@@ -31,6 +31,8 @@
   initial buffer.
 - Report buffered diagnostic and logfile write failures instead of returning
   success after dropping output.
+- Send keepalives while calculating checksums for the file list so slow
+  hashing does not look like an idle connection.
 
 ## 3.5 maintenance line
 
