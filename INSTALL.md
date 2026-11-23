@@ -116,12 +116,10 @@ target package metadata directories.
 ## libidn2
 
 The [libidn2 library][5] converts an internationalized domain name into the
-IDNA A-label ("Punycode") form that a resolver understands.  Installing this
+IDNA A-label ("Punycode") form that a resolver understands. Installing this
 development library lets rsync connect to a daemon whose name has non-ASCII
 characters in it, and lets a daemon's "hosts allow" & "hosts deny" settings be
 written the same way.
-
-[5]: https://www.gnu.org/software/libidn/#libidn2
 
 ## Package summary
 
@@ -314,7 +312,7 @@ is to append the following to config.h:
 [2]: http://facebook.github.io/zstd/
 [3]: https://lz4.github.io/lz4/
 [4]: https://www.openssl.org/docs/man1.0.2/man3/crypto.html
-[5]: http://www.ipv6.org/impl/mac.html
+[5]: https://www.gnu.org/software/libidn/#libidn2
 [6]: https://download.samba.org/pub/rsync/generated-files/
 [ppa]: https://launchpad.net/~rsyncproject/+archive/ubuntu/rsync
 [ppa-latest]: https://launchpad.net/~rsyncproject/+archive/ubuntu/rsync-latest

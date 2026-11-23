@@ -5,6 +5,7 @@ The runner and harness use Python 3.7 or later and its standard library. Some te
 ## Running tests
 
 From a configured build directory:
+
 ```sh
 make check
 make check29
@@ -14,6 +15,7 @@ make check30
 The first target runs the suite with the default protocol; the others force protocols 29 and 30. Make runs up to eight tests at once. Set CHECK_J to change that limit.
 
 For an in-tree build, individual tests and filename patterns can be selected after running `make check-progs`:
+
 ```sh
 python3 -S testsuite/runtests.py -j8 chmod-temp-dir 'xattrs*'
 python3 -S testsuite/runtests.py --help
@@ -42,15 +44,15 @@ Profiles under profiles/ distinguish tests which do not apply from missing capab
 
 The tools/check.py launcher takes a build directory, binary, profile list and fresh output directory followed by runner options. It saves run.log and receipt.json, then checks the receipt against the executable and profiles.
 
-Result | Meaning
---- | ---
-N/A | Excluded by applicability metadata
-PASS | Assertions passed
-FAIL | An assertion failed
-ERROR | The test or harness failed unexpectedly
-SKIP | Skipped without a capability
-UNSUPPORTED | A required capability was unavailable
-PROFILE_ERROR | A result disagreed with the active profile
+| Result        | Meaning                                    |
+| ------------- | ------------------------------------------ |
+| N/A           | Excluded by applicability metadata         |
+| PASS          | Assertions passed                          |
+| FAIL          | An assertion failed                        |
+| ERROR         | The test or harness failed unexpectedly    |
+| SKIP          | Skipped without a capability               |
+| UNSUPPORTED   | A required capability was unavailable      |
+| PROFILE_ERROR | A result disagreed with the active profile |
 
 With profiles active, an unsupported result is accepted only when the test declares the capability and the profile permits its absence. A generic skip fails the run. Without profiles, skips and unsupported results are accepted. Receipts record raw outcomes, profile verdicts, exclusions, executable hashes and the effective UID.
 
@@ -59,6 +61,7 @@ With profiles active, an unsupported result is accepted only when the test decla
 [ci.yml](../.github/workflows/ci.yml) defines the platform groups and required checks. Native jobs exercise root and non-root transfers where available. Historical peers run applicable tests in both executable roles over pipe and TCP. Diagnostics cover the minimum Python version, static analysis, sanitisers, coverage and Valgrind. Coverage reports omit daemon work after chroot because its counter files are outside the chroot.
 
 The minimum Python and lint jobs use the same helper test roster. Run those checks from the repository root with:
+
 ```sh
 python3 -B -S .github/scripts/diagnostics.py check-helpers
 ```

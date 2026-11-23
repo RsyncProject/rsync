@@ -1,10 +1,10 @@
 ## Supported releases
 
-Line | Status | Upstream support | End condition
---- | --- | --- | ---
-3.5 | Current stable | Security fixes, bug fixes and compatible incremental improvements | 12 months after the first stable 4.x release
-3.2 | LTS | Security fixes only | 31 May 2029
-All other lines | Unsupported | None | Support has ended
+| Line            | Status         | Upstream support                                                  | End condition                                |
+| --------------- | -------------- | ----------------------------------------------------------------- | -------------------------------------------- |
+| 3.5             | Current stable | Security fixes, bug fixes and compatible incremental improvements | 12 months after the first stable 4.x release |
+| 3.2             | LTS            | Security fixes only                                               | 31 May 2029                                  |
+| All other lines | Unsupported    | None                                                              | Support has ended                            |
 
 Only the latest patch release in each supported line receives upstream support. The 3.2 LTS line receives confirmed security fixes plus changes required to apply or verify them. It does not receive new features, general bug fixes, performance work, modernisation or optimisation. Its current release is [3.2.8](https://github.com/RsyncProject/rsync/releases/tag/v3.2.8). An extension beyond 31 May 2029 requires an explicit policy update.
 
@@ -14,10 +14,10 @@ This policy covers upstream rsync releases. Operating-system distributions may m
 
 ## Responsibilities
 
-Responsibility | Owner
---- | ---
-Security coordination, disclosure and releases | Zen Dodd ([@steadytao](https://github.com/steadytao))
-Triage and review | RsyncProject maintainers
+| Responsibility                                 | Owner                                                 |
+| ---------------------------------------------- | ----------------------------------------------------- |
+| Security coordination, disclosure and releases | Zen Dodd ([@steadytao](https://github.com/steadytao)) |
+| Triage and review                              | RsyncProject maintainers                              |
 
 The current stable line is maintained on [stable/3.5](https://github.com/RsyncProject/rsync/tree/stable/3.5). The 3.2 LTS line is maintained on [lts/3.2](https://github.com/RsyncProject/rsync/tree/lts/3.2).
 
@@ -26,6 +26,7 @@ The current stable line is maintained on [stable/3.5](https://github.com/RsyncPr
 Report suspected vulnerabilities through [GitHub private vulnerability reporting](https://github.com/RsyncProject/rsync/security/advisories/new). If GitHub cannot be used, email [rsync.project@gmail.com](mailto:rsync.project@gmail.com).
 
 Include:
+
 - the affected version and platform;
 - the relevant command, daemon configuration or restricted-shell policy;
 - a minimal reproducer;
@@ -48,6 +49,7 @@ GitHub advisories are the public record for vulnerabilities handled by the proje
 Peer-supplied file lists, checksums, arguments, filters, messages and metadata are untrusted. A security boundary exists whenever rsync has more filesystem or process authority than the peer or another user who can change a path it resolves. This applies to local transfers, remote-shell transfers, daemon modules and restricted `rrsync` commands.
 
 Where the operating system supports them, rsync uses held directory descriptors and `*at()` operations to confine security-sensitive path resolution. The remaining platform limits are:
+
 - a platform without a usable search-only directory descriptor fails closed when safe parent traversal is unavailable;
 - nested socket creation fails closed without a confined primitive, while some special-file creation retains a path-based fallback on systems without the required `*at()` operation;
 - ACL, xattr and creation-time operations may retain a path-based metadata fallback where the platform has no fd-relative equivalent;

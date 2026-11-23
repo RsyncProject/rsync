@@ -56,13 +56,13 @@ Otherwise, it must just have permission to read and write the appropriate data,
 log, and lock files.
 
 You can launch it either via inetd, as a stand-alone daemon, or from an rsync
-client via a remote shell.  If run as a stand-alone daemon then just run the
+client via a remote shell. If run as a stand-alone daemon then just run the
 command "`rsync --daemon`" from a suitable startup script.
 
 Systems using systemd can use the example unit files in the source tree's
-`packaging/systemd` directory.  The `rsync.service` file runs a stand-alone
+`packaging/systemd` directory. The `rsync.service` file runs a stand-alone
 daemon using `rsync --daemon --no-detach`, while `rsync.socket` and
-`rsync@.service` show a socket-activated setup for incoming connections.  These
+`rsync@.service` show a socket-activated setup for incoming connections. These
 files may need local adjustment to match your installed rsync path, packaging
 layout, and module policy.
 
@@ -79,14 +79,18 @@ the modules and hooks used by the installation before enabling it.
 
 When run via inetd you should add a line like this to /etc/services:
 
->     rsync           873/tcp
+> ```
+> rsync           873/tcp
+> ```
 
 and a single line something like this to /etc/inetd.conf:
 
->     rsync   stream  tcp     nowait  root   @BINDIR@/rsync rsyncd --daemon
+> ```
+> rsync   stream  tcp     nowait  root   @BINDIR@/rsync rsyncd --daemon
+> ```
 
 Replace "@BINDIR@/rsync" with the path to where you have rsync installed on
-your system.  You will then need to send inetd a HUP signal to tell it to
+your system. You will then need to send inetd a HUP signal to tell it to
 reread its config file.
 
 A standalone rsync daemon reads global settings at startup and opens the
@@ -102,49 +106,47 @@ inetd or a remote shell reads the configuration for its single connection.
 The first parameters in the file (before a [module] header) are the global
 parameters:
 
-[comment]: # (An OL starting at 0 is converted into a DL by the parser.)
+0. `motd file`
 
-0.  `motd file`
+   This parameter allows you to specify a "message of the day" (MOTD) to display
+   to clients on each connect. This usually contains site information and any
+   legal notices. The default is no MOTD file. This can be overridden by the
+   `--dparam=motdfile=FILE` command-line option when starting the daemon.
 
-    This parameter allows you to specify a "message of the day" (MOTD) to display
-    to clients on each connect. This usually contains site information and any
-    legal notices. The default is no MOTD file.  This can be overridden by the
-    `--dparam=motdfile=FILE` command-line option when starting the daemon.
+1. `pid file`
 
-0.  `pid file`
+   This parameter tells the rsync daemon to write its process ID to that file.
+   The rsync keeps the file locked so that it can know when it is safe to
+   overwrite an existing file.
 
-    This parameter tells the rsync daemon to write its process ID to that file.
-    The rsync keeps the file locked so that it can know when it is safe to
-    overwrite an existing file.
+   The filename can be overridden by the `--dparam=pidfile=FILE` command-line
+   option when starting the daemon.
 
-    The filename can be overridden by the `--dparam=pidfile=FILE` command-line
-    option when starting the daemon.
+2. `port`
 
-0.  `port`
+   You can override the default port the daemon will listen on by specifying
+   this value (defaults to 873). This is ignored if the daemon is being run
+   by inetd, and is superseded by the `--port` command-line option.
 
-    You can override the default port the daemon will listen on by specifying
-    this value (defaults to 873).  This is ignored if the daemon is being run
-    by inetd, and is superseded by the `--port` command-line option.
+3. `address`
 
-0.  `address`
+   You can override the default IP address the daemon will listen on by
+   specifying this value. This is ignored if the daemon is being run by
+   inetd, and is superseded by the `--address` command-line option.
 
-    You can override the default IP address the daemon will listen on by
-    specifying this value.  This is ignored if the daemon is being run by
-    inetd, and is superseded by the `--address` command-line option.
+4. `socket options`
 
-0.  `socket options`
+   This parameter can provide endless fun for people who like to tune their
+   systems to the utmost degree. You can set all sorts of socket options which
+   may make transfers faster (or slower!). Read the manpage for the
+   **setsockopt()** system call for details on some of the options you may be
+   able to set. By default no special socket options are set. These settings
+   can also be specified via the `--sockopts` command-line option.
 
-    This parameter can provide endless fun for people who like to tune their
-    systems to the utmost degree. You can set all sorts of socket options which
-    may make transfers faster (or slower!). Read the manpage for the
-    **setsockopt()** system call for details on some of the options you may be
-    able to set. By default no special socket options are set.  These settings
-    can also be specified via the `--sockopts` command-line option.
+5. `listen backlog`
 
-0.  `listen backlog`
-
-    You can override the default backlog value when the daemon listens for
-    connections.  It defaults to 5.
+   You can override the default backlog value when the daemon listens for
+   connections. It defaults to 5.
 
 You may also include any [MODULE PARAMETERS](#) in the global part of the
 config file, in which case the supplied value will override the default for
@@ -153,13 +155,13 @@ that parameter.
 You may use references to environment variables in the values of parameters.
 String parameters will have %VAR% references expanded as late as possible (when
 the string is first used in the program), allowing for the use of variables
-that rsync sets at connection time, such as RSYNC_USER_NAME.  Non-string
+that rsync sets at connection time, such as RSYNC_USER_NAME. Non-string
 parameters (such as true/false settings) are expanded when read from the config
-file.  If a variable does not exist in the environment, or if a sequence of
+file. If a variable does not exist in the environment, or if a sequence of
 characters is not a valid reference (such as an un-paired percent sign), the
-raw characters are passed through unchanged.  This helps with backward
+raw characters are passed through unchanged. This helps with backward
 compatibility and safety (e.g. expanding a non-existent %VAR% to an empty
-string in a path could result in a very unsafe path).  The safest way to insert
+string in a path could result in a very unsafe path). The safest way to insert
 a literal % into a value is to use %%.
 
 ## MODULE PARAMETERS
@@ -167,60 +169,64 @@ a literal % into a value is to use %%.
 After the global parameters you should define a number of modules, each module
 exports a directory tree as a symbolic name. Modules are exported by specifying
 a module name in square brackets [module] followed by the parameters for that
-module.  The module name cannot contain a slash or a closing square bracket.
+module. The module name cannot contain a slash or a closing square bracket.
 If the name contains whitespace, each internal sequence of whitespace will be
 changed into a single space, while leading or trailing whitespace will be
 discarded.
 
 There is also a special module name of "[global]" that does not define a module
 but instead switches back to the global settings context where default
-parameters can be specified.  Because each defined module gets its full set of
+parameters can be specified. Because each defined module gets its full set of
 parameters as a combination of the default values that are set at that position
 in the config file plus its own parameter list, the use of a "[global]" section
 can help to maintain shared config values for multiple modules.
 
 As with [GLOBAL PARAMETERS](#), you may use references to environment variables
-in the values of parameters.  See that section for details.
+in the values of parameters. See that section for details.
 
-0.  `comment`
+00. `comment`
 
     This parameter specifies a description string that is displayed next to the
     module name when clients obtain a list of available modules. The default is
     no comment.
 
-0.  `path`
+01. `path`
 
     This parameter specifies the directory in the daemon's filesystem to make
-    available in this module.  You must specify this parameter for each module
+    available in this module. You must specify this parameter for each module
     in `rsyncd.conf`.
 
     If the value contains a "/./" element then the path will be divided at that
-    point into a chroot dir and an inner-chroot subdir.  If [`use chroot`](#)
+    point into a chroot dir and an inner-chroot subdir. If [`use chroot`](#)
     is set to false, though, the extraneous dot dir is just cleaned out of the
-    path.  An example of this idiom is:
+    path. An example of this idiom is:
 
-    >     path = /var/rsync/./module1
+    > ```
+    > path = /var/rsync/./module1
+    > ```
 
     This will (when chrooting) chroot to "/var/rsync" and set the inside-chroot
     path to "/module1".
 
     You may base the path's value off of an environment variable by surrounding
-    the variable name with percent signs.  You can even reference a variable
-    that is set by rsync when the user connects.  For example, this would use
+    the variable name with percent signs. You can even reference a variable
+    that is set by rsync when the user connects. For example, this would use
     the authorizing user's name in the path:
 
-    >     path = /home/%RSYNC_USER_NAME%
+    > ```
+    > path = /home/%RSYNC_USER_NAME%
+    > ```
 
     It is fine if the path includes internal spaces -- they will be retained
-    verbatim (which means that you shouldn't try to escape them).  If your
+    verbatim (which means that you shouldn't try to escape them). If your
     final directory has a trailing space (and this is somehow not something you
     wish to fix), append a trailing slash to the path to avoid losing the
     trailing whitespace.
 
-0.  `use chroot`
+02. `use chroot`
 
     If "use chroot" is true, the rsync daemon will chroot to the "[path](#)" before
-    starting the file transfer with the client.  This has the advantage of
+    starting the file transfer with the client. This has the advantage of
     extra protection against possible implementation security holes, but it has
     the disadvantages of requiring super-user privileges, of not being able to
     follow symbolic links that are either absolute or outside of the new root
@@ -233,20 +239,20 @@ in the values of parameters.  See that section for details.
     divider in it -- this causes an unset value to be treated as true for that
     module.
 
-    Prior to rsync 3.2.7, the default value was "true".  The new "unset"
+    Prior to rsync 3.2.7, the default value was "true". The new "unset"
     default makes it easier to setup an rsync daemon as a non-root user or to
-    run a daemon on a system where chroot fails.  Explicitly setting the value
+    run a daemon on a system where chroot fails. Explicitly setting the value
     to "true" in rsyncd.conf will always require the chroot to succeed.
 
     It is also possible to specify a dot-dir in the module's "[path](#)" to
     indicate that you want to chdir to the earlier part of the path and then
     serve files from inside the latter part of the path (with sanitizing and
-    default symlink munging).  This can be useful if you need some library dirs
+    default symlink munging). This can be useful if you need some library dirs
     inside the chroot (typically for uid & gid lookups) but don't want to put
     the lib dir into the top of the served path (even though they can be hidden
-    with an [`exclude`](#) directive).  However, a better choice for a modern
+    with an [`exclude`](#) directive). However, a better choice for a modern
     rsync setup is to use a [`name converter`](#)" and try to avoid inner lib
-    dirs altogether.  See also the [`daemon chroot`](#) parameter, which causes
+    dirs altogether. See also the [`daemon chroot`](#) parameter, which causes
     rsync to chroot into its own chroot area before doing any path-related
     chrooting.
 
@@ -256,13 +262,13 @@ in the values of parameters.  See that section for details.
 
     When it has to limit access to a particular subdir (either due to chroot
     being disabled or having an inside-chroot path set), rsync will munge
-    symlinks (by default) and sanitize paths.  Those that dislike munged
+    symlinks (by default) and sanitize paths. Those that dislike munged
     symlinks can disable the symlink munging via the "[munge symlinks](#)"
     parameter; incoming symlink values are then sanitized instead (see that
     parameter).
 
     When rsync is sanitizing paths, it resolves away the ".." path elements that
-    would take an arg above the module hierarchy.  For an operator-supplied
+    would take an arg above the module hierarchy. For an operator-supplied
     option path such as `--backup-dir` & `--compare-dest`, a leading slash is
     also substituted with the module's path (so an absolute path is interpreted
     as rooted in the module's "[path](#)" dir); for the transfer's own source
@@ -270,7 +276,7 @@ in the values of parameters.  See that section for details.
 
     When a chroot is in effect *and* the "[name converter](#)" parameter is
     *not* set, the "[numeric ids](#)" parameter will default to being enabled
-    (disabling name lookups).  This means that if you manually setup
+    (disabling name lookups). This means that if you manually setup
     name-lookup libraries in your chroot (instead of using a name converter)
     that you need to explicitly set `numeric ids = false` for rsync to do name
     lookups.
@@ -279,56 +285,56 @@ in the values of parameters.  See that section for details.
     protect them through your OS's normal user/group or ACL settings (to
     prevent the rsync module's user from being able to change them), and then
     hide them from the user's view via "[exclude](#)" (see how in the discussion of
-    that parameter).  However, it's easier and safer to setup a name converter.
+    that parameter). However, it's easier and safer to setup a name converter.
 
-0.  `daemon chroot`
+03. `daemon chroot`
 
     This parameter specifies a path to which the daemon will chroot before
     beginning communication with clients. Module paths (and any "[use chroot](#)"
     settings) will then be related to this one. This lets you choose if you
     want the whole daemon to be chrooted (with this setting), just the
-    transfers to be chrooted (with "[use chroot](#)"), or both.  Keep in mind that
+    transfers to be chrooted (with "[use chroot](#)"), or both. Keep in mind that
     the "daemon chroot" area may need various OS/lib/etc files installed to
-    allow the daemon to function.  By default the daemon runs without any
+    allow the daemon to function. By default the daemon runs without any
     chrooting.
 
-0.  `proxy protocol`
+04. `proxy protocol`
 
     When this parameter is enabled, all incoming connections must start with a
-    V1 or V2 proxy protocol header.  If the header is not found, the connection
+    V1 or V2 proxy protocol header. If the header is not found, the connection
     is closed.
 
     Setting this to `true` requires a proxy server to forward source IP
     information to rsync, allowing you to log proper IP/host info and make use
-    of client-oriented IP restrictions.  The default of `false` means that the
-    IP information comes directly from the socket's metadata.  If rsync is not
+    of client-oriented IP restrictions. The default of `false` means that the
+    IP information comes directly from the socket's metadata. If rsync is not
     behind a proxy, this should be disabled.
 
     _CAUTION_: using this option can be dangerous if you do not ensure that
-    only the proxy is allowed to connect to the rsync port.  If any non-proxied
+    only the proxy is allowed to connect to the rsync port. If any non-proxied
     connections are allowed through, the client will be able to use a modified
-    rsync to spoof any remote IP address that they desire.  You can lock this
+    rsync to spoof any remote IP address that they desire. You can lock this
     down using something like iptables `-uid-owner root` rules (for strict
     localhost access), various firewall rules, or you can require password
     authorization so that any spoofing by users will not grant extra access.
 
-    This setting is global.  If you need some modules to require this and not
+    This setting is global. If you need some modules to require this and not
     others, then you will need to setup multiple rsync daemon processes on
     different ports.
 
-0.  `proxy protocol hosts`
+05. `proxy protocol hosts`
 
     This global parameter lists the socket peer IP addresses that are allowed
-    to supply a `proxy protocol` header.  The syntax is the same token format
-    used by `hosts allow`.  When `proxy protocol = true`, this list must match
+    to supply a `proxy protocol` header. The syntax is the same token format
+    used by `hosts allow`. When `proxy protocol = true`, this list must match
     the direct peer before rsync trusts the forwarded client address.
 
-0.  `name converter`
+06. `name converter`
 
     This parameter lets you specify a program that will be run by the rsync
-    daemon to do user & group conversions between names & ids.  This script
+    daemon to do user & group conversions between names & ids. This script
     is started prior to any chroot being setup, and runs as the daemon user
-    (not the transfer user).  You can specify a fully qualified pathname or
+    (not the transfer user). You can specify a fully qualified pathname or
     a program name that is on the $PATH.
 
     The program can be used to do normal user & group lookups without having to
@@ -336,22 +342,22 @@ in the values of parameters.  See that section for details.
     customized conversions.
 
     The nameconvert program has access to all of the environment variables that
-    are described in the section on `pre-xfer exec`.  This is useful if you
+    are described in the section on `pre-xfer exec`. This is useful if you
     want to customize the conversion using information about the module and/or
     the copy request.
 
     There is a sample python script in the support dir named "nameconvert" that
-    implements the normal user & group lookups.  Feel free to customize it or
+    implements the normal user & group lookups. Feel free to customize it or
     just use it as documentation to implement your own.
 
-0.  `numeric ids`
+07. `numeric ids`
 
     Enabling this parameter disables the mapping of users and groups by name
-    for the current daemon module.  This prevents the daemon from trying to
-    load any user/group-related files or libraries.  This enabling makes the
+    for the current daemon module. This prevents the daemon from trying to
+    load any user/group-related files or libraries. This enabling makes the
     transfer behave as if the client had passed the `--numeric-ids`
-    command-line option.  By default, this parameter is enabled for chroot
-    modules and disabled for non-chroot modules.  Also keep in mind that
+    command-line option. By default, this parameter is enabled for chroot
+    modules and disabled for non-chroot modules. Also keep in mind that
     uid/gid preservation requires the module to be running as root (see "[uid](#)")
     or for "[fake super](#)" to be configured.
 
@@ -360,21 +366,21 @@ in the values of parameters.  See that section for details.
     that the module has the necessary resources it needs to translate names and
     that it is not possible for a user to change those resources.
 
-0.  `munge symlinks`
+08. `munge symlinks`
 
     This parameter tells rsync to modify all incoming symlinks the same way as
     the (non-daemon-affecting) `--munge-links` command-line option: it prefixes
-    each stored symlink's value with the string "/rsyncd-munged/".  Because that
+    each stored symlink's value with the string "/rsyncd-munged/". Because that
     directory does not normally exist, a munged symlink cannot be followed, so
-    an uploaded symlink cannot be used to read or write a file through it.  On
+    an uploaded symlink cannot be used to read or write a file through it. On
     the way back out the prefix is stripped, so clients see the original symlink
-    values.  When this parameter is enabled, rsync refuses to run a module if
+    values. When this parameter is enabled, rsync refuses to run a module if
     "/rsyncd-munged/" already exists in it as a directory or a symlink to a
-    directory.  The default depends on chroot.  For a plain chrooted module --
+    directory. The default depends on chroot. For a plain chrooted module --
     "[use chroot](#)" on and "[path](#)" with no "/./" split, so the daemon
     chroots straight into the module and serves it as the chroot root -- munging
     is disabled by default, since the chroot itself already stops a symlink from
-    escaping.  In every other case it is enabled: any non-chroot module, or a
+    escaping. In every other case it is enabled: any non-chroot module, or a
     chroot module whose "[path](#)" uses a "/./" split to serve an inner subdir
     below the chroot root.
 
@@ -386,7 +392,7 @@ in the values of parameters.  See that section for details.
     cannot name a path outside the module (it can still point to another name
     inside the module).
 
-    Munging changes only the symlink VALUES that are stored.  Whether the daemon
+    Munging changes only the symlink VALUES that are stored. Whether the daemon
     follows a *pre-existing* in-module symlink when it resolves a transfer path
     is a separate matter, governed by the secure path resolver that is on by
     default; see the "[insecure links](#)" parameter for the exact rule and how
@@ -400,7 +406,7 @@ in the values of parameters.  See that section for details.
     instance on links you create locally inside a module), there is a python
     script in the support directory of the source code named "munge-symlinks".
 
-0.  `insecure links`
+09. `insecure links`
 
     This parameter (defaulting to "false") controls whether the daemon resolves
     its symlink-bearing paths with the normal symlink-race defences or with the
@@ -410,8 +416,8 @@ in the values of parameters.  See that section for details.
     create -- the directory enumeration and file-content opens of the served
     module, and the operator-supplied paths (`--backup-dir`, `--temp-dir`,
     `--partial-dir`, the alt-dest basis dirs, and so on) are all resolved with a
-    walk that follows a symlink component only when it is owned by uid&nbsp;0 or
-    by the uid the module runs as, refusing one planted by any other user.  A
+    walk that follows a symlink component only when it is owned by uid 0 or
+    by the uid the module runs as, refusing one planted by any other user. A
     client can never relax this: a client that sends `--insecure-links` to the
     daemon has its request refused.
 
@@ -422,42 +428,42 @@ in the values of parameters.  See that section for details.
     > TOCTOU vulnerabilities that the default closes (including CVE-2026-53797
     > and CVE-2026-53801): an attacker who can create a symlink inside the module
     > -- or who shares the host with the served tree -- can redirect the daemon's
-    > reads and writes to files **outside** the module.  Enable it **only** on a
+    > reads and writes to files **outside** the module. Enable it **only** on a
     > single-tenant, fully-isolated, or otherwise trusted host where no untrusted
-    > local user can plant a symlink in the served tree.  It is the daemon
+    > local user can plant a symlink in the served tree. It is the daemon
     > analogue of the client's `--insecure-links` and exists for the same narrow
     > "I accept the risk in my isolated environment" case.
 
-0.  `charset`
+10. `charset`
 
     This specifies the name of the character set in which the module's
-    filenames are stored.  If the client uses an `--iconv` option, the daemon
+    filenames are stored. If the client uses an `--iconv` option, the daemon
     will use the value of the "charset" parameter regardless of the character
-    set the client actually passed.  This allows the daemon to support charset
+    set the client actually passed. This allows the daemon to support charset
     conversion in a chroot module without extra files in the chroot area, and
-    also ensures that name-translation is done in a consistent manner.  If the
+    also ensures that name-translation is done in a consistent manner. If the
     "charset" parameter is not set, the `--iconv` option is refused, just as if
     "iconv" had been specified via "[refuse options](#)".
 
     If you wish to force users to always use `--iconv` for a particular module,
-    add "no-iconv" to the "[refuse options](#)" parameter.  Keep in mind that this
+    add "no-iconv" to the "[refuse options](#)" parameter. Keep in mind that this
     will restrict access to your module to very new rsync clients.
 
-0.  `max connections`
+11. `max connections`
 
     This parameter allows you to specify the maximum number of simultaneous
-    connections you will allow.  Any clients connecting when the maximum has
-    been reached will receive a message telling them to try later.  The default
-    is 0, which means no limit.  A negative value disables the module.  See
+    connections you will allow. Any clients connecting when the maximum has
+    been reached will receive a message telling them to try later. The default
+    is 0, which means no limit. A negative value disables the module. See
     also the "[lock file](#)" parameter.
 
-0.  `log file`
+12. `log file`
 
     When the "log file" parameter is set to a non-empty string, the rsync
     daemon will log messages to the indicated file rather than using syslog.
     This is particularly useful on systems (such as AIX) where **syslog()**
-    doesn't work for chrooted programs.  The file is opened before **chroot()**
-    is called, allowing it to be placed outside the transfer.  If this value is
+    doesn't work for chrooted programs. The file is opened before **chroot()**
+    is called, allowing it to be placed outside the transfer. If this value is
     set on a per-module basis instead of globally, the global log will still
     contain any authorization failures or config-file error messages.
 
@@ -466,39 +472,41 @@ in the values of parameters.  See that section for details.
     These rules do not change what the daemon sends to syslog.
 
     If the daemon fails to open the specified file, it will fall back to using
-    syslog and output an error about the failure.  (Note that the failure to
+    syslog and output an error about the failure. (Note that the failure to
     open the specified log file used to be a fatal error.)
 
     This setting can be overridden by using the `--log-file=FILE` or
-    `--dparam=logfile=FILE` command-line options.  The former overrides all the
-    log-file parameters of the daemon and all module settings.  The latter sets
+    `--dparam=logfile=FILE` command-line options. The former overrides all the
+    log-file parameters of the daemon and all module settings. The latter sets
     the daemon's log file and the default for all the modules, which still
     allows modules to override the default setting.
 
-0.  `syslog facility`
+13. `syslog facility`
 
     This parameter allows you to specify the syslog facility name to use when
     logging messages from the rsync daemon. You may use any standard syslog
     facility name which is defined on your system. Common names are auth,
     authpriv, cron, daemon, ftp, kern, lpr, mail, news, security, syslog, user,
     uucp, local0, local1, local2, local3, local4, local5, local6 and local7.
-    The default is daemon.  This setting has no effect if the "[log file](#)"
+    The default is daemon. This setting has no effect if the "[log file](#)"
     setting is a non-empty string (either set in the per-modules settings, or
     inherited from the global settings).
 
-0.  `syslog tag`
+14. `syslog tag`
 
     This parameter allows you to specify the syslog tag to use when logging
-    messages from the rsync daemon. The default is "rsyncd".  This setting has
+    messages from the rsync daemon. The default is "rsyncd". This setting has
     no effect if the "[log file](#)" setting is a non-empty string (either set in
     the per-modules settings, or inherited from the global settings).
 
     For example, if you wanted each authenticated user's name to be included in
     the syslog tag, you could do something like this:
 
-    >     syslog tag = rsyncd.%RSYNC_USER_NAME%
+    > ```
+    > syslog tag = rsyncd.%RSYNC_USER_NAME%
+    > ```
 
-0.  `max verbosity`
+15. `max verbosity`
 
     This parameter allows you to control the maximum amount of verbose
     information that you'll allow the daemon to generate (since the information
@@ -506,21 +514,21 @@ in the values of parameters.  See that section for details.
     request one level of verbosity.
 
     This also affects the user's ability to request higher levels of `--info`
-    and `--debug` logging.  If the max value is 2, then no info and/or debug
+    and `--debug` logging. If the max value is 2, then no info and/or debug
     value that is higher than what would be set by `-vv` will be honored by the
-    daemon in its logging.  To see how high of a verbosity level you need to
+    daemon in its logging. To see how high of a verbosity level you need to
     accept for a particular info/debug level, refer to `rsync --info=help` and
-    `rsync --debug=help`.  For instance, it takes max-verbosity 4 to be able to
+    `rsync --debug=help`. For instance, it takes max-verbosity 4 to be able to
     output debug TIME2 and FLIST3.
 
-0.  `lock file`
+16. `lock file`
 
     This parameter specifies the file to use to support the "[max connections](#)"
     parameter. The rsync daemon uses record locking on this file to ensure that
     the max connections limit is not exceeded for the modules sharing the lock
-    file.  The default is `/var/run/rsyncd.lock`.
+    file. The default is `/var/run/rsyncd.lock`.
 
-0.  `read only`
+17. `read only`
 
     This parameter determines whether clients will be able to upload files or
     not. If "read only" is true then any attempted uploads will fail. If
@@ -529,24 +537,24 @@ in the values of parameters.  See that section for details.
 
     Note that "[auth users](#)" can override this setting on a per-user basis.
 
-0.  `write only`
+18. `write only`
 
     This parameter determines whether clients will be able to download files or
     not. If "write only" is true then any attempted downloads will fail. If
     "write only" is false then downloads will be possible if file permissions
-    on the daemon side allow them.  The default is for this parameter to be
+    on the daemon side allow them. The default is for this parameter to be
     disabled.
 
     Helpful hint: you probably want to specify "refuse options = delete" for a
     write-only module.
 
-0.  `open noatime`
+19. `open noatime`
 
     When set to True, this parameter tells the rsync daemon to open files with
     the O_NOATIME flag
     (on systems that support it) to avoid changing the access time of the files
-    that are being transferred.  If your OS does not support the O_NOATIME flag
-    then rsync will silently ignore this option.  Note also that some
+    that are being transferred. If your OS does not support the O_NOATIME flag
+    then rsync will silently ignore this option. Note also that some
     filesystems are mounted to avoid updating the atime on read access even
     without the O_NOATIME flag being set.
 
@@ -556,165 +564,167 @@ in the values of parameters.  See that section for details.
     When set to Unset (the default) the user controls the setting via
     `--open-noatime`.
 
-0.  `list`
+20. `list`
 
     This parameter determines whether this module is listed when the client
-    asks for a listing of available modules.  In addition, if this is false,
+    asks for a listing of available modules. In addition, if this is false,
     the daemon will pretend the module does not exist when a client denied by
-    "[hosts allow](#)" or "[hosts deny](#)" attempts to access it.  Realize that if
+    "[hosts allow](#)" or "[hosts deny](#)" attempts to access it. Realize that if
     "[reverse lookup](#)" is disabled globally but enabled for the module, the
     resulting reverse lookup to a potentially client-controlled DNS server may
-    still reveal to the client that it hit an existing module.  The default is
+    still reveal to the client that it hit an existing module. The default is
     for modules to be listable.
 
-0.  `uid`
+21. `uid`
 
     This parameter specifies the user name or user ID that file transfers to
     and from that module should take place as when the daemon was run as root.
     In combination with the "[gid](#)" parameter this determines what file
     permissions are available. The default when run by a super-user is to
-    switch to the system's "nobody" user.  The default for a non-super-user is
-    to not try to change the user.  See also the "[gid](#)" parameter.
+    switch to the system's "nobody" user. The default for a non-super-user is
+    to not try to change the user. See also the "[gid](#)" parameter.
 
     The RSYNC_USER_NAME environment variable may be used to request that rsync
-    run as the authorizing user.  For example, if you want a rsync to run as
+    run as the authorizing user. For example, if you want a rsync to run as
     the same user that was received for the rsync authentication, this setup is
     useful:
 
-    >     uid = %RSYNC_USER_NAME%
-    >     gid = *
+    > ```
+    > uid = %RSYNC_USER_NAME%
+    > gid = *
+    > ```
 
-0.  `gid`
+22. `gid`
 
     This parameter specifies one or more group names/IDs that will be used when
-    accessing the module.  The first one will be the default group, and any
-    extra ones be set as supplemental groups.  You may also specify a "`*`" as
+    accessing the module. The first one will be the default group, and any
+    extra ones be set as supplemental groups. You may also specify a "`*`" as
     the first gid in the list, which will be replaced by all the normal groups
-    for the transfer's user (see "[uid](#)").  The default when run by a super-user
+    for the transfer's user (see "[uid](#)"). The default when run by a super-user
     is to switch to your OS's "nobody" (or perhaps "nogroup") group with no
-    other supplementary groups.  The default for a non-super-user is to not
+    other supplementary groups. The default for a non-super-user is to not
     change any group attributes (and indeed, your OS may not allow a
     non-super-user to try to change their group settings).
 
     The specified list is normally split into tokens based on spaces and
-    commas.  However, if the list starts with a comma, then the list is only
-    split on commas, which allows a group name to contain a space.  In either
+    commas. However, if the list starts with a comma, then the list is only
+    split on commas, which allows a group name to contain a space. In either
     case any leading and/or trailing whitespace is removed from the tokens and
     empty tokens are ignored.
 
-0.  `daemon uid`
+23. `daemon uid`
 
     This parameter specifies a uid under which the daemon will run. The daemon
     usually runs as user root, and when this is left unset the user is left
     unchanged. See also the "[uid](#)" parameter.
 
-0.  `daemon gid`
+24. `daemon gid`
 
     This parameter specifies a gid under which the daemon will run. The daemon
     usually runs as group root, and when this is left unset, the group is left
     unchanged. See also the "[gid](#)" parameter.
 
-0.  `fake super`
+25. `fake super`
 
     Setting "fake super = yes" for a module causes the daemon side to behave as
-    if the `--fake-super` command-line option had been specified.  This allows
+    if the `--fake-super` command-line option had been specified. This allows
     the full attributes of a file to be stored without having to have the
     daemon actually running as root.
 
-0.  `filter`
+26. `filter`
 
     The daemon has its own filter chain that determines what files it will let
-    the client access.  This chain is not sent to the client and is independent
-    of any filters the client may have specified.  Files excluded by the daemon
+    the client access. This chain is not sent to the client and is independent
+    of any filters the client may have specified. Files excluded by the daemon
     filter chain (`daemon-excluded` files) are treated as non-existent if the
     client tries to pull them, are skipped with an error message if the client
     tries to push them (triggering exit code 23), and are never deleted from
-    the module.  You can use daemon filters to prevent clients from downloading
+    the module. You can use daemon filters to prevent clients from downloading
     or tampering with private administrative files, such as files you may add
     to support uid/gid name translations.
 
     The daemon filter chain is built from the "filter", "[include from](#)",
     "[include](#)", "[exclude from](#)", and "[exclude](#)" parameters, in that order of
-    priority.  Anchored patterns are anchored at the root of the module.  To
+    priority. Anchored patterns are anchored at the root of the module. To
     prevent access to an entire subtree, for example, "`/secret`", you **must**
     exclude everything in the subtree; the easiest way to do this is with a
     triple-star pattern like "`/secret/***`".
 
     The filter chain matches the **logical name** of each item relative to the
-    module root, not the physical file it resolves to.  It is a visibility and
+    module root, not the physical file it resolves to. It is a visibility and
     tamper filter, **not** a security boundary against symlinks: a symlink inside
     the module whose own name is not excluded can still be followed to an excluded
     target (the name the filter sees -- e.g. "`link`" -- is not the excluded name
-    -- e.g. "`secret`").  What protects a writable module from symlink trickery is
+    -- e.g. "`secret`"). What protects a writable module from symlink trickery is
     the "[munge symlinks](#)" parameter (enabled by default for a writable,
     non-chrooted module), **not** this filter; do not rely on `exclude`/`filter` to
     confine a peer who can introduce or traverse a symlink.
 
     The "filter" parameter takes a space-separated list of daemon filter rules,
     though it is smart enough to know not to split a token at an internal space
-    in a rule (e.g. "`- /foo  - /bar`" is parsed as two rules).  You may specify
-    one or more merge-file rules using the normal syntax.  Only one "filter"
+    in a rule (e.g. "`- /foo  - /bar`" is parsed as two rules). You may specify
+    one or more merge-file rules using the normal syntax. Only one "filter"
     parameter can apply to a given module in the config file, so put all the
-    rules you want in a single parameter.  Note that per-directory merge-file
+    rules you want in a single parameter. Note that per-directory merge-file
     rules do not provide as much protection as global rules, but they can be
     used to make `--delete` work better during a client download operation if
     the per-dir merge files are included in the transfer and the client
     requests that they be used.
 
-0.  `exclude`
+27. `exclude`
 
-    This parameter takes a space-separated list of daemon exclude patterns.  As
+    This parameter takes a space-separated list of daemon exclude patterns. As
     with the client `--exclude` option, patterns can be qualified with "`- `" or
-    "`+ `" to explicitly indicate exclude/include.  Only one "exclude" parameter
-    can apply to a given module.  See the "filter" parameter for a description
+    "`+ `" to explicitly indicate exclude/include. Only one "exclude" parameter
+    can apply to a given module. See the "filter" parameter for a description
     of how excluded files affect the daemon.
 
-0.  `include`
+28. `include`
 
-    Use an "include" to override the effects of the "[exclude](#)" parameter.  Only
-    one "include" parameter can apply to a given module.  See the "[filter](#)"
+    Use an "include" to override the effects of the "[exclude](#)" parameter. Only
+    one "include" parameter can apply to a given module. See the "[filter](#)"
     parameter for a description of how excluded files affect the daemon.
 
-0.  `exclude from`
+29. `exclude from`
 
     This parameter specifies the name of a file on the daemon that contains
-    daemon exclude patterns, one per line.  Only one "exclude from" parameter
+    daemon exclude patterns, one per line. Only one "exclude from" parameter
     can apply to a given module; if you have multiple exclude-from files, you
-    can specify them as a merge file in the "[filter](#)" parameter.  See the
+    can specify them as a merge file in the "[filter](#)" parameter. See the
     "[filter](#)" parameter for a description of how excluded files affect the
     daemon.
 
-0.  `include from`
+30. `include from`
 
-    Analogue of "[exclude from](#)" for a file of daemon include patterns.  Only one
-    "include from" parameter can apply to a given module.  See the "[filter](#)"
+    Analogue of "[exclude from](#)" for a file of daemon include patterns. Only one
+    "include from" parameter can apply to a given module. See the "[filter](#)"
     parameter for a description of how excluded files affect the daemon.
 
-0.  `incoming chmod`
+31. `incoming chmod`
 
     This parameter allows you to specify a set of comma-separated chmod strings
     that will affect the permissions of all incoming files (files that are
-    being received by the daemon).  These changes happen after all other
+    being received by the daemon). These changes happen after all other
     permission calculations, and this will even override destination-default
     and/or existing permissions when the client does not specify `--perms`.
     See the description of the `--chmod` rsync option and the **chmod**(1)
     manpage for information on the format of this string.
 
-0.  `outgoing chmod`
+32. `outgoing chmod`
 
     This parameter allows you to specify a set of comma-separated chmod strings
     that will affect the permissions of all outgoing files (files that are
-    being sent out from the daemon).  These changes happen first, making the
+    being sent out from the daemon). These changes happen first, making the
     sent permissions appear to be different than those stored in the filesystem
-    itself.  For instance, you could disable group write permissions on the
-    server while having it appear to be on to the clients.  See the description
+    itself. For instance, you could disable group write permissions on the
+    server while having it appear to be on to the clients. See the description
     of the `--chmod` rsync option and the **chmod**(1) manpage for information
     on the format of this string.
 
-0.  `auth users`
+33. `auth users`
 
     This parameter specifies a comma and/or space-separated list of
-    authorization rules.  In its simplest form, you list the usernames that
+    authorization rules. In its simplest form, you list the usernames that
     will be allowed to connect to this module. The usernames do not need to
     exist on the local system. The rules may contain shell wildcard characters
     that will be matched against the username provided by the client for
@@ -726,40 +736,44 @@ in the values of parameters.  See that section for details.
     connect without a password (this is called "anonymous rsync").
 
     In addition to username matching, you can specify groupname matching via a
-    '@' prefix.  When using groupname matching, the authenticating username
+    '@' prefix. When using groupname matching, the authenticating username
     must be a real user on the system, or it will be assumed to be a member of
-    no groups.  For example, specifying "@rsync" will match the authenticating
+    no groups. For example, specifying "@rsync" will match the authenticating
     user if the named user is a member of the rsync group.
 
-    Finally, options may be specified after a colon (:).  The options allow you
+    Finally, options may be specified after a colon (:). The options allow you
     to "deny" a user or a group, set the access to "ro" (read-only), or set the
-    access to "rw" (read/write).  Setting an auth-rule-specific ro/rw setting
+    access to "rw" (read/write). Setting an auth-rule-specific ro/rw setting
     overrides the module's "[read only](#)" setting.
 
     Be sure to put the rules in the order you want them to be matched, because
     the checking stops at the first matching user or group, and that is the
-    only auth that is checked.  For example:
+    only auth that is checked. For example:
 
-    >     auth users = joe:deny @guest:deny admin:rw @rsync:ro susan joe sam
+    > ```
+    > auth users = joe:deny @guest:deny admin:rw @rsync:ro susan joe sam
+    > ```
 
-    In the above rule, user joe will be denied access no matter what.  Any user
-    that is in the group "guest" is also denied access.  The user "admin" gets
+    In the above rule, user joe will be denied access no matter what. Any user
+    that is in the group "guest" is also denied access. The user "admin" gets
     access in read/write mode, but only if the admin user is not in group
     "guest" (because the admin user-matching rule would never be reached if the
-    user is in group "guest").  Any other user who is in group "rsync" will get
-    read-only access.  Finally, users susan, joe, and sam get the ro/rw setting
+    user is in group "guest"). Any other user who is in group "rsync" will get
+    read-only access. Finally, users susan, joe, and sam get the ro/rw setting
     of the module, but only if the user didn't match an earlier group-matching
     rule.
 
     If you need to specify a user or group name with a space in it, start your
     list with a comma to indicate that the list should only be split on commas
     (though leading and trailing whitespace will also be removed, and empty
-    entries are just ignored).  For example:
+    entries are just ignored). For example:
 
-    >     auth users = , joe:deny, @Some Group:deny, admin:rw, @RO Group:ro
+    > ```
+    > auth users = , joe:deny, @Some Group:deny, admin:rw, @RO Group:ro
+    > ```
 
     See the description of the secrets file for how you can have per-user
-    passwords as well as per-group passwords.  It also explains how a user can
+    passwords as well as per-group passwords. It also explains how a user can
     authenticate using their user password or (when applicable) a group
     password, depending on what rule is being authenticated.
 
@@ -768,89 +782,91 @@ in the values of parameters.  See that section for details.
     rsyncd.conf-level username that differs from the remote-shell-level
     username when using a remote shell to connect to an rsync daemon.
 
-0.  `secrets file`
+34. `secrets file`
 
     This parameter specifies the name of a file that contains the
     username:password and/or @groupname:password pairs used for authenticating
     this module. This file is only consulted if the "[auth users](#)" parameter is
-    specified.  The file is line-based and contains one name:password pair per
-    line.  Any line has a hash (#) as the very first character on the line is
-    considered a comment and is skipped.  The passwords can contain any
+    specified. The file is line-based and contains one name:password pair per
+    line. Any line has a hash (#) as the very first character on the line is
+    considered a comment and is skipped. The passwords can contain any
     characters but be warned that many operating systems limit the length of
     passwords that can be typed at the client end, so you may find that
     passwords longer than 8 characters don't work.
 
     The use of group-specific lines are only relevant when the module is being
-    authorized using a matching "@groupname" rule.  When that happens, the user
+    authorized using a matching "@groupname" rule. When that happens, the user
     can be authorized via either their "username:password" line or the
     "@groupname:password" line for the group that triggered the authentication.
 
     It is up to you what kind of password entries you want to include, either
-    users, groups, or both.  The use of group rules in "[auth users](#)" does not
+    users, groups, or both. The use of group rules in "[auth users](#)" does not
     require that you specify a group password if you do not want to use shared
     passwords.
 
     There is no default for the "secrets file" parameter, you must choose a
-    name (such as `/etc/rsyncd.secrets`).  Unless "[strict modes](#)" is
+    name (such as `/etc/rsyncd.secrets`). Unless "[strict modes](#)" is
     disabled, the file must not be readable or writable by "other", and (when
     the daemon runs as root) must be owned by root; see "[strict modes](#)" for
-    the exact check.  If the file is not found or is rejected, no logins for an
+    the exact check. If the file is not found or is rejected, no logins for an
     "[auth users](#)" module will be possible.
 
-0.  `auth digest`
+35. `auth digest`
 
     This parameter sets the *minimum* message digest that the daemon will accept
     for the challenge-response authentication of an "[auth users](#)" module.
     The available digests, strongest first, are `sha512`, `sha256`, `sha1`,
-    `md5`, `md4`.  The daemon selects its own most-preferred digest that also
+    `md5`, `md4`. The daemon selects its own most-preferred digest that also
     appears in the connecting client's advertised list (and falls back to `md5`,
     or `md4` below protocol 30, for a client that advertises none), so a client
     that advertises only weak digests can still force a weak negotiated digest.
     If it is weaker than the configured
-    name, the connection is refused before the challenge is sent.  The value is a
+    name, the connection is refused before the challenge is sent. The value is a
     single digest name, for example:
 
-    >     auth digest = sha256
+    > ```
+    > auth digest = sha256
+    > ```
 
     which requires `sha256` or `sha512` and refuses an `md5` or `md4` exchange.
 
-    This guards against an *auth-digest downgrade*.  A peer that sends no digest
+    This guards against an *auth-digest downgrade*. A peer that sends no digest
     list (any rsync before 3.2.0, including the openrsync that ships with macOS)
     makes the daemon fall back to `md5` (or `md4` below protocol 30), and an
     on-path attacker can rewrite the unauthenticated negotiation to force the same
-    weak choice.  A captured challenge-response is far cheaper to brute-force
+    weak choice. A captured challenge-response is far cheaper to brute-force
     offline against a weak digest, so a site whose clients are all modern can
-    require a strong one.  See the rsync `SECURITY.md` document for the full
+    require a strong one. See the rsync `SECURITY.md` document for the full
     threat model.
 
     There is **no default** -- the floor is off and the daemon accepts whatever
-    digest is negotiated, preserving compatibility with older clients.  Enabling a
+    digest is negotiated, preserving compatibility with older clients. Enabling a
     floor refuses every client that cannot offer at least that digest, notably any
     rsync older than 3.2.0 (when the SHA digests were added) and the
-    macOS-bundled openrsync, which authenticate only with `md4`/`md5`.  The SHA
+    macOS-bundled openrsync, which authenticate only with `md4`/`md5`. The SHA
     digests require an rsync built with openssl at both ends; naming a digest this
     build does not provide refuses all logins to the module (fail-closed).
 
     Like the other auth parameters, this may be set per module or, for a default
     that applies to every module, in the global part of the config file.
 
-0.  `strict modes`
+36. `strict modes`
 
     This parameter determines whether or not the permissions on the secrets
-    file will be checked.  If "strict modes" is true (the default), the secrets
+    file will be checked. If "strict modes" is true (the default), the secrets
     file is rejected if it is readable or writable by "other" (i.e. if any of
     the other-read or other-write permission bits is set), and, when the daemon
-    is running as root, if the file is not owned by root.  Group permissions and
+    is running as root, if the file is not owned by root. Group permissions and
     the other-execute bit are not consulted, so modes such as 600 or 640 are
-    accepted while 644 (or any other-readable/-writable mode) is rejected.  If
-    "strict modes" is false, no permission check is performed.  This parameter
+    accepted while 644 (or any other-readable/-writable mode) is rejected. If
+    "strict modes" is false, no permission check is performed. This parameter
     was added to accommodate rsync running on the Windows operating system.
 
-0.  `hosts allow`
+37. `hosts allow`
 
     This parameter allows you to specify a list of comma- and/or
     whitespace-separated patterns that are matched against a connecting
-    client's hostname and IP address.  If none of the patterns match, then the
+    client's hostname and IP address. If none of the patterns match, then the
     connection is rejected.
 
     Each pattern can be in one of six forms:
@@ -859,7 +875,7 @@ in the values of parameters.  See that section for details.
       the form a:b:c::d:e:f. In this case the incoming machine's IP address
       must match exactly.
     - an address/mask in the form ipaddr/n where ipaddr is the IP address and n
-      is the number of one bits in the netmask.  All IP addresses which match
+      is the number of one bits in the netmask. All IP addresses which match
       the masked IP address will be allowed in.
     - an address/mask in the form ipaddr/maskaddr where ipaddr is the IP
       address and maskaddr is the netmask in dotted decimal notation for IPv4,
@@ -868,11 +884,11 @@ in the values of parameters.  See that section for details.
     - a hostname pattern using wildcards. If the hostname of the connecting IP
       (as determined by a reverse lookup) matches the wildcarded name (using
       the same rules as normal Unix filename matching), the client is allowed
-      in.  This only works if "[reverse lookup](#)" is enabled (the default).
+      in. This only works if "[reverse lookup](#)" is enabled (the default).
     - a hostname. A plain hostname is matched against the reverse DNS of the
       connecting IP (if "[reverse lookup](#)" is enabled), and/or the IP of the
       given hostname is matched against the connecting IP (if "[forward lookup](#)"
-      is enabled, as it is by default).  Any match will be allowed in.
+      is enabled, as it is by default). Any match will be allowed in.
     - an '@' followed by a netgroup name, which will match if the reverse DNS
       of the connecting IP is in the specified netgroup.
 
@@ -880,34 +896,36 @@ in the values of parameters.  See that section for details.
     a hostname pattern may contain non-ASCII characters: this file is read as
     UTF-8, and each non-ASCII label is converted to its IDNA A-label
     ("Punycode") form before matching, since the name the daemon has for a
-    client always reaches it from DNS as ASCII.  A pattern written with
+    client always reaches it from DNS as ASCII. A pattern written with
     combining characters is normalized on the way, so it matches the same as
-    its precomposed spelling.  Only those labels change, so an address, a
+    its precomposed spelling. Only those labels change, so an address, a
     mask, an already-punycoded name, and the wildcard characters are all
-    matched exactly as written.  A pattern that cannot be converted that way
-    is matched as it stands, and thus matches nothing.  That includes a
+    matched exactly as written. A pattern that cannot be converted that way
+    is matched as it stands, and thus matches nothing. That includes a
     pattern whose conversion would have introduced a character it was not
     written with, such as the U+FF0A FULLWIDTH ASTERISK that the IDNA mapping
-    turns into a "*".
+    turns into a "\*".
 
     Note IPv6 link-local addresses can have a scope in the address
     specification:
 
-    >     fe80::1%link1
-    >     fe80::%link1/64
-    >     fe80::%link1/ffff:ffff:ffff:ffff::
+    > ```
+    > fe80::1%link1
+    > fe80::%link1/64
+    > fe80::%link1/ffff:ffff:ffff:ffff::
+    > ```
 
     You can also combine "hosts allow" with "[hosts deny](#)" as a way to add
-    exceptions to your deny list.  When both parameters are specified, the
+    exceptions to your deny list. When both parameters are specified, the
     "hosts allow" parameter is checked first and a match results in the client
-    being able to connect.  A non-allowed host is then matched against the
-    "[hosts deny](#)" list to see if it should be rejected.  A host that does not
+    being able to connect. A non-allowed host is then matched against the
+    "[hosts deny](#)" list to see if it should be rejected. A host that does not
     match either list is allowed to connect.
 
     The default is no "hosts allow" parameter, which means all hosts can
     connect.
 
-0.  `hosts deny`
+38. `hosts deny`
 
     This parameter allows you to specify a list of comma- and/or
     whitespace-separated patterns that are matched against a connecting clients
@@ -917,28 +935,28 @@ in the values of parameters.  See that section for details.
     The default is no "hosts deny" parameter, which means all hosts can
     connect.
 
-0.  `reverse lookup`
+39. `reverse lookup`
 
     Controls whether the daemon performs a reverse lookup on the client's IP
     address to determine its hostname, which is used for "[hosts allow](#)" &
-    "[hosts deny](#)" checks and the "%h" log escape.  This is enabled by default,
+    "[hosts deny](#)" checks and the "%h" log escape. This is enabled by default,
     but you may wish to disable it to save time if you know the lookup will not
     return a useful result, in which case the daemon will use the name
     "UNDETERMINED" instead.
 
     If this parameter is enabled globally (even by default), rsync performs the
     lookup as soon as a client connects, so disabling it for a module will not
-    avoid the lookup.  Thus, you probably want to disable it globally and then
+    avoid the lookup. Thus, you probably want to disable it globally and then
     enable it for modules that need the information.
 
-0.  `forward lookup`
+40. `forward lookup`
 
     Controls whether the daemon performs a forward lookup on any hostname
-    specified in an hosts allow/deny setting.  By default this is enabled,
+    specified in an hosts allow/deny setting. By default this is enabled,
     allowing the use of an explicit hostname that would not be returned by
     reverse DNS of the connecting IP.
 
-0.  `ignore errors`
+41. `ignore errors`
 
     This parameter tells rsyncd to ignore I/O errors on the daemon when
     deciding whether to run the delete phase of the transfer. Normally rsync
@@ -947,38 +965,38 @@ in the values of parameters.  See that section for details.
     I/O error. In some cases this test is counter productive so you can use
     this parameter to turn off this behavior.
 
-0.  `ignore nonreadable`
+42. `ignore nonreadable`
 
     This tells the rsync daemon to completely ignore files that are not
     readable by the user. This is useful for public archives that may have some
     non-readable files among the directories, and the sysadmin doesn't want
     those files to be seen at all.
 
-0.  `transfer logging`
+43. `transfer logging`
 
     This parameter enables per-file logging of downloads and uploads in a
-    format somewhat similar to that used by ftp daemons.  The daemon always
+    format somewhat similar to that used by ftp daemons. The daemon always
     logs the transfer at the end, so if a transfer is aborted, no mention will
     be made in the log file.
 
     If you want to customize the log lines, see the "[log format](#)" parameter.
 
-0.  `log format`
+44. `log format`
 
     This parameter allows you to specify the format used for logging file
-    transfers when transfer logging is enabled.  The format is a text string
+    transfers when transfer logging is enabled. The format is a text string
     containing embedded single-character escape sequences prefixed with a
-    percent (%) character.  An optional numeric field width may also be
+    percent (%) character. An optional numeric field width may also be
     specified between the percent and the escape letter (e.g.
-    "`%-50n %8l %07p`").  In addition, one or more apostrophes may be specified
+    "`%-50n %8l %07p`"). In addition, one or more apostrophes may be specified
     prior to a numerical escape to indicate that the numerical value should be
-    made more human-readable.  The 3 supported levels are the same as for the
+    made more human-readable. The 3 supported levels are the same as for the
     `--human-readable` command-line option, though the default is for
-    human-readability to be off.  Each added apostrophe increases the level
+    human-readability to be off. Each added apostrophe increases the level
     (e.g. "`%''l %'b %f`").
 
     The default log format is "`%o %h [%a] %m (%u) %f %l`", and a "`%t [%p] `"
-    is always prefixed when using the "[log file](#)" parameter.  (A perl script
+    is always prefixed when using the "[log file](#)" parameter. (A perl script
     that will summarize this default log format is included in the rsync source
     code distribution in the "support" subdirectory: rsyncstats.)
 
@@ -1017,10 +1035,10 @@ in the values of parameters.  See that section for details.
     `--itemize-changes` option in the rsync manpage.
 
     Note that some of the logged output changes when talking with older rsync
-    versions.  For instance, deleted files were only output as verbose messages
+    versions. For instance, deleted files were only output as verbose messages
     prior to rsync 2.6.4.
 
-0.  `timeout`
+45. `timeout`
 
     This parameter allows you to override the clients choice for I/O timeout
     for this module. Using this parameter you can ensure that rsync won't wait
@@ -1028,10 +1046,10 @@ in the values of parameters.  See that section for details.
     zero means no timeout and is the default. A good choice for anonymous rsync
     daemons may be 600 (giving a 10 minute timeout).
 
-0.  `refuse options`
+46. `refuse options`
 
     This parameter allows you to specify a space-separated list of rsync
-    command-line options that will be refused by your rsync daemon.  You may
+    command-line options that will be refused by your rsync daemon. You may
     specify the full option name, its one-letter abbreviation, or a wild-card
     string that matches multiple options. Beginning in 3.2.0, you can also
     negate a match term by starting it with a "!".
@@ -1041,7 +1059,9 @@ in the values of parameters.  See that section for details.
     For example, this would refuse `--checksum` (`-c`) and all the various
     delete options:
 
-    >     refuse options = c delete
+    > ```
+    > refuse options = c delete
+    > ```
 
     The reason the above refuses all delete options is that the options imply
     `--delete`, and implied options are refused just like explicit options.
@@ -1049,26 +1069,32 @@ in the values of parameters.  See that section for details.
     The use of a negated match allows you to fine-tune your refusals after a
     wild-card, such as this:
 
-    >     refuse options = delete-* !delete-during
+    > ```
+    > refuse options = delete-* !delete-during
+    > ```
 
     Negated matching can also turn your list of refused options into a list of
     accepted options. To do this, begin the list with a "`*`" (to refuse all
-    options) and then specify one or more negated matches to accept.  For
+    options) and then specify one or more negated matches to accept. For
     example:
 
-    >     refuse options = * !a !v !compress*
+    > ```
+    > refuse options = * !a !v !compress*
+    > ```
 
     Don't worry that the "`*`" will refuse certain vital options such as
     `--dry-run`, `--server`, `--no-iconv`, `--seclude-args`, etc. These
     important options are not matched by wild-card, so they must be overridden
-    by their exact name.  For instance, if you're forcing iconv transfers you
+    by their exact name. For instance, if you're forcing iconv transfers you
     could use something like this:
 
-    >     refuse options = * no-iconv !a !v
+    > ```
+    > refuse options = * no-iconv !a !v
+    > ```
 
     As an additional aid (beginning in 3.2.0), refusing (or "`!refusing`") the
-    "a" or "archive"  option also affects all the options that the `--archive`
-    option implies (`-rdlptgoD`), but only if the option  is matched explicitly
+    "a" or "archive" option also affects all the options that the `--archive`
+    option implies (`-rdlptgoD`), but only if the option is matched explicitly
     (not using a wildcard). If you want to do something tricky, you can use
     "`archive*`" to avoid this side-effect, but keep in mind that no normal
     rsync client ever sends the actual archive option to the server.
@@ -1083,11 +1109,15 @@ in the values of parameters.  See that section for details.
     accept all delete options) or specify a limited set that includes "delete",
     such as:
 
-    >     refuse options = * !a !delete !delete-during
+    > ```
+    > refuse options = * !a !delete !delete-during
+    > ```
 
     ... whereas this accepts any delete option except `--delete-after`:
 
-    >     refuse options = * !a !delete* delete-after
+    > ```
+    > refuse options = * !a !delete* delete-after
+    > ```
 
     A note on refusing "compress": it may be better to set the "[dont compress](#)"
     daemon parameter to "`*`" and ensure that `RSYNC_COMPRESS_LIST=zlib` is set
@@ -1100,7 +1130,7 @@ in the values of parameters.  See that section for details.
 
     Note that the "copy-devices" & "write-devices" options are refused by
     default, but they can be explicitly accepted with "`!copy-devices`" and/or
-    "`!write-devices`".  The options "log-file" and "log-file-format" are
+    "`!write-devices`". The options "log-file" and "log-file-format" are
     forcibly refused and cannot be accepted.
 
     Here are all the options that are not matched by wild-cards:
@@ -1108,7 +1138,7 @@ in the values of parameters.  See that section for details.
     - `--server`: Required for rsync to even work.
     - `--rsh`, `-e`: Required to convey compatibility flags to the server.
     - `--out-format`: This is required to convey output behavior to a remote
-      receiver.  While rsync passes the older alias `--log-format` for
+      receiver. While rsync passes the older alias `--log-format` for
       compatibility reasons, this options should not be confused with
       `--log-file-format`.
     - `--sender`: Use "[write only](#)" parameter instead of refusing this.
@@ -1121,7 +1151,7 @@ in the values of parameters.  See that section for details.
     - `--checksum-seed`: Is a fairly rare, safe option.
     - `--write-devices`: Is non-wild but also auto-disabled.
 
-0.  `dont compress`
+47. `dont compress`
 
     **NOTE:** This parameter currently has no effect except in one instance: if
     it is set to "`*`" then it minimizes or disables compression for all files
@@ -1136,9 +1166,9 @@ in the values of parameters.  See that section for details.
 
     The "dont compress" parameter takes a space-separated list of
     case-insensitive wildcard patterns. Any source filename matching one of the
-    patterns will be compressed as little as possible during the transfer.  If
+    patterns will be compressed as little as possible during the transfer. If
     the compression algorithm has an "off" level, then no compression occurs
-    for those files.  If an algorithms has the ability to change the level in
+    for those files. If an algorithms has the ability to change the level in
     mid-stream, it will be minimized to reduce the CPU usage as much as
     possible.
 
@@ -1146,25 +1176,25 @@ in the values of parameters.  See that section for details.
     list of file suffixes that are skipped by default if this parameter is not
     set.
 
-0.  `early exec`, `pre-xfer exec`, `post-xfer exec`
+48. `early exec`, `pre-xfer exec`, `post-xfer exec`
 
     You may specify a command to be run in the early stages of the connection,
-    or right before and/or after the transfer.  If the `early exec` or
+    or right before and/or after the transfer. If the `early exec` or
     `pre-xfer exec` command returns an error code, the transfer is aborted
-    before it begins.  Any output from the `pre-xfer exec` command on stdout
+    before it begins. Any output from the `pre-xfer exec` command on stdout
     (up to several KB) will be displayed to the user when aborting, but is
-    _not_ displayed if the script returns success.  The other programs cannot
-    send any text to the user.  All output except for the `pre-xfer exec`
+    _not_ displayed if the script returns success. The other programs cannot
+    send any text to the user. All output except for the `pre-xfer exec`
     stdout goes to the corresponding daemon's stdout/stderr, which is typically
-    discarded.  See the `--no-detach` option for a way to see the daemon's
+    discarded. See the `--no-detach` option for a way to see the daemon's
     output, which can assist with debugging.
 
     Note that the `early exec` command runs before any part of the transfer
-    request is known except for the module name.  This helper script can be
+    request is known except for the module name. This helper script can be
     used to setup a disk mount or decrypt some data into a module dir, but you
     may need to use `lock file` and `max connections` to avoid concurrency
-    issues.  If the client rsync specified the `--early-input=FILE` option, it
-    can send up to about 5K of data to the stdin of the early script.  The
+    issues. If the client rsync specified the `--early-input=FILE` option, it
+    can send up to about 5K of data to the stdin of the early script. The
     stdin will otherwise be empty.
 
     Note that the `post-xfer exec` command is still run even if one of the
@@ -1181,17 +1211,17 @@ in the values of parameters.  See that section for details.
     - `RSYNC_USER_NAME`: The accessing user's name (empty if no user).
     - `RSYNC_PID`: A unique number for this transfer.
     - `RSYNC_REQUEST`: (pre-xfer only) The module/path info specified by the
-      user.  Note that the user can specify multiple source files, so the
+      user. Note that the user can specify multiple source files, so the
       request can be something like "mod/path1 mod/path2", etc.
     - `RSYNC_ARG#`: (pre-xfer only) The pre-request arguments are set in these
       numbered values. RSYNC_ARG0 is always "rsyncd", followed by the options
-      that were used in RSYNC_ARG1, and so on.  There will be a value of "."
+      that were used in RSYNC_ARG1, and so on. There will be a value of "."
       indicating that the options are done and the path args are beginning --
       these contain similar information to RSYNC_REQUEST, but with values
       separated and the module name stripped off.
-    - `RSYNC_EXIT_STATUS`: (post-xfer only) the server side's exit value.  This
+    - `RSYNC_EXIT_STATUS`: (post-xfer only) the server side's exit value. This
       will be 0 for a successful run, a positive value for an error that the
-      server generated, or a -1 if rsync failed to exit properly.  Note that an
+      server generated, or a -1 if rsync failed to exit properly. Note that an
       error that occurs on the client side does not currently get sent to the
       server side, so this is not the final exit status for the whole transfer.
     - `RSYNC_RAW_STATUS`: (post-xfer only) the raw exit value from
@@ -1199,9 +1229,9 @@ in the values of parameters.  See that section for details.
 
     A `%VAR%` reference expanded into one of these commands is escaped for the
     quoting context it appears in, which is correct for the single shell that
-    runs the command.  It is not correct for a command that starts a SECOND
+    runs the command. It is not correct for a command that starts a SECOND
     shell, such as `sh -c '... %RSYNC_USER_NAME% ...'`: the outer shell consumes
-    the escaping, and the inner one sees the value bare.  A value of `touc?`
+    the escaping, and the inner one sees the value bare. A value of `touc?`
     would then be glob-expanded against `/usr/bin/`, so the substitution is not
     data any more -- it chooses the command.
 
@@ -1209,21 +1239,23 @@ in the values of parameters.  See that section for details.
     carrying any character that a shell could act on is refused outright, and
     the transfer is aborted with
 
-    >     refusing to run shell hook: %VAR% holds a shell metacharacter
+    > ```
+    > refusing to run shell hook: %VAR% holds a shell metacharacter
+    > ```
 
     The refused characters are whitespace, the quoting and expansion characters
     `'` `"` `` ` `` `$` `\`, the separators `;` `&` `|`, redirections `<` `>`,
     parentheses, the pattern characters `*` `?` `[` `]`, `#`, `!`, `~`, `{` `}`,
-    and any control character.  Some of those are harmless on their own and are
+    and any control character. Some of those are harmless on their own and are
     refused for what a *second* shell would do with them -- `!` negates in
     command position, so a hook written as an access check can be turned from a
     denial into an approval, and `~` is tilde-expanded.
 
     This applies to EVERY `%RSYNC_*%` value, including ones you supplied
-    yourself.  In particular a module whose `path` contains any of them cannot
+    yourself. In particular a module whose `path` contains any of them cannot
     be interpolated into one of these commands: `path = /srv/My Backups` with a command mentioning
     `%RSYNC_MODULE_PATH%` will refuse every transfer of that module, not just a
-    hostile one.  The restriction is deliberate -- rsync cannot tell your space
+    hostile one. The restriction is deliberate -- rsync cannot tell your space
     from an attacker's once both are inside the same string, and `path` itself
     may be built from a peer value such as `path = /home/%RSYNC_USER_NAME%`.
 
@@ -1242,7 +1274,7 @@ in the values of parameters.  See that section for details.
     **system()** call's default shell), and use RSYNC_NO_XFER_EXEC to disable
     both options completely.
 
-0.  `temp dir`
+49. `temp dir`
 
     Specifies a directory that rsync should use for temporary files created
     during the transfer of updated files. If that directory is on a different
@@ -1251,12 +1283,11 @@ in the values of parameters.  See that section for details.
     This parameter equals with `--temp-dir` option, so please consult rsync
     manpage for further information.
 
-
 ## CONFIG DIRECTIVES
 
 There are currently two config directives available that allow a config file to
-incorporate the contents of other files:  `&include` and `&merge`.  Both allow
-a reference to either a file or a directory.  They differ in how segregated the
+incorporate the contents of other files: `&include` and `&merge`. Both allow
+a reference to either a file or a directory. They differ in how segregated the
 file's contents are considered to be.
 
 The `&include` directive treats each file as more distinct, with each one
@@ -1272,16 +1303,20 @@ etc.
 When an `&include` or `&merge` directive refers to a directory, it will read in
 all the `*.conf` or `*.inc` files (respectively) that are contained inside that
 directory (without any recursive scanning), with the files sorted into alpha
-order.  So, if you have a directory named "rsyncd.d" with the files "foo.conf",
+order. So, if you have a directory named "rsyncd.d" with the files "foo.conf",
 "bar.conf", and "baz.conf" inside it, this directive:
 
->     &include /path/rsyncd.d
+> ```
+> &include /path/rsyncd.d
+> ```
 
 would be the same as this set of directives:
 
->     &include /path/rsyncd.d/bar.conf
->     &include /path/rsyncd.d/baz.conf
->     &include /path/rsyncd.d/foo.conf
+> ```
+> &include /path/rsyncd.d/bar.conf
+> &include /path/rsyncd.d/baz.conf
+> &include /path/rsyncd.d/foo.conf
+> ```
 
 except that it adjusts as files are added and removed from the directory.
 
@@ -1296,12 +1331,14 @@ that will affect other include files.
 
 For example, this is a useful /etc/rsyncd.conf file:
 
->     port = 873
->     log file = /var/log/rsync.log
->     pid file = /var/lock/rsync.lock
+> ```
+> port = 873
+> log file = /var/log/rsync.log
+> pid file = /var/lock/rsync.lock
 >
->     &merge /etc/rsyncd.d
->     &include /etc/rsyncd.d
+> &merge /etc/rsyncd.d
+> &include /etc/rsyncd.d
+> ```
 
 This would merge any `/etc/rsyncd.d/*.inc` files (for global values that should
 stay in effect), and then include any `/etc/rsyncd.d/*.conf` files (defining
@@ -1314,60 +1351,59 @@ master process usually runs as root, so it should be configured defensively.
 The following is a practical checklist; the project's `SECURITY.md` describes the
 underlying threat model and the per-platform residuals.
 
-0.  **Confine each module to its path.**
-    Leave "[use chroot](#)" enabled (the default attempts a chroot) so the
-    per-connection worker is jailed inside the module's "[path](#)".  Where chroot
-    is unavailable rsync still resolves every transfer path so it cannot escape
-    the module through a symlinked parent, but a chroot is the stronger boundary
-    -- keep it on unless you have a specific reason not to.  A `path =
-    /outer/./inner` chroots to `/outer` while serving `/inner` as the module root.
+0. **Confine each module to its path.**
+   Leave "[use chroot](#)" enabled (the default attempts a chroot) so the
+   per-connection worker is jailed inside the module's "[path](#)". Where chroot
+   is unavailable rsync still resolves every transfer path so it cannot escape
+   the module through a symlinked parent, but a chroot is the stronger boundary
+   -- keep it on unless you have a specific reason not to. A `path = /outer/./inner` chroots to `/outer` while serving `/inner` as the module root.
 
-0.  **Drop privileges.**
-    Give each module a low-privilege "[uid](#)" and "[gid](#)" so a worker never
-    serves files as root; only the master process needs root (to chroot and bind
-    the port).  Keep modules "[read only](#)" unless they must accept uploads, and
-    prefer "[numeric ids](#)" (or a "[name converter](#)") so a malicious file
-    list cannot map files to an unexpected local owner.
+1. **Drop privileges.**
+   Give each module a low-privilege "[uid](#)" and "[gid](#)" so a worker never
+   serves files as root; only the master process needs root (to chroot and bind
+   the port). Keep modules "[read only](#)" unless they must accept uploads, and
+   prefer "[numeric ids](#)" (or a "[name converter](#)") so a malicious file
+   list cannot map files to an unexpected local owner.
 
-0.  **Restrict who can connect.**
-    Limit reachability with "[hosts allow](#)" / "[hosts deny](#)", bind the
-    daemon to a specific "[address](#)", and use a host firewall.  A module
-    without "[auth users](#)" is reachable by anyone who can reach the port.
+2. **Restrict who can connect.**
+   Limit reachability with "[hosts allow](#)" / "[hosts deny](#)", bind the
+   daemon to a specific "[address](#)", and use a host firewall. A module
+   without "[auth users](#)" is reachable by anyone who can reach the port.
 
-0.  **Authenticate with a strong secret and digest.**
-    Require login with "[auth users](#)" plus a "[secrets file](#)" that is
-    readable only by the daemon user (rsync refuses a too-open file unless
-    "[strict modes](#)" is disabled), and use a long, high-entropy secret.  To
-    refuse the weak MD4/MD5 challenge digests that old clients can negotiate, set
-    a floor with "[auth digest](#)" (for example `auth digest = sha512`); see the
-    AUTHENTICATION STRENGTH section below.
+3. **Authenticate with a strong secret and digest.**
+   Require login with "[auth users](#)" plus a "[secrets file](#)" that is
+   readable only by the daemon user (rsync refuses a too-open file unless
+   "[strict modes](#)" is disabled), and use a long, high-entropy secret. To
+   refuse the weak MD4/MD5 challenge digests that old clients can negotiate, set
+   a floor with "[auth digest](#)" (for example `auth digest = sha512`); see the
+   AUTHENTICATION STRENGTH section below.
 
-0.  **Encrypt the connection.**
-    The daemon protocol authenticates but does **not** encrypt the data stream.
-    Do not expose a cleartext daemon to an untrusted network: front it with a TLS
-    proxy (see the SSL/TLS Daemon Setup section below) or run it over ssh.
+4. **Encrypt the connection.**
+   The daemon protocol authenticates but does **not** encrypt the data stream.
+   Do not expose a cleartext daemon to an untrusted network: front it with a TLS
+   proxy (see the SSL/TLS Daemon Setup section below) or run it over ssh.
 
-0.  **Keep symlink handling safe.**
-    Leave "[munge symlinks](#)" enabled on any writable module (it is the default)
-    so an uploaded symlink cannot redirect a later operation outside the module.
-    Do **not** set "[insecure links](#) = yes" on a host shared with untrusted
-    local users: it disables the daemon's symlink-escape protections (re-opening
-    the symlink TOCTOU/escape vulnerabilities, including CVE-2026-53797 and
-    CVE-2026-53801) and is appropriate only on a single-tenant, fully isolated
-    host.
+5. **Keep symlink handling safe.**
+   Leave "[munge symlinks](#)" enabled on any writable module (it is the default)
+   so an uploaded symlink cannot redirect a later operation outside the module.
+   Do **not** set "[insecure links](#) = yes" on a host shared with untrusted
+   local users: it disables the daemon's symlink-escape protections (re-opening
+   the symlink TOCTOU/escape vulnerabilities, including CVE-2026-53797 and
+   CVE-2026-53801) and is appropriate only on a single-tenant, fully isolated
+   host.
 
-0.  **Refuse options you do not want.**
-    Use "[refuse options](#)" to reject client options a module should not allow.
+6. **Refuse options you do not want.**
+   Use "[refuse options](#)" to reject client options a module should not allow.
 
 ## AUTHENTICATION STRENGTH
 
 Daemon authentication is a challenge-response system in which the client
-returns a digest of the shared secret and a server-chosen challenge.  Modern
+returns a digest of the shared secret and a server-chosen challenge. Modern
 rsync (3.2.7 and later, built with openssl) negotiates the strongest digest both
 sides support -- `sha512` by default -- but for backward compatibility it falls
 back to `md5` (or `md4` below protocol 30) for a client that advertises no digest
-list, and the digest negotiation is itself unauthenticated.  A daemon that wants
-to require a strong digest can set "[auth digest](#)".  For the best protection,
+list, and the digest negotiation is itself unauthenticated. A daemon that wants
+to require a strong digest can set "[auth digest](#)". For the best protection,
 run rsync over ssh or a verified TLS transport (`rsync-ssl`), which protects the
 exchange at the transport layer, and use a high-entropy shared secret (which is
 infeasible to brute-force regardless of the digest).
@@ -1386,10 +1422,10 @@ configure a TCP proxy (such as haproxy or nginx) as the front-end that handles
 the encryption.
 
 - You should limit the access to the backend-rsyncd port to only allow the
-  proxy to connect.  If it is on the same host as the proxy, then configuring
+  proxy to connect. If it is on the same host as the proxy, then configuring
   it to only listen on localhost is a good idea.
 - You should consider turning on the `proxy protocol` rsync-daemon parameter if
-  your proxy supports sending that information.  The examples below assume that
+  your proxy supports sending that information. The examples below assume that
   this is enabled.
 
 An example haproxy setup is as follows:
@@ -1473,8 +1509,10 @@ A more sophisticated example would be:
 
 The /etc/rsyncd.secrets file would look something like this:
 
->     tridge:mypass
->     susan:herpass
+> ```
+> tridge:mypass
+> susan:herpass
+> ```
 
 ## FILES
 
@@ -1502,7 +1540,7 @@ This manpage is current for version @VERSION@ of rsync.
 
 ## CREDITS
 
-Rsync is distributed under the GNU General Public License.  See the file
+Rsync is distributed under the GNU General Public License. See the file
 [COPYING](COPYING) for details.
 
 An rsync web site is available at <https://rsync.samba.org/> and its github
@@ -1515,7 +1553,7 @@ Thanks to Karsten Thygesen for his many suggestions and documentation!
 
 ## AUTHOR
 
-Rsync was originally written by Andrew Tridgell and Paul Mackerras.  Many
+Rsync was originally written by Andrew Tridgell and Paul Mackerras. Many
 people from around the world have helped to maintain and improve it.
 
 Special thanks go to Wayne Davison, who maintained rsync from 2004 to 2024.

@@ -100,6 +100,46 @@ repos:
           - -Uisblank
           - -DSIZEOF_CHARP=8
           - -DZLIB_CONST
+          - -DICONV_OPTION
+          - -DCAN_CHMOD_SYMLINK
+          - -DCAN_CHOWN_SYMLINK
+          - -DCAN_SET_NSEC
+          - -DCAN_SET_SYMLINK_TIMES
+          - -DLOG_AUTH
+          - -DLOG_AUTHPRIV
+          - -DLOG_CRON
+          - -DLOG_DAEMON
+          - -DLOG_FTP
+          - -DLOG_KERN
+          - -DLOG_LOCAL0
+          - -DLOG_LOCAL1
+          - -DLOG_LOCAL2
+          - -DLOG_LOCAL3
+          - -DLOG_LOCAL4
+          - -DLOG_LOCAL5
+          - -DLOG_LOCAL6
+          - -DLOG_LOCAL7
+          - -DLOG_LPR
+          - -DLOG_MAIL
+          - -DLOG_NDELAY
+          - -DLOG_NEWS
+          - -DLOG_SYSLOG
+          - -DLOG_USER
+          - -DLOG_UUCP
+          - -DSUPPORT_ACLS
+          - -DSUPPORT_ACL_FD
+          - -DSUPPORT_CRTIMES
+          - -DSUPPORT_HARD_LINKS
+          - -DSUPPORT_IDN
+          - -DSUPPORT_IO_PRIORITY
+          - -DSUPPORT_LINKS
+          - -DSUPPORT_LZ4
+          - -DSUPPORT_NICE_PRIORITY
+          - -DSUPPORT_PREALLOCATION
+          - -DSUPPORT_XATTRS
+          - -DSUPPORT_XXH3
+          - -DSUPPORT_XXHASH
+          - -DSUPPORT_ZSTD
           - -DNORETURN=
           - -DPOPT_fprintf=fprintf
           # config.h is generated (gitignored), so cppcheck never sees it in CI.
@@ -121,6 +161,18 @@ repos:
           - --suppress=constParameterCallback
           - --suppress=unusedFunction
           - --suppress=missingIncludeSystem
+          # Generated headers (config.h, git-version.h, default-cvsignore.h,
+          # default-dont-compress.h, daemon-parm.h, help-rsync*.h, rounding.h)
+          # are gitignored and absent on a fresh checkout; -I. above resolves
+          # them at the project root once the build has generated them.
+          # Suppress the resulting missingInclude notices in the files that
+          # include them (filename only, no line numbers — they shift easily).
+          - --suppress=missingInclude:usage.c
+          - --suppress=missingInclude:flist.c
+          - --suppress=missingInclude:log.c
+          - --suppress=missingInclude:loadparm.c
+          - --suppress=missingInclude:lib/snprintf.c
+          - --suppress=missingInclude:testsuite/tools/dirfd-probe.c
           - --suppress=missingInclude:rsync.h
           - --suppress=shiftTooManyBits:byteorder.h
           - --suppress=unusedStructMember:rsync.h

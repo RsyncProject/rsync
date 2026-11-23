@@ -38,15 +38,15 @@ We admit only the cohort's registered IPv4 addresses on TCP ports 18731 and 1873
 
 We configure the controller identity with these claims:
 
-Field | Value
---- | ---
-Issuer | https://token.actions.githubusercontent.com
-Subject | repo:RsyncProject/rsync:ref:refs/heads/master
-repository_id | 266877886
-repository_owner_id | 166180282
-event_name | workflow_run
-workflow_ref | RsyncProject/rsync/.github/workflows/interoperability*.yml@refs/heads/master
-runner_environment | github-hosted
+| Field               | Value                                                                         |
+| ------------------- | ----------------------------------------------------------------------------- |
+| Issuer              | https://token.actions.githubusercontent.com                                   |
+| Subject             | repo:RsyncProject/rsync:ref:refs/heads/master                                 |
+| repository_id       | 266877886                                                                     |
+| repository_owner_id | 166180282                                                                     |
+| event_name          | workflow_run                                                                  |
+| workflow_ref        | RsyncProject/rsync/.github/workflows/interoperability\*.yml@refs/heads/master |
+| runner_environment  | github-hosted                                                                 |
 
 We give endpoint jobs no federated identity. The controller independently checks PR change selection before requesting authority. Endpoint jobs check the current CI attempt and selected workflow revision without rereading the PR diff.
 
