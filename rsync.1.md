@@ -1556,12 +1556,18 @@ sign) if you want the local shell to expand it.
     from the sender.  Without this option, the receiver's symlink would be
     deleted and replaced with a real directory.
 
+    When receiver path confinement applies (the default for local and
+    remote-shell transfers), `-K` does not extend the receiving root. A
+    relative link target can contain `..` as long as resolving it stays within
+    that root. Rsync will not follow a link beyond the root even when you own
+    both directories. This refusal can be reported as "Too many levels of
+    symbolic links" even when there is no loop.
+
     For example, suppose you transfer a directory "foo" that contains a file
-    "file", but on the receiver, "foo" is a symlink to directory "bar".  Without
-    `--keep-dirlinks`, the receiver deletes symlink "foo", recreates it as a
-    directory, and receives the file into the new directory.  With
-    `--keep-dirlinks`, the receiver keeps the symlink and "file" ends up in
-    "bar".
+    "file". On the receiver, "foo" is a symlink to directory "bar" within the
+    receiving root. Without `--keep-dirlinks`, the receiver replaces the symlink
+    with a real directory and receives the file there. With `--keep-dirlinks`,
+    the receiver keeps the symlink and "file" ends up in "bar".
 
     One note of caution: if you use `--keep-dirlinks`, you must either trust all the
     symlinks in the copy, or enable the [`--munge-links`](#opt) option on the
