@@ -1345,7 +1345,7 @@ int set_stat_xattr(const char *fname, struct file_struct *file, mode_t new_mode,
 		char buf[256];
 		int len = snprintf(buf, sizeof buf, "%o %u,%u %u:%u",
 			to_wire_mode(fmode),
-			(int)major(rdev), (int)minor(rdev),
+			(unsigned int)major(rdev), (unsigned int)minor(rdev),
 			F_OWNER(file), F_GROUP(file));
 		if ((fd >= 0 ? sys_fsetxattr(fd, XSTAT_ATTR, buf, len)
 			     : sys_lsetxattr(fname, XSTAT_ATTR, buf, len)) < 0) {

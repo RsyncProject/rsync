@@ -16,7 +16,8 @@ class Results(unittest.TestCase):
     def setUp(self):
         self.expected = dict(linux='true', diagnostics='true', bsd='false', macos='true',
                              other='true', android='true', archive='true', valgrind='true', interoperability='true')
-        self.selections = dict(self.expected, versions='true', asan='false', coverage='false', clang='false')
+        self.selections = dict(self.expected, versions='true', asan='false', coverage='false',
+                               static_analysis='false')
         self.versions_selected = 'true'
         self.data = {
             'changes': {'result': 'success', 'outputs': {}},
@@ -27,10 +28,10 @@ class Results(unittest.TestCase):
                 'jobs': json.dumps({'ubuntu': {'result': 'success'}, 'almalinux': {'result': 'skipped'}}),
                 'inputs': json.dumps({'ubuntu': True, 'almalinux': False})}},
             'diagnostics': {'result': 'success', 'outputs': {
-                'jobs': json.dumps({'clang_21': {'result': 'success'},
+                'jobs': json.dumps({'static_analysis': {'result': 'success'},
                                     'asan': {'result': 'skipped'}, 'python_37': {'result': 'success'},
                                     'versions': {'result': 'success'}}),
-                'inputs': json.dumps({'clang_21': True, 'asan': False, 'python_37': True, 'versions': True})}},
+                'inputs': json.dumps({'static_analysis': True, 'asan': False, 'python_37': True, 'versions': True})}},
             'bsd': {'result': 'skipped', 'outputs': {}},
             'macos': {'result': 'success', 'outputs': {
                 'jobs': json.dumps({'macos': {'result': 'success'}})}},
@@ -139,12 +140,12 @@ class Results(unittest.TestCase):
         jobs = json.loads(outputs['jobs'])
         for result in ('failure', 'cancelled', 'skipped', None):
             with self.subTest(result=result):
-                outputs['jobs'] = json.dumps({**jobs, 'clang_21': {'result': result}})
+                outputs['jobs'] = json.dumps({**jobs, 'static_analysis': {'result': result}})
                 self.reject()
-        outputs['jobs'] = json.dumps({key: value for key, value in jobs.items() if key != 'clang_21'})
+        outputs['jobs'] = json.dumps({key: value for key, value in jobs.items() if key != 'static_analysis'})
         self.reject()
-        outputs['jobs'] = json.dumps({**jobs, 'clang_21': {'result': 'skipped'}})
-        outputs['inputs'] = json.dumps({'clang_21': False, 'asan': False, 'python_37': True, 'versions': True})
+        outputs['jobs'] = json.dumps({**jobs, 'static_analysis': {'result': 'skipped'}})
+        outputs['inputs'] = json.dumps({'static_analysis': False, 'asan': False, 'python_37': True, 'versions': True})
         self.assertTrue(self.verify())
 
     def test_selected_archived_peers_cannot_be_omitted(self):
@@ -171,7 +172,8 @@ class Results(unittest.TestCase):
         for name in self.expected:
             if name != 'diagnostics':
                 self.data[name] = {'result': 'skipped', 'outputs': {}}
-        inputs = {name: name == 'versions' for name in ('lint', 'python_37', 'asan', 'coverage', 'clang_21', 'versions')}
+        inputs = {name: name == 'versions' for name in
+                  ('lint', 'python_37', 'asan', 'coverage', 'static_analysis', 'versions')}
         jobs = {name: {'result': 'success' if chosen else 'skipped'} for name, chosen in inputs.items()}
         outputs = self.data['diagnostics']['outputs']
         outputs.update(jobs=json.dumps(jobs), inputs=json.dumps(inputs))
@@ -202,9 +204,9 @@ class Results(unittest.TestCase):
     def test_failed_job_cannot_be_advisory(self):
         outputs = self.data['diagnostics']['outputs']
         jobs = json.loads(outputs['jobs'])
-        jobs['clang_21']['result'] = 'failure'
+        jobs['static_analysis']['result'] = 'failure'
         outputs['jobs'] = json.dumps(jobs)
-        outputs['advisory'] = 'clang_21'
+        outputs['advisory'] = 'static_analysis'
         self.reject()
 
     def test_every_family_requires_nested_results(self):
@@ -274,11 +276,11 @@ class Results(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         outputs = self.data['diagnostics']['outputs']
         jobs = json.loads(outputs['jobs'])
-        outputs['jobs'] = json.dumps({**jobs, 'clang_21': {'result': 'failure'}})
+        outputs['jobs'] = json.dumps({**jobs, 'static_analysis': {'result': 'failure'}})
         result = subprocess.run(command, env={**env, 'CI_RESULTS': json.dumps(self.data)},
                                 capture_output=True, text=True, timeout=10)
         self.assertNotEqual(result.returncode, 0)
-        self.assertIn('diagnostics/clang_21: failure', result.stderr)
+        self.assertIn('diagnostics/static_analysis: failure', result.stderr)
         result = subprocess.run(command, env={**env, 'CI_RESULTS': 'not JSON'},
                                 capture_output=True, text=True, timeout=10)
         self.assertNotEqual(result.returncode, 0)

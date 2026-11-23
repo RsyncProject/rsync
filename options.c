@@ -145,6 +145,7 @@ int fuzzy_basis = 0;
 size_t bwlimit_writemax = 0;
 int ignore_existing = 0;
 int ignore_non_existing = 0;
+int ignore_non_existing_dirs = 0;
 int need_messages_from_generator = 0;
 int max_delete = INT_MIN;
 OFF_T max_size = -1;
@@ -727,6 +728,7 @@ static struct poptOption long_options[] = {
   {"update",          'u', POPT_ARG_NONE,   &update_only, 0, 0, 0 },
   {"existing",         0,  POPT_ARG_NONE,   &ignore_non_existing, 0, 0, 0 },
   {"ignore-non-existing",0,POPT_ARG_NONE,   &ignore_non_existing, 0, 0, 0 },
+  {"ignore-non-existing-directory",0,POPT_ARG_NONE,&ignore_non_existing_dirs, 0, 0, 0 },
   {"ignore-existing",  0,  POPT_ARG_NONE,   &ignore_existing, 0, 0, 0 },
   {"max-size",         0,  POPT_ARG_STRING, &max_size_arg, OPT_MAX_SIZE, 0, 0 },
   {"min-size",         0,  POPT_ARG_STRING, &min_size_arg, OPT_MIN_SIZE, 0, 0 },
@@ -3233,6 +3235,9 @@ void server_options(char **args, int *argc_p)
 		/* Backward compatibility: send --existing, not --ignore-non-existing. */
 		if (ignore_non_existing)
 			ADD_SERVER_ARG("--existing");
+
+		if (ignore_non_existing_dirs)
+			ADD_SERVER_ARG("--ignore-non-existing-directory");
 
 		if (tmpdir) {
 			ADD_SERVER_ARG("--temp-dir");
