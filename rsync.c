@@ -505,6 +505,7 @@ int set_file_attrs(const char *fname, struct file_struct *file, stat_x *sxp,
 		   const char *fnamecmp, int flags)
 {
 	int updated = 0;
+	int attr_error = 0;
 	int mtime_stale = 0;
 	stat_x sx2;
 	int change_uid, change_gid;
@@ -535,7 +536,7 @@ int set_file_attrs(const char *fname, struct file_struct *file, stat_x *sxp,
 		if (sret < 0) {
 			rsyserr(FERROR_XFER, errno, "stat %s failed",
 				full_fname(fname));
-			return 0;
+			return flags & ATTRS_REQUIRE_SUCCESS ? -1 : 0;
 		}
 		init_stat_x(&sx2);
 		sxp = &sx2;
@@ -639,6 +640,15 @@ int set_file_attrs(const char *fname, struct file_struct *file, stat_x *sxp,
 #endif
 	}
 
+	if ((flags & ATTRS_REQUIRE_SUCCESS) && (op_refuse
+#if defined SUPPORT_XATTRS || defined SUPPORT_ACLS
+	    || xattr_refuse
+#endif
+	    )) {
+		errno = ELOOP;
+		goto failed;
+	}
+
 	if (inherit && S_ISDIR(new_mode) && sxp->st.st_mode & S_ISGID) {
 		/* We just created this directory and its setgid
 		 * bit is on, so make sure it stays on. */
@@ -686,7 +696,7 @@ int set_file_attrs(const char *fname, struct file_struct *file, stat_x *sxp,
 				rsyserr(FERROR_XFER, errno, "%s %s failed",
 					change_uid ? "chown" : "chgrp",
 					full_fname(fname));
-				goto cleanup;
+				goto failed;
 			}
 			if (uid == (uid_t)-1 && sxp->st.st_uid != (uid_t)-1)
 				rprintf(FERROR_XFER, "uid 4294967295 (-1) is impossible to set on %s\n", full_fname(fname));
@@ -711,9 +721,13 @@ int set_file_attrs(const char *fname, struct file_struct *file, stat_x *sxp,
 	}
 
 #ifdef SUPPORT_XATTRS
-	if (am_root < 0 && !op_refuse && !xattr_refuse)
+	if (am_root < 0 && !op_refuse && !xattr_refuse) {
 		/* Changing the fake stat xattr can change mtime on disk. */
-		mtime_stale = set_stat_xattr(fname, file, new_mode, held_fd) > 0;
+		int ret = set_stat_xattr(fname, file, new_mode, held_fd);
+		if (ret < 0 && (flags & ATTRS_REQUIRE_SUCCESS))
+			goto failed;
+		mtime_stale = ret > 0;
+	}
 	if (preserve_xattrs && fnamecmp && !op_refuse && !xattr_refuse)
 		set_xattr(fname, file, fnamecmp, sxp, held_fd);
 #endif
@@ -756,16 +770,17 @@ int set_file_attrs(const char *fname, struct file_struct *file, stat_x *sxp,
 		if (sxp->crtime == 0)
 			sxp->crtime = get_create_time(fname, &sxp->st);
 		if (!same_time(sxp->crtime, 0L, file_crtime, 0L)) {
-			if (
 #ifdef HAVE_GETATTRLIST
-			     do_setattrlist_crtime(fname, file_crtime) == 0
+			int ret = do_setattrlist_crtime(fname, file_crtime);
 #elif defined __CYGWIN__
-			     do_SetFileTime(fname, file_crtime) == 0
+			int ret = do_SetFileTime(fname, file_crtime);
 #else
 #error Unknown crtimes implementation
 #endif
-			)
+			if (ret == 0)
 				updated |= UPDATED_CRTIME;
+			else if (flags & ATTRS_REQUIRE_SUCCESS)
+				goto failed;
 		}
 	}
 #endif
@@ -785,7 +800,7 @@ int set_file_attrs(const char *fname, struct file_struct *file, stat_x *sxp,
 		}
 		if (ret < 0) {
 			rsyserr(FERROR_XFER, errno, "failed to set times on %s", full_fname(fname));
-			goto cleanup;
+			goto failed;
 		}
 		if (ret > 0) { /* ret == 1 if symlink could not be set */
 			updated &= ~(UPDATED_MTIME|UPDATED_ATIME);
@@ -801,7 +816,10 @@ int set_file_attrs(const char *fname, struct file_struct *file, stat_x *sxp,
 	 * an access ACL, it changes sxp->st.st_mode so we know whether we
 	 * need to chmod(). */
 	if (preserve_acls && !S_ISLNK(new_mode) && !op_refuse && !xattr_refuse) {
-		if (set_acl_fdat(held_fd, dfd, leaf, fname, file, sxp, new_mode) > 0)
+		int ret = set_acl_fdat(held_fd, dfd, leaf, fname, file, sxp, new_mode);
+		if (ret < 0 && (flags & ATTRS_REQUIRE_SUCCESS))
+			goto failed;
+		if (ret > 0)
 			updated |= UPDATED_ACLS;
 	}
 #endif
@@ -817,7 +835,7 @@ int set_file_attrs(const char *fname, struct file_struct *file, stat_x *sxp,
 			rsyserr(FERROR_XFER, errno,
 				"failed to set permissions on %s",
 				full_fname(fname));
-			goto cleanup;
+			goto failed;
 		}
 		if (ret == 0)
 			updated |= UPDATED_MODE;
@@ -830,6 +848,13 @@ int set_file_attrs(const char *fname, struct file_struct *file, stat_x *sxp,
 		else
 			rprintf(FCLIENT, "%s is uptodate\n", fname);
 	}
+	goto cleanup;
+
+  failed:
+	if (flags & ATTRS_REQUIRE_SUCCESS) {
+		attr_error = errno ? errno : EIO;
+		updated = -1;
+	}
   cleanup:
 #if defined SUPPORT_XATTRS || defined SUPPORT_ACLS
 	if (held_fd >= 0 && held_fd != op_leaf_fd)	/* may alias op_leaf_fd (cross-tree) */
@@ -839,6 +864,8 @@ int set_file_attrs(const char *fname, struct file_struct *file, stat_x *sxp,
 		close(op_leaf_fd);
 	if (sxp == &sx2)
 		free_stat_x(&sx2);
+	if (attr_error)
+		errno = attr_error;
 	return updated;
 }
 

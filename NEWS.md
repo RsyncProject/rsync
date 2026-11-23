@@ -31,6 +31,8 @@
   initial buffer.
 - Report buffered diagnostic and logfile write failures instead of returning
   success after dropping output.
+- Preserve directories and their requested attributes when deleting them
+  with `--backup-dir`. Leave the original directory in place if its backup fails.
 
 ## 3.5 maintenance line
 

@@ -23,6 +23,7 @@
 #include "rsync.h"
 
 extern int am_root;
+extern int dry_run;
 extern int make_backups;
 extern int max_delete;
 extern char *backup_dir;
@@ -58,14 +59,13 @@ static int del_held_dfd(const char *path, const char **leaf)
 	return -1;
 }
 
-static void del_chmod(const char *fbuf, mode_t mode)
+static int del_chmod(const char *fbuf, mode_t mode)
 {
 	const char *leaf;
 	int dfd = del_held_dfd(fbuf, &leaf);
 	if (dfd >= 0)
-		do_chmod_atfd(dfd, leaf, mode);
-	else
-		do_chmod_at(fbuf, mode);
+		return do_chmod_atfd(dfd, leaf, mode);
+	return do_chmod_at(fbuf, mode);
 }
 
 static int del_unlink(const char *fbuf)
@@ -81,6 +81,43 @@ static inline int is_backup_file(char *fn)
 {
 	int k = strlen(fn) - backup_suffix_len;
 	return k > 0 && strcmp(fn+k, backup_suffix) == 0;
+}
+
+static enum delret delete_item_with_stat(char *fbuf, uint16 mode, uint16 flags,
+					STRUCT_STAT *backup_stat);
+
+/* Record the directory before removing children changes its timestamps. */
+static int directory_backup_stat(const char *path, uint16 mode, uint16 flags,
+				 STRUCT_STAT *st)
+{
+	int error;
+
+	if (!S_ISDIR(mode) || make_backups <= 0 || !backup_dir
+	 || dry_run || (flags & DEL_FOR_BACKUP))
+		return 0;
+
+	if ((am_root < 0 ? x_lstat(path, st, NULL) : do_lstat_at(path, st)) == 0) {
+		if (S_ISDIR(st->st_mode))
+			return 1;
+		errno = ENOTDIR;
+	}
+	error = errno;
+	if (error != ENOENT)
+		rsyserr(FERROR_XFER, error, "backup stat %s failed", full_fname(path));
+	errno = error;
+	return -1;
+}
+
+static void restore_directory_backup_mode(const char *path, const STRUCT_STAT *original)
+{
+	STRUCT_STAT current;
+	const char *leaf;
+	int dfd = del_held_dfd(path, &leaf);
+	int ret = dfd >= 0 ? do_lstat_atfd(dfd, leaf, &current) : do_lstat_at(path, &current);
+
+	if (ret == 0 && current.st_dev == original->st_dev && current.st_ino == original->st_ino
+	 && del_chmod(path, original->st_mode) < 0)
+		rsyserr(FERROR_XFER, errno, "restore permissions on %s failed", full_fname(path));
 }
 
 /* The directory is about to be deleted: if DEL_RECURSE is given, delete all
@@ -140,6 +177,8 @@ static enum delret delete_dir_contents(char *fname, uint16 flags)
 
 	for (j = dirlist->used; j--; ) {
 		struct file_struct *fp = dirlist->files[j];
+		STRUCT_STAT st;
+		int back_up, restore_mode = 0;
 
 		if (fp->flags & FLAG_MOUNT_DIR && S_ISDIR(fp->mode)) {
 			if (DEBUG_GTE(DEL, 1)) {
@@ -152,15 +191,29 @@ static enum delret delete_dir_contents(char *fname, uint16 flags)
 		}
 
 		strlcpy(p, fp->basename, remainder);
-		if (!(fp->mode & S_IWUSR) && !am_root && fp->flags & FLAG_OWNED_BY_US)
-			del_chmod(fname, fp->mode | S_IWUSR);
-		/* Save stack by recursing to ourself directly. */
-		if (S_ISDIR(fp->mode)) {
-			if (delete_dir_contents(fname, flags | DEL_RECURSE) != DR_SUCCESS)
+		back_up = directory_backup_stat(fname, fp->mode, flags, &st);
+		if (back_up < 0) {
+			if (errno != ENOENT)
 				ret = DR_NOT_EMPTY;
+			continue;
 		}
-		if (delete_item(fname, fp->mode, flags) != DR_SUCCESS)
+		if (!(fp->mode & S_IWUSR) && !am_root && fp->flags & FLAG_OWNED_BY_US)
+			restore_mode = del_chmod(fname, fp->mode | S_IWUSR) == 0 && back_up;
+		/* Save stack by recursing to ourself directly. */
+		if (S_ISDIR(fp->mode)
+		 && delete_dir_contents(fname, flags | DEL_RECURSE) != DR_SUCCESS) {
 			ret = DR_NOT_EMPTY;
+			if (back_up) {
+				if (restore_mode)
+					restore_directory_backup_mode(fname, &st);
+				continue;
+			}
+		}
+		if (delete_item_with_stat(fname, fp->mode, flags, back_up ? &st : NULL) != DR_SUCCESS) {
+			if (restore_mode)
+				restore_directory_backup_mode(fname, &st);
+			ret = DR_NOT_EMPTY;
+		}
 	}
 
 	if (del_dirfd >= 0)
@@ -188,11 +241,13 @@ static enum delret delete_dir_contents(char *fname, uint16 flags)
  * Note that fbuf must point to a MAXPATHLEN buffer if the mode indicates it's
  * a directory! (The buffer is used for recursion, but returned unchanged.)
  */
-enum delret delete_item(char *fbuf, uint16 mode, uint16 flags)
+static enum delret delete_item_with_stat(char *fbuf, uint16 mode, uint16 flags,
+					STRUCT_STAT *backup_stat)
 {
 	enum delret ret;
 	char *what;
 	int ok;
+	int restore_mode = 0;
 
 	if (DEBUG_GTE(DEL, 2)) {
 		rprintf(FINFO, "delete_item(%s) mode=%o flags=%d\n",
@@ -200,7 +255,7 @@ enum delret delete_item(char *fbuf, uint16 mode, uint16 flags)
 	}
 
 	if (flags & DEL_NO_UID_WRITE)
-		del_chmod(fbuf, mode | S_IWUSR);
+		restore_mode = del_chmod(fbuf, mode | S_IWUSR) == 0 && backup_stat;
 
 	if (S_ISDIR(mode) && !(flags & DEL_DIR_IS_EMPTY)) {
 		/* This only happens on the first call to delete_item() since
@@ -216,12 +271,17 @@ enum delret delete_item(char *fbuf, uint16 mode, uint16 flags)
 
 	if (!(flags & DEL_MAKE_ROOM) && max_delete >= 0 && stats.deleted_files >= max_delete) {
 		skipped_deletes++;
-		return DR_AT_LIMIT;
+		ret = DR_AT_LIMIT;
+		goto check_ret;
 	}
 
 	if (S_ISDIR(mode)) {
 		const char *leaf;
 		int dfd = del_held_dfd(fbuf, &leaf);
+		if (backup_stat && !make_directory_backup(fbuf, backup_stat)) {
+			ret = DR_FAILURE;
+			goto check_ret;
+		}
 		what = "rmdir";
 		ok = (dfd >= 0 ? do_unlink_atfd(dfd, leaf, AT_REMOVEDIR) : do_rmdir_at(fbuf)) == 0;
 	} else {
@@ -257,7 +317,7 @@ enum delret delete_item(char *fbuf, uint16 mode, uint16 flags)
 		}
 		ret = DR_SUCCESS;
 	} else {
-		if (S_ISDIR(mode) && errno == ENOTEMPTY) {
+		if (S_ISDIR(mode) && (errno == ENOTEMPTY || errno == EEXIST)) {
 			rprintf(FINFO, "cannot delete non-empty directory: %s\n",
 				fbuf);
 			ret = DR_NOT_EMPTY;
@@ -270,6 +330,8 @@ enum delret delete_item(char *fbuf, uint16 mode, uint16 flags)
 	}
 
   check_ret:
+	if (ret != DR_SUCCESS && restore_mode)
+		restore_directory_backup_mode(fbuf, backup_stat);
 	if (ret != DR_SUCCESS && flags & DEL_MAKE_ROOM) {
 		const char *desc;
 		switch (flags & DEL_MAKE_ROOM) {
@@ -285,6 +347,16 @@ enum delret delete_item(char *fbuf, uint16 mode, uint16 flags)
 			desc, fbuf);
 	}
 	return ret;
+}
+
+enum delret delete_item(char *fbuf, uint16 mode, uint16 flags)
+{
+	STRUCT_STAT st;
+	int back_up = directory_backup_stat(fbuf, mode, flags, &st);
+
+	if (back_up < 0)
+		return errno == ENOENT ? DR_SUCCESS : DR_FAILURE;
+	return delete_item_with_stat(fbuf, mode, flags, back_up ? &st : NULL);
 }
 
 uint16 get_del_for_flag(uint16 mode)

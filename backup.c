@@ -222,6 +222,98 @@ char *get_backup_name(const char *fname)
 	return NULL;
 }
 
+static BOOL copy_directory_backup_attrs(const char *fname, int source_fd,
+					const char *backup, STRUCT_STAT *original)
+{
+	struct file_struct *file;
+	stat_x source;
+	int ret = -1, backup_fd = -1, save_errno;
+
+	(void)source_fd;
+	init_stat_x(&source);
+	file = make_file(fname, NULL, original, 0, NO_FILTERS);
+	if (!file) {
+		errno = EIO;
+		goto cleanup;
+	}
+	source.st = *original;
+#ifdef SUPPORT_ACLS
+	if (preserve_acls) {
+		if (get_acl_fdat(source_fd, -1, NULL, fname, &source) < 0)
+			goto cleanup;
+		cache_tmp_acl(file, &source);
+	}
+#endif
+#ifdef SUPPORT_XATTRS
+	if (preserve_xattrs) {
+		backup_fd = backup_source_fd(backup);
+		if ((backup_fd < 0 && backup_metadata_hardened())
+		 || copy_xattrs(fname, source_fd, backup, backup_fd) < 0)
+			goto cleanup;
+	}
+#endif
+	ret = set_file_attrs(backup, file, NULL, NULL,
+			     ATTRS_ACCURATE_TIME | ATTRS_REQUIRE_SUCCESS);
+
+  cleanup:
+	save_errno = errno;
+	if (backup_fd >= 0)
+		close(backup_fd);
+	free_stat_x(&source);
+	if (file)
+		unmake_file(file);
+#ifdef SUPPORT_ACLS
+	uncache_tmp_acls();
+#endif
+	errno = save_errno;
+	return ret >= 0;
+}
+
+/* Prepare an empty counterpart before rmdir proves the original is empty.
+ * A directory created for a child backup is reused, without touching its contents. */
+BOOL make_directory_backup(const char *fname, STRUCT_STAT *original)
+{
+	STRUCT_STAT current, dest;
+	int save_resolve = operator_path_resolve;
+	int source_fd = backup_source_fd(fname);
+	char *backup;
+	BOOL ok = False;
+
+	if ((source_fd < 0 && backup_metadata_hardened())
+	 || (source_fd >= 0 ? do_fstat(source_fd, &current) : do_lstat_at(fname, &current)) < 0)
+		goto done;
+	if (!S_ISDIR(current.st_mode) || current.st_dev != original->st_dev
+	 || current.st_ino != original->st_ino) {
+		errno = EINVAL;
+		goto done;
+	}
+
+	operator_path_resolve = 1;
+	if (!(backup = get_backup_name(fname)))
+		goto done;
+	if (do_mkdir_at(backup, ACCESSPERMS) < 0 && errno != EEXIST)
+		goto done;
+	if (do_lstat_at(backup, &dest) < 0)
+		goto done;
+	if (!S_ISDIR(dest.st_mode) || (dest.st_dev == current.st_dev && dest.st_ino == current.st_ino)) {
+		errno = EEXIST;
+		goto done;
+	}
+	if (!copy_directory_backup_attrs(fname, source_fd, backup, original))
+		goto done;
+	ok = True;
+	if (INFO_GTE(BACKUP, 1))
+		rprintf(FINFO, "backed up %s to %s\n", fname, backup);
+
+  done:
+	if (!ok)
+		rsyserr(FERROR_XFER, errno ? errno : EIO, "backup directory %s failed", full_fname(fname));
+	if (source_fd >= 0)
+		close(source_fd);
+	operator_path_resolve = save_resolve;
+	return ok;
+}
+
 /* Has same return codes as make_backup(). */
 static inline int link_or_rename(const char *from, const char *to,
 				 BOOL prefer_rename, STRUCT_STAT *stp)
