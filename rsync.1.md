@@ -3451,6 +3451,16 @@ sign) if you want the local shell to expand it.
     able to set.  By default no special socket options are set.  This only
     affects direct socket connections to a remote rsync daemon.
 
+    Separate options with commas, spaces or tabs. Existing integer options
+    take a decimal value and default to 1 when no value is given. Fixed
+    values such as `IPTOS_LOWDELAY` do not accept an argument. Where
+    supported on Linux, `TCP_CONGESTION=NAME` selects a congestion control
+    algorithm. The name must be non-empty and no longer than 15 bytes.
+    The kernel can refuse an algorithm that is unavailable or not permitted.
+
+    Unknown names, known but unavailable options, invalid arguments and
+    kernel refusals are reported. They do not stop the connection attempt.
+
     See also [the daemon version of the `--sockopts` option](#dopt--sockopts).
 
 0.  `--blocking-io`

@@ -140,6 +140,7 @@ parameters:
     **setsockopt()** system call for details on some of the options you may be
     able to set. By default no special socket options are set.  These settings
     can also be specified via the `--sockopts` command-line option.
+    See [the client option](rsync.1#opt--sockopts) for the value syntax.
 
 0.  `listen backlog`
 

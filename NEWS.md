@@ -2,6 +2,8 @@
 
 ## Enhancements
 
+- Accept `TCP_CONGESTION=NAME` in socket options on supported Linux builds.
+  Distinguish unknown names, unavailable options and malformed values.
 - Reduce directory lookups when linking unchanged regular files with non-daemon
   `--link-dest` transfers. Reuse checked receiver and basis directories.
 - Reuse checked directories for ordinary scans and file reads beneath a
