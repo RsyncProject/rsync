@@ -2,6 +2,8 @@
 
 ## Enhancements
 
+- Accept `TCP_CONGESTION=NAME` in socket options on supported Linux builds.
+  Distinguish unknown names, unavailable options and malformed values.
 - Add `--update-links` to skip newer destination symlinks independently
   of `--update`.
 - Allow daemon modules to apply PAM account policy after rsync authentication.
