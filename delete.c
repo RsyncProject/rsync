@@ -93,7 +93,7 @@ static int directory_backup_stat(const char *path, uint16 mode, uint16 flags,
 	int error;
 
 	if (!S_ISDIR(mode) || make_backups <= 0 || !backup_dir
-	 || dry_run || (flags & DEL_FOR_BACKUP))
+	 || dry_run || (flags & (DEL_FOR_BACKUP | DEL_MAKE_ROOM)))
 		return 0;
 
 	if ((am_root < 0 ? x_lstat(path, st, NULL) : do_lstat_at(path, st)) == 0) {
@@ -125,7 +125,7 @@ static void restore_directory_backup_mode(const char *path, const STRUCT_STAT *o
  * DR_NOT_EMPTY.  Note that fname must point to a MAXPATHLEN buffer!  (The
  * buffer is used for recursion, but returned unchanged.)
  */
-static enum delret delete_dir_contents(char *fname, uint16 flags)
+static enum delret delete_dir_contents(char *fname, uint16 flags, BOOL back_up_dirs)
 {
 	struct file_list *dirlist;
 	enum delret ret;
@@ -191,7 +191,7 @@ static enum delret delete_dir_contents(char *fname, uint16 flags)
 		}
 
 		strlcpy(p, fp->basename, remainder);
-		back_up = directory_backup_stat(fname, fp->mode, flags, &st);
+		back_up = back_up_dirs ? directory_backup_stat(fname, fp->mode, flags, &st) : 0;
 		if (back_up < 0) {
 			if (errno != ENOENT)
 				ret = DR_NOT_EMPTY;
@@ -201,7 +201,7 @@ static enum delret delete_dir_contents(char *fname, uint16 flags)
 			restore_mode = del_chmod(fname, fp->mode | S_IWUSR) == 0 && back_up;
 		/* Save stack by recursing to ourself directly. */
 		if (S_ISDIR(fp->mode)
-		 && delete_dir_contents(fname, flags | DEL_RECURSE) != DR_SUCCESS) {
+		 && delete_dir_contents(fname, flags | DEL_RECURSE, back_up_dirs) != DR_SUCCESS) {
 			ret = DR_NOT_EMPTY;
 			if (back_up) {
 				if (restore_mode)
@@ -262,7 +262,8 @@ static enum delret delete_item_with_stat(char *fbuf, uint16 mode, uint16 flags,
 		 * delete_dir_contents() always calls us w/DEL_DIR_IS_EMPTY. */
 		ignore_perishable = 1;
 		/* If DEL_RECURSE is not set, this just reports emptiness. */
-		ret = delete_dir_contents(fbuf, flags);
+		/* Replacing a directory must not start backing up its subdirectories. */
+		ret = delete_dir_contents(fbuf, flags, backup_stat != NULL);
 		ignore_perishable = 0;
 		if (ret == DR_NOT_EMPTY || ret == DR_AT_LIMIT)
 			goto check_ret;

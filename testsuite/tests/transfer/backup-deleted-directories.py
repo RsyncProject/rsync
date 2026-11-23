@@ -13,13 +13,14 @@ def test(context: TestContext):
     src = context.source
     src.mkdir()
 
-    def transfer(dst, backup, delete_mode, *options, status=0):
-        args = ['-a', delete_mode, '--backup', *options]
+    def transfer(dst, backup, *options, status=0):
+        args = ['-a', '--backup', *options]
         if backup is not None:
             args.append(f'--backup-dir={backup}')
         result = run_rsync(*args, f'{src}/', f'{dst}/', capture_output=True, check=False)
         if result.returncode != status:
-            test_fail(f'{dst.name}: expected exit {status}, got {result.returncode}: {result.stderr}')
+            case = dst.relative_to(context.scratch)
+            test_fail(f'{case}: expected exit {status}, got {result.returncode}: {result.stderr}')
 
     for mode in ('--delete-before', '--delete-during', '--delete-delay', '--delete-after'):
         root = context.scratch / mode[2:]
@@ -74,15 +75,23 @@ def test(context: TestContext):
         empty.chmod(0o551)
         os.utime(empty, (1_501_234_567, 1_501_234_567))
         backup.mkdir()
-        if collision == 'unwritable':
-            backup.chmod(0o500)
-        elif collision in ('file', 'nested-file'):
+        if collision in ('file', 'nested-file'):
             (backup / name).parent.mkdir(parents=True, exist_ok=True)
             (backup / name).write_bytes(b'occupied')
-        else:
+        elif collision == 'symlink':
             (root / 'other').mkdir()
             (backup / 'empty').symlink_to(root / 'other', target_is_directory=True)
         try:
+            if collision == 'unwritable':
+                backup.chmod(0o500)
+                probe = backup / 'write-probe'
+                try:
+                    probe.mkdir()
+                except PermissionError:
+                    pass
+                else:
+                    probe.rmdir()
+                    continue
             transfer(dst, backup, '--delete-during', status=23)
         finally:
             backup.chmod(0o700)
@@ -100,6 +109,19 @@ def test(context: TestContext):
     transfer(dst, None, '--delete-during')
     if list(dst.iterdir()):
         test_fail('backup suffix mode changed how empty directories are deleted')
+
+    (src / 'entry').write_bytes(b'new contents')
+    for case, subdir in (('replace-empty', 'entry'), ('replace-nested', 'entry/empty')):
+        root = context.scratch / case
+        dst, backup = root / 'dest', root / 'backup'
+        (dst / subdir).mkdir(parents=True)
+        backup.mkdir()
+        (backup / 'entry').write_bytes(b'previous backup')
+        transfer(dst, backup, '--force')
+        if (dst / 'entry').read_bytes() != b'new contents':
+            test_fail(f'{case}: replacement did not reach the destination')
+        if (backup / 'entry').read_bytes() != b'previous backup':
+            test_fail(f'{case}: directory replacement changed the previous backup')
 
 
 if __name__ == '__main__':

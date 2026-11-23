@@ -251,7 +251,7 @@ static BOOL copy_directory_backup_attrs(const char *fname, int source_fd,
 	if (preserve_xattrs) {
 		backup_fd = backup_source_fd(backup);
 		if ((backup_fd < 0 && backup_metadata_hardened())
-		 || copy_xattrs(fname, source_fd, backup, backup_fd) < 0)
+		 || reconcile_backup_xattrs(fname, source_fd, backup, backup_fd) < 0)
 			goto cleanup;
 	}
 #endif
