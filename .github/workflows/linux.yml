@@ -162,6 +162,20 @@ jobs:
       - name: Tests (non-root TCP)
         if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         run: python3 -S testsuite/tools/check.py "$PWD" "$PWD/rsync" "nonroot,${{ matrix.profiles }}" "$PWD/test-results/nonroot/tcp" --use-tcp --daemon-tests-only -j8
+      - name: PAM account policy
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.release == '24.04' && matrix.arch == 'amd64' }}
+        run: |
+          python3 -B -S testsuite/tools/check-daemon-pam.py --rsync "$PWD/rsync"
+          sudo apt-get install -y libpam0g-dev libpam-wrapper
+          pam_build=$(mktemp -d "$RUNNER_TEMP/rsync-pam.XXXXXXXX")
+          git archive HEAD | tar -x -C "$pam_build"
+          cd "$pam_build"
+          ./configure --enable-pam
+          make -j2 rsync
+          cc -Wall -Wextra -Werror -shared -fPIC -o pam-account.so testsuite/fixtures/pam-account.c -lpam
+          wrapper=$(dpkg -L libpam-wrapper | awk '/\/libpam_wrapper[.]so$/ { print }')
+          test -f "$wrapper"
+          python3 -B -S testsuite/tools/check-daemon-pam.py --rsync "$PWD/rsync" --with-pam "$wrapper" "$PWD/pam-account.so"
       - name: Upload binaries
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2

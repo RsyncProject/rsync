@@ -2,6 +2,8 @@
 
 ## Enhancements
 
+- Allow daemon modules to apply PAM account policy after rsync authentication.
+  Both build-time support and the module setting are disabled by default.
 - Reduce directory lookups when linking unchanged regular files with non-daemon
   `--link-dest` transfers. Reuse checked receiver and basis directories.
 - Reuse checked directories for ordinary scans and file reads beneath a
@@ -34,6 +36,8 @@
 - Preserve directories and their requested attributes in `--backup-dir`
   when removing them during a deletion pass. Leave the original directory
   in place if its backup fails.
+- Send keepalives during file-list checksumming on multiplexed streams.
+  Client uploads using protocols below 30 cannot send these keepalives.
 
 ## 3.5 maintenance line
 

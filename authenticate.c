@@ -22,9 +22,76 @@
 #include "itypes.h"
 #include "ifuncs.h"
 
+#ifdef SUPPORT_PAM
+# ifdef HAVE_SECURITY_PAM_APPL_H
+#  include <security/pam_appl.h>
+# else
+#  include <pam/pam_appl.h>
+# endif
+#endif
+
 extern int read_only;
 extern char *password_file;
 extern struct name_num_obj valid_auth_checksums;
+
+#ifdef SUPPORT_PAM
+# ifdef PAM_CONST_MESSAGES
+#  define PAM_MSG_CONST const
+# else
+#  define PAM_MSG_CONST
+# endif
+
+static int pam_account_conversation(int count, PAM_MSG_CONST struct pam_message **messages,
+				    struct pam_response **responses, void *data)
+{
+	int i;
+	(void)data;
+
+	if (!responses)
+		return PAM_CONV_ERR;
+	*responses = NULL;
+	if (count <= 0 || !messages || !*messages)
+		return PAM_CONV_ERR;
+# ifdef PAM_MAX_NUM_MSG
+	if (count > PAM_MAX_NUM_MSG)
+		return PAM_CONV_ERR;
+# endif
+
+	for (i = 0; i < count; i++) {
+# ifdef __sun
+		/* Solaris passes a pointer to a contiguous array. */
+		const struct pam_message *msg = *messages + i;
+# else
+		const struct pam_message *msg = messages[i];
+# endif
+		if (!msg || !msg->msg
+		 || (msg->msg_style != PAM_TEXT_INFO && msg->msg_style != PAM_ERROR_MSG))
+			return PAM_CONV_ERR;
+	}
+
+	*responses = calloc(count, sizeof **responses);
+	return *responses ? PAM_SUCCESS : PAM_BUF_ERR;
+}
+# undef PAM_MSG_CONST
+
+static const char *check_pam_account(const char *user, const char *addr)
+{
+	const struct pam_conv conv = { pam_account_conversation, NULL };
+	pam_handle_t *pamh = NULL;
+	int end_status, status = pam_start("rsync", user, &conv, &pamh);
+
+	if (status != PAM_SUCCESS)
+		return pam_strerror(NULL, status);
+
+	status = pam_set_item(pamh, PAM_RHOST, addr);
+	if (status == PAM_SUCCESS)
+		status = pam_acct_mgmt(pamh, PAM_SILENT);
+	end_status = pam_end(pamh, status);
+	if (status == PAM_SUCCESS)
+		status = end_status;
+	return status == PAM_SUCCESS ? NULL : pam_strerror(NULL, status);
+}
+#endif
 
 /***************************************************************************
 encode a buffer using base64 - simple and slow algorithm. null terminates
@@ -285,6 +352,7 @@ char *auth_server(int f_in, int f_out, int module, const char *host,
 		  const char *addr, const char *leader)
 {
 	char *users = lp_auth_users(module);
+	int use_pam = lp_use_pam(module);
 	char challenge[MAX_DIGEST_LEN*2];
 	char line[BIGPATHBUFLEN];
 	const char **auth_uid_groups = NULL;
@@ -294,7 +362,18 @@ char *auth_server(int f_in, int f_out, int module, const char *host,
 	char *tok, *pass;
 	char opt_ch = '\0';
 
-	/* if no auth list then allow anyone in! */
+	if (use_pam) {
+#ifndef SUPPORT_PAM
+		rprintf(FLOG, "use pam requires PAM support in module %s\n", lp_name(module));
+		return NULL;
+#else
+		if (!users || !*users) {
+			rprintf(FLOG, "use pam requires auth users in module %s\n", lp_name(module));
+			return NULL;
+		}
+#endif
+	}
+
 	if (!users || !*users)
 		return "";
 
@@ -425,6 +504,10 @@ char *auth_server(int f_in, int f_out, int module, const char *host,
 		free(auth_uid_groups);
 	}
 
+#ifdef SUPPORT_PAM
+	if (!err && use_pam)
+		err = check_pam_account(line, addr);
+#endif
 	if (err) {
 		rprintf(FLOG, "auth failed on module %s from %s (%s) for %s: %s\n",
 			lp_name(module), host, addr, line, err);
