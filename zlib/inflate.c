@@ -1391,7 +1391,8 @@ int ZEXPORT inflateSync(z_streamp strm)
             state->bits -= 8;
         }
         state->have = 0;
-        syncsearch(&(state->have), buf, len);
+        if (len)
+            syncsearch(&(state->have), buf, len);
     }
 
     /* search available input */

@@ -8,7 +8,7 @@ import sys
 
 FAMILIES = ('linux', 'bsd', 'macos', 'other', 'android',
             'archive', 'diagnostics', 'valgrind', 'interoperability')
-OUTPUTS = (*FAMILIES, 'versions', 'asan', 'coverage', 'clang')
+OUTPUTS = (*FAMILIES, 'versions', 'asan', 'coverage', 'static_analysis')
 ARCHIVE_DOCUMENTS = {
     'rsync-ssl.1.md', 'rsyncd.conf.5.md', 'support/rrsync.1.md',
     'rsync.1', 'rsync.1.html', 'rsync-ssl.1', 'rsync-ssl.1.html',
@@ -61,7 +61,7 @@ def workflow(selected, name):
         'versions.yml': ('versions', 'diagnostics'),  # The workflow deletion is a selected change.
         'android.yml': ('android', 'diagnostics'),
         'archive.yml': ('archive', 'diagnostics'),
-        'diagnostics.yml': ('diagnostics', 'versions', 'asan', 'coverage', 'clang'),
+        'diagnostics.yml': ('diagnostics', 'versions', 'asan', 'coverage', 'static_analysis'),
         'valgrind.yml': ('valgrind', 'diagnostics'),
         'interoperability.yml': ('interoperability', 'diagnostics'),
         'interoperability-cleanup.yml': ('interoperability', 'diagnostics'),
@@ -91,7 +91,9 @@ def script(selected, name):
     elif base == 'diagnostics':
         enable(selected, 'diagnostics')
         if not test:
-            enable(selected, 'valgrind', 'asan', 'coverage', 'clang')
+            enable(selected, 'valgrind', 'asan', 'coverage', 'static_analysis')
+    elif name == 'cppcheck.cfg':
+        enable(selected, 'diagnostics', 'static_analysis')
     elif base == 'changes' and not test:
         enable(selected, *OUTPUTS)
     elif base == 'check-results' and not test:
