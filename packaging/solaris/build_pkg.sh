@@ -87,4 +87,3 @@ mv "$FAKE_ROOT/$OUTPUTFILE" . || exit 1
 
 # Comment this out if you want to see, which file structure has been created
 rm -rf "$FAKE_ROOT"
-
