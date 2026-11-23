@@ -17,7 +17,7 @@ def check(data, expected, selections, *, versions_selected, scheduled=False):
     require(expected and all(value in ('true', 'false') for value in expected.values()),
             'Invalid job selection')
     require(isinstance(selections, dict)
-            and set(selections) == set(expected) | {'versions', 'asan', 'coverage', 'clang'}
+            and set(selections) == set(expected) | {'versions', 'asan', 'coverage', 'static_analysis'}
             and all(value in ('true', 'false') for value in selections.values()),
             'Invalid change selection')
     selected_families = {name: selections[name] for name in expected}

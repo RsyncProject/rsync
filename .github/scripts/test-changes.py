@@ -12,7 +12,7 @@ from unittest.mock import patch
 changes = runpy.run_path(str(Path(__file__).with_name('changes.py')))
 select = changes['select']
 families = changes['FAMILIES']
-full_selection = {*families, 'versions', 'asan', 'coverage', 'clang'}
+full_selection = {*families, 'versions', 'asan', 'coverage', 'static_analysis'}
 
 
 class Changes(unittest.TestCase):
@@ -75,14 +75,14 @@ class Changes(unittest.TestCase):
         cases = {
             '.github/workflows/linux.yml': {'linux', 'diagnostics'},
             '.github/workflows/ci.yml': full_selection,
-            '.github/workflows/diagnostics.yml': {'diagnostics', 'versions', 'asan', 'coverage', 'clang'},
+            '.github/workflows/diagnostics.yml': {'diagnostics', 'versions', 'asan', 'coverage', 'static_analysis'},
             '.github/workflows/versions.yml': {'diagnostics', 'versions'},
             '.github/scripts/versions.py': {'diagnostics', 'versions'},
             '.github/workflows/interoperability.yml': {'interoperability', 'diagnostics'},
             '.github/scripts/android-emulator.py': {'android', 'diagnostics'},
             '.github/scripts/test-archive.py': {'archive', 'diagnostics'},
             '.github/scripts/guest.py': {'linux', 'bsd', 'other', 'diagnostics'},
-            '.github/scripts/diagnostics.py': {'diagnostics', 'valgrind', 'asan', 'coverage', 'clang'},
+            '.github/scripts/diagnostics.py': {'diagnostics', 'valgrind', 'asan', 'coverage', 'static_analysis'},
             '.github/scripts/test-diagnostics.py': {'diagnostics'},
             '.github/scripts/check-results.py': full_selection,
             '.github/scripts/test-results.py': {'diagnostics'},
@@ -130,7 +130,7 @@ class Changes(unittest.TestCase):
         self.assertIn("github.event.schedule == '52 8 * * 1'", ci)
         _, job, workflow = diagnostics.partition('\n  versions:\n')
         self.assertTrue(job)
-        self.assertIn('needs: [lint, python_37, asan, coverage, clang_21]', workflow)
+        self.assertIn('needs: [lint, python_37, asan, coverage, static_analysis]', workflow)
         self.assertIn('if: ${{ !cancelled() && inputs.versions }}', workflow)
         self.assertEqual(workflow.count('run: make check-progs'), 1)
         self.assertNotIn('matrix.role', workflow)

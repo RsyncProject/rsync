@@ -2030,75 +2030,61 @@ uint32 read_uint(int f)
 
 int32 read_varint(int f)
 {
-	union {
-		char b[5];
-		int32 x;
-	} u;
+	char b[5] = {0};
+	int32 val;
 	uchar ch;
 	int extra;
 
-	u.x = 0;
 	ch = read_byte(f);
 	extra = int_byte_extra[ch / 4];
 	if (extra) {
 		uchar bit = ((uchar)1<<(8-extra));
-		if (extra >= (int)sizeof u.b) {
+		if (extra >= (int)sizeof b) {
 			rprintf(FERROR, "Overflow in read_varint()\n");
 			exit_cleanup(RERR_STREAMIO);
 		}
-		read_buf(f, u.b, extra);
-		u.b[extra] = ch & (bit-1);
+		read_buf(f, b, extra);
+		b[extra] = ch & (bit-1);
 	} else
-		u.b[0] = ch;
-#if CAREFUL_ALIGNMENT
-	u.x = IVAL(u.b,0);
-#endif
+		b[0] = ch;
+	val = IVAL(b, 0);
 #if SIZEOF_INT32 > 4
-	if (u.x & (int32)0x80000000)
-		u.x |= ~(int32)0xffffffff;
+	if (val & (int32)0x80000000)
+		val |= ~(int32)0xffffffff;
 #endif
-	return u.x;
+	return val;
 }
 
 int64 read_varlong(int f, uchar min_bytes)
 {
-	union {
-		char b[9];
-		int64 x;
-	} u;
+	char b[9] = {0};
 	char b2[8];
 	int extra;
 
-#if SIZEOF_INT64 < 8
-	memset(u.b, 0, 8);
-#else
-	u.x = 0;
-#endif
 	read_buf(f, b2, min_bytes);
-	memcpy(u.b, b2+1, min_bytes-1);
+	memcpy(b, b2+1, min_bytes-1);
 	extra = int_byte_extra[CVAL(b2, 0) / 4];
 	if (extra) {
 		uchar bit = ((uchar)1<<(8-extra));
-		if (min_bytes + extra > (int)sizeof u.b) {
+		if (min_bytes + extra > (int)sizeof b) {
 			rprintf(FERROR, "Overflow in read_varlong()\n");
 			exit_cleanup(RERR_STREAMIO);
 		}
-		read_buf(f, u.b + min_bytes - 1, extra);
-		u.b[min_bytes + extra - 1] = CVAL(b2, 0) & (bit-1);
+		read_buf(f, b + min_bytes - 1, extra);
+		b[min_bytes + extra - 1] = CVAL(b2, 0) & (bit-1);
 #if SIZEOF_INT64 < 8
-		if (min_bytes + extra > 5 || u.b[4] || CVAL(u.b,3) & 0x80) {
+		if (min_bytes + extra > 5 || b[4] || CVAL(b,3) & 0x80) {
 			rprintf(FERROR, "Integer overflow: attempted 64-bit offset\n");
 			exit_cleanup(RERR_UNSUPPORTED);
 		}
 #endif
 	} else
-		u.b[min_bytes + extra - 1] = CVAL(b2, 0);
+		b[min_bytes - 1] = CVAL(b2, 0);
 #if SIZEOF_INT64 < 8
-	u.x = IVAL(u.b,0);
-#elif CAREFUL_ALIGNMENT
-	u.x = IVAL64(u.b,0);
+	return IVAL(b, 0);
+#else
+	return IVAL64(b, 0);
 #endif
-	return u.x;
 }
 
 /* Read an int32 and verify lo <= v <= hi. On out-of-range, abort with a

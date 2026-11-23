@@ -52,6 +52,7 @@ aclocal.m4
 /t_acl
 /t_chmod_secure
 /t_clean_fname
+/t_byteorder
 /t_hashtable_overflow
 /t_iwildmatch
 /t_rename_secure

@@ -100,12 +100,24 @@ class Diagnostics(unittest.TestCase):
                 def logged(command, path):
                     calls.append(command)
                     return status
-                argv = ['diagnostics.py', 'scan']
+                argv = ['diagnostics.py', 'scan', '23']
                 with patch.object(sys, 'argv', argv), patch.dict(diagnostics['main'].__globals__,
                         {'logged': logged, 'summary': lambda *args: None}):
                     self.assertEqual(diagnostics['main'](), status)
-                self.assertEqual(calls[0][0], 'scan-build-21')
+                self.assertEqual(calls[0][:2], ['intercept-build-23', 'scan-build-23'])
                 self.assertIn('--status-bugs', calls[0])
+                self.assertIn('check-progs', calls[0])
+
+    def test_cppcheck_uses_the_configured_database_and_propagates_failure(self):
+        build = Path.cwd() / 'build'
+        with patch.object(diagnostics['subprocess'], 'call', return_value=17) as run:
+            self.assertEqual(diagnostics['check_cppcheck'](build), 17)
+        command = run.call_args[0][0]
+        self.assertEqual(command[0], 'cppcheck')
+        self.assertIn('--project=' + str(build / 'compile_commands.json'), command)
+        self.assertIn('-i' + str(build / 'rounding.c'), command)
+        self.assertIn('--error-exitcode=1', command)
+        self.assertEqual(run.call_args[1]['cwd'], build.parent)
 
 
 if __name__ == '__main__':
