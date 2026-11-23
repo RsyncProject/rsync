@@ -109,8 +109,9 @@ def test(context: TestContext):
 
     # As with --group, a non-root backup must skip a group the user cannot
     # grant (setgid shares, BSD/macOS inherited groups) rather than fail.
+    groups = {os.getegid(), *os.getgroups()}
     if os.geteuid() == 0:
-        foreign = next(g for g in range(54321, 65534) if g not in os.getgroups())
+        foreign = next(g for g in range(54321, 65534) if g not in groups)
         parent, extra = context.scratch / 'foreign-group', ['--no-super']
         parent.mkdir()
     else:
@@ -120,7 +121,7 @@ def test(context: TestContext):
             parent = None
         if parent is not None:
             foreign = parent.stat().st_gid
-            if foreign in os.getgroups():
+            if foreign in groups:
                 shutil.rmtree(parent)
                 parent = None
     if parent is not None:
@@ -155,6 +156,54 @@ def test(context: TestContext):
     transfer(dst, None, '--delete-during')
     if list(dst.iterdir()):
         test_fail('backup suffix mode changed how empty directories are deleted')
+
+    dst, backup = context.scratch / 'with-suffix', context.scratch / 'suffixed-backup'
+    empty, sibling = dst / 'entry', dst / 'entry.saved'
+    empty.mkdir(parents=True)
+    sibling.mkdir()
+    (sibling / 'data').write_bytes(b'previous contents')
+    empty.chmod(0o700)
+    sibling.chmod(0o751)
+    os.utime(empty, (1_501_234_567, 1_501_234_567))
+    os.utime(sibling, (1_505_432_109, 1_505_432_109))
+    transfer(dst, backup, '--delete-during', '--suffix=.saved')
+    for name, mode, mtime in (('entry', 0o700, 1_501_234_567),
+                              ('entry.saved', 0o751, 1_505_432_109)):
+        path = backup / name
+        if not path.is_dir():
+            test_fail(f'suffix: missing backup directory for {name}')
+        actual = path.stat()
+        if (stat.S_IMODE(actual.st_mode), actual.st_mtime) != (mode, mtime):
+            test_fail(f'suffix: directory metadata does not match {name}')
+    if (backup / 'entry.saved' / 'data.saved').read_bytes() != b'previous contents':
+        test_fail('suffix: the file did not keep its suffixed backup name')
+    if list(dst.iterdir()) or (backup / 'entry.saved.saved').exists():
+        test_fail('suffix: incorrect directory deletion or an extra backup directory')
+
+    for first in ('file', 'directory'):
+        root = context.scratch / f'suffix-{first}-first'
+        dst, backup = root / 'dest', root / 'backup'
+        dst.mkdir(parents=True)
+        entry, directory = dst / 'entry', dst / 'entry.saved'
+        saved = backup / 'entry.saved'
+        if first == 'file':
+            entry.write_bytes(b'previous file')
+        else:
+            directory.mkdir()
+            directory.chmod(0o751)
+        transfer(dst, backup, '--delete-during', '--suffix=.saved')
+        if first == 'file':
+            directory.mkdir()
+            child = directory / 'data'
+            child.write_bytes(b'new directory entry')
+        else:
+            entry.write_bytes(b'new file')
+        transfer(dst, backup, '--delete-during', '--suffix=.saved', status=23)
+        if first == 'file':
+            if saved.read_bytes() != b'previous file' or child.read_bytes() != b'new directory entry':
+                test_fail('suffix: creating a directory replaced a previous file backup')
+        elif stat.S_IMODE(saved.stat().st_mode) != 0o751 or entry.read_bytes() != b'new file':
+            test_fail('suffix: backing up a file replaced a previous directory backup')
 
     (src / 'entry').write_bytes(b'new contents')
     for case, subdir in (('replace-empty', 'entry'), ('replace-nested', 'entry/empty')):

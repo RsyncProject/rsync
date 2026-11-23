@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
 
+import os
+import stat
+
 from harness import TestContext, requires, run
 from harness.filesystem import acl_get, acl_set
 from harness.results import test_fail
@@ -39,6 +42,23 @@ def test(context: TestContext):
         test_fail('the directory backup changed an excluded extended attribute')
     if 'user.backup-stale=' in dump_values(saved):
         test_fail('the directory backup retained a stale extended attribute')
+
+    if os.geteuid() != 0:
+        old.mkdir()
+        set_value('backup-directory', 'next value', old)
+        old.chmod(0o555)
+        saved.chmod(0o555)
+        try:
+            run_rsync('-aX', '--delete', f'--backup-dir={backup}',
+                      f'{context.source}/', f'{dest}/')
+            if old.exists() or get_value('backup-directory', saved) != b'next value':
+                test_fail('rsync did not update the xattrs on the reused read-only directory')
+            if stat.S_IMODE(saved.stat().st_mode) != 0o555:
+                test_fail('updating the backup xattrs changed the saved mode')
+        finally:
+            for path in (old, saved):
+                if path.is_dir():
+                    path.chmod(0o755)
 
 
 if __name__ == '__main__':

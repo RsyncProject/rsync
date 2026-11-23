@@ -2620,7 +2620,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 				operator_path_resolve = 0;
 				goto pretend_missing;
 			}
-			if (copy_file(fname, backupptr, -1, back_file->mode) < 0) {
+			if (copy_inplace_backup(fname, back_file->mode) < 0) {
 				operator_path_resolve = 0;
 				unmake_file(back_file);
 				back_file = NULL;
@@ -2666,17 +2666,8 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 			operator_path_resolve = 0;
 			goto pretend_missing;
 		}
-		if (robust_unlink(backupptr) && errno != ENOENT) {
+		if ((f_copy = open_inplace_backup()) < 0) {
 			operator_path_resolve = 0;
-			rsyserr(FERROR_XFER, errno, "unlink %s",
-				full_fname(backupptr));
-			unmake_file(back_file);
-			back_file = NULL;
-			goto cleanup;
-		}
-		if ((f_copy = do_open_at(backupptr, O_WRONLY | O_CREAT | O_TRUNC | O_EXCL, 0600)) < 0) {
-			operator_path_resolve = 0;
-			rsyserr(FERROR_XFER, errno, "open %s", full_fname(backupptr));
 			unmake_file(back_file);
 			back_file = NULL;
 			goto cleanup;

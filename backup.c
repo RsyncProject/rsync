@@ -22,6 +22,7 @@
 #include "ifuncs.h"
 
 extern int am_root;
+extern int dry_run;
 extern int preserve_acls;
 extern int preserve_xattrs;
 extern int preserve_devices;
@@ -29,6 +30,7 @@ extern int preserve_specials;
 extern int preserve_links;
 extern int safe_symlinks;
 extern int backup_dir_len;
+extern int backup_suffix_len;
 extern unsigned int backup_dir_remainder;
 extern int operator_path_resolve;
 extern char backup_dir_buf[MAXPATHLEN];
@@ -61,6 +63,137 @@ int backup_source_fd(const char *path)
 	return -1;
 }
 
+struct backup_dir_access {
+	int fd;
+	mode_t mode;
+};
+
+/* Change only an owned directory beneath the checked backup root. The fd
+ * keeps mode restoration tied to the same directory, not to its name. */
+static BOOL allow_backup_dir_write(struct backup_dir_access *access)
+{
+#if defined HAVE_CHMOD && defined AT_FDCWD && defined O_NOFOLLOW && defined O_DIRECTORY
+	STRUCT_STAT st, root_st, pinned;
+	char root[MAXPATHLEN];
+	int root_fd, fd, save_errno;
+
+	if (dry_run || !operator_path_resolve || !backup_dir || am_root > 0
+	 || !backup_dir_buf[backup_dir_len])
+		return True;
+	if (do_lstat_at(backup_dir_buf, &st) < 0 || !S_ISDIR(st.st_mode)
+	 || st.st_uid != MY_UID() || st.st_mode & S_IWUSR)
+		return True;
+	/* A chmod may silently clear an ungrantable setgid bit. */
+	if (st.st_mode & S_ISGID && !is_in_group(st.st_gid))
+		return True;
+
+	memcpy(root, backup_dir_buf, backup_dir_len);
+	root[backup_dir_len] = '\0';
+	if ((root_fd = open_no_attacker_symlinks_dirfd(root)) < 0)
+		goto failed;
+	if (do_fstat(root_fd, &root_st) < 0)
+		fd = -1;
+	else if (root_st.st_dev == st.st_dev && root_st.st_ino == st.st_ino) {
+		close(root_fd);
+		return True;
+	} else
+		fd = secure_relative_open_at_beneath(root_fd, backup_dir_buf + backup_dir_len,
+			O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC, 0);
+	save_errno = errno;
+	close(root_fd);
+	errno = save_errno;
+	if (fd < 0)
+		goto failed;
+	if (do_fstat(fd, &pinned) < 0)
+		goto close_failed;
+	if (pinned.st_dev != st.st_dev || pinned.st_ino != st.st_ino
+	 || pinned.st_mode != st.st_mode || pinned.st_uid != st.st_uid || pinned.st_gid != st.st_gid) {
+		errno = EINVAL;
+		goto close_failed;
+	}
+	if (do_chmod_attrs(backup_dir_buf, (st.st_mode & CHMOD_BITS) | S_IWUSR, fd, -1, NULL, False) < 0)
+		goto close_failed;
+	access->fd = fd;
+	access->mode = st.st_mode & CHMOD_BITS;
+	return True;
+
+  close_failed:
+	save_errno = errno;
+	close(fd);
+	errno = save_errno;
+  failed:
+	save_errno = errno;
+	rsyserr(FERROR_XFER, save_errno, "cannot make backup directory %s writable", full_fname(backup_dir_buf));
+	errno = save_errno;
+	return False;
+#else
+	(void)access;
+	return True;
+#endif
+}
+
+static BOOL allow_backup_parent_write(struct backup_dir_access *access)
+{
+	char *slash;
+	BOOL ok;
+
+	if (!backup_dir || !(slash = strrchr(backup_dir_buf + backup_dir_len, '/')))
+		return True;
+	*slash = '\0';
+	ok = allow_backup_dir_write(access);
+	*slash = '/';
+	return ok;
+}
+
+static BOOL restore_backup_dir_mode(struct backup_dir_access *access)
+{
+#ifdef HAVE_CHMOD
+	if (access->fd >= 0) {
+		int save_errno = errno;
+		int ret = do_chmod_attrs(backup_dir_buf, access->mode, access->fd, -1, NULL, False);
+		int error = errno;
+
+		close(access->fd);
+		access->fd = -1;
+		if (ret < 0) {
+			rsyserr(FERROR_XFER, error, "cannot restore backup directory mode for %s",
+				full_fname(backup_dir_buf));
+			errno = error;
+			return False;
+		}
+		errno = save_errno;
+	}
+#else
+	(void)access;
+#endif
+	return True;
+}
+
+static int mkdir_backup_dir(void)
+{
+	struct backup_dir_access parent = {.fd = -1};
+	int ret = do_mkdir_at(backup_dir_buf, ACCESSPERMS);
+	int save_errno = errno;
+
+	if (ret == 0 || (errno != EACCES && errno != EPERM))
+		return ret;
+	if (!allow_backup_parent_write(&parent))
+		return -1;
+	if (parent.fd < 0) {
+		errno = save_errno;
+		return ret;
+	}
+	ret = do_mkdir_at(backup_dir_buf, ACCESSPERMS);
+	return restore_backup_dir_mode(&parent) ? ret : -1;
+}
+
+static void backup_suffix_collision(void)
+{
+	rprintf(FERROR_XFER, "backup path %s is both a directory and a suffixed backup name\n",
+		full_fname(backup_dir_buf));
+	errno = EEXIST;
+}
+
 /* Returns -1 on error, 0 on missing dir, and 1 on present dir. */
 static int validate_backup_dir(void)
 {
@@ -73,8 +206,23 @@ static int validate_backup_dir(void)
 		return -1;
 	}
 	if (!S_ISDIR(st.st_mode)) {
+		struct backup_dir_access parent = {.fd = -1};
 		int flags = get_del_for_flag(st.st_mode) | DEL_FOR_BACKUP | DEL_RECURSE;
-		if (delete_item(backup_dir_buf, st.st_mode, flags) == 0)
+		const char *relative = backup_dir_buf + backup_dir_len;
+		const char *slash = strrchr(relative, '/');
+		const char *name = slash ? slash + 1 : relative;
+		size_t len = strlen(name);
+		int ret;
+
+		if (backup_suffix_len && len > (size_t)backup_suffix_len
+		 && strcmp(name + len - backup_suffix_len, backup_suffix) == 0) {
+			backup_suffix_collision();
+			return -1;
+		}
+		if (!allow_backup_parent_write(&parent))
+			return -1;
+		ret = delete_item(backup_dir_buf, st.st_mode, flags);
+		if (restore_backup_dir_mode(&parent) && ret == 0)
 			return 0;
 		return -1;
 	}
@@ -85,10 +233,10 @@ static int validate_backup_dir(void)
  * backup_dir_buf.  Any new directories (compared to the prior backup
  * path) are ensured to exist as directories, replacing anything else
  * that may be in the way (e.g. a symlink). */
-static BOOL copy_valid_path(const char *fname)
+static BOOL copy_valid_path(const char *fname, const char *suffix)
 {
 	const char *f;
-	const char *const parts[] = { fname, backup_suffix };
+	const char *const parts[] = { fname, suffix };
 	int val;
 	BOOL ret = True;
 	stat_x sx;
@@ -126,7 +274,7 @@ static BOOL copy_valid_path(const char *fname)
 	for ( ; b; name = b + 1, b = strchr(name, '/')) {
 		*b = '\0';
 
-		while (do_mkdir_at(backup_dir_buf, ACCESSPERMS) < 0) {
+		while (mkdir_backup_dir() < 0) {
 			if (errno == EEXIST) {
 				val = validate_backup_dir();
 				if (val > 0)
@@ -192,10 +340,9 @@ static BOOL copy_valid_path(const char *fname)
 	return ret;
 }
 
-/* Make a complete pathname for backup file and verify any new path elements. */
-char *get_backup_name(const char *fname)
+static char *backup_name(const char *fname, const char *suffix)
 {
-	const char *const parts[] = { fname, backup_suffix };
+	const char *const parts[] = { fname, suffix };
 
 	if (backup_dir) {
 		static int initialized = 0;
@@ -214,7 +361,7 @@ char *get_backup_name(const char *fname)
 			initialized = 1;
 		}
 		/* copy fname into backup_dir_buf while validating the dirs. */
-		if (copy_valid_path(fname))
+		if (copy_valid_path(fname, suffix))
 			return backup_dir_buf;
 		/* copy_valid_path() has printed an error message. */
 		return NULL;
@@ -225,6 +372,48 @@ char *get_backup_name(const char *fname)
 
 	rprintf(FERROR, "backup filename too long\n");
 	return NULL;
+}
+
+/* Make a complete pathname for a file backup and verify its parents. */
+char *get_backup_name(const char *fname)
+{
+	return backup_name(fname, backup_suffix);
+}
+
+int copy_inplace_backup(const char *fname, mode_t mode)
+{
+	struct backup_dir_access parent = {.fd = -1};
+	int ret;
+
+	if (!allow_backup_parent_write(&parent))
+		return -1;
+	ret = copy_file(fname, backup_dir_buf, -1, mode);
+	return restore_backup_dir_mode(&parent) ? ret : -1;
+}
+
+int open_inplace_backup(void)
+{
+	struct backup_dir_access parent = {.fd = -1};
+	const char *what = "unlink";
+	int fd = -1, error;
+
+	if (!allow_backup_parent_write(&parent))
+		return -1;
+	if (robust_unlink(backup_dir_buf) == 0 || errno == ENOENT) {
+		what = "open";
+		fd = do_open_at(backup_dir_buf, O_WRONLY | O_CREAT | O_TRUNC | O_EXCL, 0600);
+	}
+	error = errno;
+	if (!restore_backup_dir_mode(&parent)) {
+		if (fd >= 0)
+			close(fd);
+		return -1;
+	}
+	if (fd < 0) {
+		rsyserr(FERROR_XFER, error, "%s %s", what, full_fname(backup_dir_buf));
+		errno = error;
+	}
+	return fd;
 }
 
 static BOOL copy_directory_backup_attrs(const char *fname, int source_fd,
@@ -253,9 +442,17 @@ static BOOL copy_directory_backup_attrs(const char *fname, int source_fd,
 #endif
 #ifdef SUPPORT_XATTRS
 	if (preserve_xattrs) {
-		backup_fd = backup_source_fd(backup);
-		if ((backup_fd < 0 && backup_metadata_hardened())
-		 || reconcile_backup_xattrs(fname, source_fd, backup, backup_fd) < 0)
+		struct backup_dir_access target = {.fd = -1};
+		int xattr_ret;
+
+		if (!allow_backup_dir_write(&target))
+			goto cleanup;
+		backup_fd = target.fd >= 0 ? target.fd : backup_source_fd(backup);
+		xattr_ret = backup_fd < 0 && backup_metadata_hardened() ? -1
+			: reconcile_backup_xattrs(fname, source_fd, backup, backup_fd);
+		if (target.fd >= 0)
+			backup_fd = -1;
+		if (!restore_backup_dir_mode(&target) || xattr_ret < 0)
 			goto cleanup;
 	}
 #endif
@@ -296,9 +493,10 @@ BOOL make_directory_backup(const char *fname, STRUCT_STAT *original)
 	}
 
 	operator_path_resolve = 1;
-	if (!(backup = get_backup_name(fname)))
+	/* Directory metadata belongs to the same path as its child backups. */
+	if (!(backup = backup_name(fname, "")))
 		goto done;
-	if (do_mkdir_at(backup, ACCESSPERMS) < 0 && errno != EEXIST)
+	if (mkdir_backup_dir() < 0 && errno != EEXIST)
 		goto done;
 	if (do_lstat_at(backup, &dest) < 0)
 		goto done;
@@ -361,11 +559,11 @@ static inline int link_or_rename(const char *from, const char *to,
 /* Hard-link, rename, or copy an item to the backup name.  Returns 0 for
  * failure, 1 if item was moved, 2 if item was duplicated or hard linked
  * into backup area, or 3 if item doesn't exist or isn't a regular file. */
-static int make_backup_inner(const char *fname, BOOL prefer_rename)
+static int make_backup_inner(const char *fname, BOOL prefer_rename, struct backup_dir_access *parent)
 {
 	stat_x sx;
 	struct file_struct *file;
-	int save_preserve_xattrs;
+	int save_preserve_xattrs, save_errno;
 	char *buf;
 	int ret = 0;
 
@@ -414,10 +612,22 @@ static int make_backup_inner(const char *fname, BOOL prefer_rename)
 	 * linking is possible. */
 	if ((ret = link_or_rename(fname, buf, prefer_rename, &sx.st)) != 0)
 		goto success;
+	save_errno = errno;
+	if (!allow_backup_parent_write(parent))
+		return 0;
+	if (parent->fd >= 0) {
+		if ((ret = link_or_rename(fname, buf, prefer_rename, &sx.st)) != 0)
+			goto success;
+	} else
+		errno = save_errno;
 	if (errno == EEXIST || errno == EISDIR) {
 		STRUCT_STAT bakst;
 		if (do_lstat_at(buf, &bakst) == 0) {
 			int flags = get_del_for_flag(bakst.st_mode) | DEL_FOR_BACKUP | DEL_RECURSE;
+			if (backup_dir && backup_suffix_len && S_ISDIR(bakst.st_mode)) {
+				backup_suffix_collision();
+				return 0;
+			}
 			if (delete_item(buf, bakst.st_mode, flags) != 0)
 				return 0;
 		}
@@ -535,6 +745,7 @@ static int make_backup_inner(const char *fname, BOOL prefer_rename)
 
 int make_backup(const char *fname, BOOL prefer_rename)
 {
+	struct backup_dir_access parent = {.fd = -1};
 	int ret;
 	/* The --backup-dir is an operator-supplied path: resolve it (and the
 	 * tail/rename beneath it) with the ownership walk so a foreign-owned
@@ -542,7 +753,9 @@ int make_backup(const char *fname, BOOL prefer_rename)
 	 * absolute and relative alike.  --insecure-links / "insecure links ="
 	 * restores legacy following. */
 	operator_path_resolve = 1;
-	ret = make_backup_inner(fname, prefer_rename);
+	ret = make_backup_inner(fname, prefer_rename, &parent);
+	if (!restore_backup_dir_mode(&parent))
+		ret = 0;
 	operator_path_resolve = 0;
 	return ret;
 }
