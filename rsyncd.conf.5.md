@@ -809,6 +809,14 @@ in the values of parameters.  See that section for details.
     "[auth users](#)" and a build configured with `--enable-pam`. The daemon
     refuses access to the module if either is missing.
 
+    Configure an account policy for the `rsync` PAM service before enabling
+    this option. PAM can use the system's default policy when no service
+    policy is configured.
+
+    Older rsync daemons ignore this setting and do not enforce PAM account
+    policy. Enable it only after every daemon serving the module supports it.
+    Take the module out of service before rolling back to an older daemon.
+
 0.  `auth digest`
 
     This parameter sets the *minimum* message digest that the daemon will accept

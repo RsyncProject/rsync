@@ -35,10 +35,10 @@ extern char *password_file;
 extern struct name_num_obj valid_auth_checksums;
 
 #ifdef SUPPORT_PAM
-# ifdef __sun
-#  define PAM_MSG_CONST
-# else
+# ifdef PAM_CONST_MESSAGES
 #  define PAM_MSG_CONST const
+# else
+#  define PAM_MSG_CONST
 # endif
 
 static int pam_account_conversation(int count, PAM_MSG_CONST struct pam_message **messages,

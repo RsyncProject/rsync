@@ -710,6 +710,42 @@ if test x"$enable_pam" = x"yes"; then
        test x"$ac_cv_header_pam_pam_appl_h" != x"yes"; then
         AC_MSG_ERROR([PAM development headers are required for --enable-pam])
     fi
+    AC_CACHE_CHECK([for the PAM conversation message qualifier], [rsync_cv_pam_conv_qualifier], [
+        rsync_cv_pam_conv_qualifier=unsupported
+        # Old Solaris headers without a prototype accept either form.
+        case "$host_os" in
+            solaris*) pam_conv_qualifiers="mutable const" ;;
+            *)        pam_conv_qualifiers="const mutable" ;;
+        esac
+        rsync_save_c_werror_flag=$ac_c_werror_flag
+        AC_LANG_WERROR
+        for pam_conv_qualifier in $pam_conv_qualifiers; do
+            pam_conv_const=
+            if test "$pam_conv_qualifier" = const; then
+                pam_conv_const=const
+            fi
+            AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[
+#ifdef HAVE_SECURITY_PAM_APPL_H
+# include <security/pam_appl.h>
+#else
+# include <pam/pam_appl.h>
+#endif
+extern int probe_conversation(int, $pam_conv_const struct pam_message **,
+                              struct pam_response **, void *);
+            ]], [[
+                struct pam_conv conv = { probe_conversation, 0 };
+                (void)conv;
+            ]])], [rsync_cv_pam_conv_qualifier=$pam_conv_qualifier; break])
+        done
+        ac_c_werror_flag=$rsync_save_c_werror_flag
+    ])
+    case "$rsync_cv_pam_conv_qualifier" in
+        const)
+            AC_DEFINE([PAM_CONST_MESSAGES], [1], [Define if PAM conversations take const messages.])
+            ;;
+        mutable) ;;
+        *) AC_MSG_ERROR([Unsupported PAM conversation callback type]) ;;
+    esac
     AC_SEARCH_LIBS([pam_start], [pam],
         [AC_DEFINE([SUPPORT_PAM], [1], [Define if daemon PAM account checks are enabled.])],
         [AC_MSG_ERROR([libpam is required for --enable-pam])])
