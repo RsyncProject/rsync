@@ -5,7 +5,7 @@ rrsync - a script to setup restricted rsync users via ssh logins
 ## SYNOPSIS
 
 ```
-rrsync [-ro|-wo] [-munge] [-absolute] [-no-del] [-no-lock] [-no-overwrite] DIR
+rrsync [-ro|-wo] [-munge] [-absolute] [-no-del] [-no-lock] [-no-overwrite] [-log FILE] DIR
 ```
 
 The single non-option argument specifies the restricted _DIR_ to use. It can be
@@ -91,6 +91,22 @@ The remainder of this manpage is dedicated to using the rrsync script.
 
     Avoid the single-run (per-user) lock check.  Useful with [`-munge`](#opt).
 
+0.  `-log FILE`
+
+    Record server-side transfers and deletions in FILE. A relative FILE is
+    resolved from rrsync's initial working directory. The log must be a regular
+    file outside DIR; the path cannot pass through DIR even when it later
+    leaves by `..` or a symlink. An existing log is appended without changing
+    its permissions. A new log is created with mode 0600, subject to the
+    process umask. The client's `--log-file` is refused while `-log` is set.
+
+    The transfer is refused if the log cannot be opened securely. A later log
+    write failure makes rsync exit with an error, but files transferred before
+    that failure are not rolled back. Keep hard-link and bind-mount aliases of
+    the log outside the client's reach; path traversal cannot identify every
+    such alias. This option is unavailable when DIR is `/` or the platform
+    lacks the required no-follow directory operations.
+
 0.  `-no-overwrite`
 
     Enforce `--ignore-existing` on the server. Prevents overwriting existing
@@ -103,8 +119,9 @@ The remainder of this manpage is dedicated to using the rrsync script.
     replacing whatever has appeared at that name since the check), and backup
     mode (`-b`, `--backup-dir`, whose published backup replaces whatever
     already occupies the backup name). Resumable uploads with an explicit
-    `--partial-dir`, `--delay-updates`, `--delay-symlinks`, and server-side
-    logging are therefore unavailable under this option.
+    `--partial-dir`, `--delay-updates` and `--delay-symlinks` are therefore
+    unavailable under this option. Administrator-controlled `-log` remains
+    available because its log stays outside the restricted dir.
 
 0.  `-help`, `-h`
 

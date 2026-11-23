@@ -59,6 +59,7 @@ extern char *auth_user;
 extern char *stdout_format;
 extern char *logfile_format;
 extern char *logfile_name;
+extern char *rrsync_logfile_name;
 #ifdef ICONV_CONST
 extern iconv_t ic_chck;
 #endif
@@ -162,7 +163,8 @@ static void exit_log_write_error(FILE *stream, int error)
 	if (len > 0 && (size_t)len < sizeof message) {
 		if (logfile_fp && stream != logfile_fp && !ferror(logfile_fp))
 			logit(LOG_ERR, message, (size_t)len);
-		else if (stream != stderr && !am_server && !am_daemon)
+		else if (stream != stderr
+		      && ((!am_server && !am_daemon) || (rrsync_logfile_name && stream == logfile_fp)))
 			fputs(message, stderr);
 	}
 	exit_cleanup(RERR_MESSAGEIO);
@@ -254,8 +256,8 @@ static void logfile_open(void)
 	 * attacker-writable dirs; a planted symlink could redirect root's log
 	 * into e.g. /root/.ssh/authorized_keys.  Refuse symlinks not owned by
 	 * uid 0 or our euid. */
-	int fd = open_no_attacker_symlinks(logfile_name,
-						O_WRONLY | O_APPEND | O_CREAT, 0644);
+	int fd = rrsync_logfile_name ? open_rrsync_logfile(logfile_name)
+		: open_no_attacker_symlinks(logfile_name, O_WRONLY | O_APPEND | O_CREAT, 0644);
 	int open_errno;
 
 	logfile_fp = fd >= 0 && do_fstat(fd, &st) == 0 ? fdopen(fd, "a") : NULL;
@@ -266,6 +268,10 @@ static void logfile_open(void)
 	if (logfile_fp) {
 		logfile_regular = S_ISREG(st.st_mode);
 		logfile_filter = select_logfile_filter();
+	} else if (rrsync_logfile_name) {
+		logfile_name = logfile_format = NULL;
+		rsyserr(FERROR, open_errno, "failed to open required log file");
+		exit_cleanup(RERR_MESSAGEIO);
 	} else {
 		/* Rsync falls back to using syslog on failure. */
 		syslog_init();
