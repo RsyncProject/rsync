@@ -31,8 +31,8 @@
   initial buffer.
 - Report buffered diagnostic and logfile write failures instead of returning
   success after dropping output.
-- Send keepalives while calculating checksums for the file list so slow
-  hashing does not look like an idle connection.
+- Send keepalives during file-list checksumming on multiplexed streams.
+  Client uploads using protocols below 30 cannot send these keepalives.
 
 ## 3.5 maintenance line
 
