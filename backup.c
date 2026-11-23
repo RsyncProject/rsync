@@ -148,6 +148,8 @@ static BOOL copy_valid_path(const char *fname)
 			struct file_struct *file;
 			if (!(file = make_file(rel, NULL, NULL, 0, NO_FILTERS)))
 				continue;
+			if (!am_root && !is_in_group(sx.st.st_gid))
+				file->flags |= FLAG_SKIP_GROUP;
 #if defined SUPPORT_ACLS || defined SUPPORT_XATTRS
 			{	/* read the source dir's ACL/xattr through a confined fd */
 			int bfd = backup_source_fd(rel);
@@ -240,6 +242,8 @@ static BOOL copy_directory_backup_attrs(const char *fname, int source_fd,
 		goto cleanup;
 	}
 	source.st = *original;
+	if (!am_root && !is_in_group(original->st_gid))
+		file->flags |= FLAG_SKIP_GROUP;
 #ifdef SUPPORT_ACLS
 	if (preserve_acls) {
 		if (get_acl_fdat(source_fd, -1, NULL, fname, &source) < 0)

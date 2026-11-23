@@ -1,7 +1,10 @@
 #!/usr/bin/env python3
 
 import os
+import shutil
 import stat
+import tempfile
+from pathlib import Path
 
 from harness import TestContext, requires, run
 from harness.results import test_fail
@@ -103,6 +106,49 @@ def test(context: TestContext):
                 test_fail('failed backup changed the existing symlink or its target')
         elif collision in ('file', 'nested-file') and (backup / name).read_bytes() != b'occupied':
             test_fail(f'{collision}: failed backup overwrote an existing file')
+
+    # As with --group, a non-root backup must skip a group the user cannot
+    # grant (setgid shares, BSD/macOS inherited groups) rather than fail.
+    if os.geteuid() == 0:
+        foreign = next(g for g in range(54321, 65534) if g not in os.getgroups())
+        parent, extra = context.scratch / 'foreign-group', ['--no-super']
+        parent.mkdir()
+    else:
+        try:
+            parent, extra = Path(tempfile.mkdtemp(prefix='rsync-foreign-', dir='/tmp')), []
+        except OSError:
+            parent = None
+        if parent is not None:
+            foreign = parent.stat().st_gid
+            if foreign in os.getgroups():
+                shutil.rmtree(parent)
+                parent = None
+    if parent is not None:
+        try:
+            dst, backup = parent / 'dest', context.scratch / 'foreign-group-backup'
+            inner = dst / 'old' / 'empty'
+            inner.mkdir(parents=True)
+            snapshots = {}
+            for path in (inner, inner.parent):
+                if os.geteuid() == 0:
+                    os.chown(path, -1, foreign)
+                os.utime(path, (1_501_234_567, 1_501_234_567))
+                snapshots[path.relative_to(dst)] = path.stat()
+            result = run_rsync('-a', '--backup', '--delete-during', *extra,
+                               f'--backup-dir={backup}', f'{src}/', f'{dst}/',
+                               capture_output=True, check=False)
+            if result.returncode != 0:
+                test_fail(f'foreign-group: expected exit 0, got {result.returncode}: {result.stderr}')
+            if inner.parent.exists():
+                test_fail('foreign-group: directory was not deleted')
+            for name, original in snapshots.items():
+                actual = (backup / name).stat()
+                if (actual.st_mode, actual.st_mtime) != (original.st_mode, original.st_mtime):
+                    test_fail(f'foreign-group: backup did not preserve metadata for {name}')
+                if actual.st_gid == foreign:
+                    test_fail(f'foreign-group: backup of {name} kept an ungrantable group')
+        finally:
+            shutil.rmtree(parent)
 
     dst = context.scratch / 'suffix-only'
     (dst / 'empty').mkdir(parents=True)
