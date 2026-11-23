@@ -3968,6 +3968,22 @@ sign) if you want the local shell to expand it.
     specify the [`--progress`](#opt) option in order to use
     [`--info=progress2`](#opt).)
 
+    The percentage compares the size of the files transferred so far with the
+    size of the files in the transfer.  Both are full file sizes, not the
+    amount of data sent.  When the whole file list is known before the
+    transfer starts (see [`--no-inc-recursive`](#opt)), a file that needed no
+    transfer is taken out of that total once rsync starts transferring a later
+    file, or once it reaches the end of the list.  Such a file is still in the
+    total while it lies ahead of the current transfer, so the percentage can
+    understate progress and it moves straight to 100% at the end if files
+    needing no transfer follow the last one transferred.  A run that transfers
+    nothing ends at 100%.  A file that has to be sent a second time is added
+    to the total again, which can make the percentage step back.  With
+    incremental recursion the total only covers the part of the file list
+    scanned so far and keeps the files that needed no transfer, so the
+    percentage can finish below 100%, or pass it when a file is sent a second
+    time.
+
     The time field estimates time remaining during the transfer and shows
     elapsed time in the final summary.
 

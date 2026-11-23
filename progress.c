@@ -31,6 +31,7 @@ extern int need_unsorted_flist;
 extern int output_needs_newline;
 extern int stdout_format_has_i;
 extern struct stats stats;
+extern int inc_recurse;
 extern struct file_list *cur_flist;
 
 BOOL want_progress_now = False;
@@ -52,6 +53,7 @@ static struct progress_history ph_start;
 static struct progress_history ph_list[PROGRESS_HISTORY_SECS];
 static int newest_hpos, oldest_hpos;
 static int current_file_index;
+static OFF_T unchecked_size; /* size of the entries not yet checked for a transfer */
 
 static unsigned long msdiff(struct timeval *t1, struct timeval *t2)
 {
@@ -146,6 +148,49 @@ void progress_init(void)
 	}
 }
 
+/* The size that an entry has in the transfer, as counted by stats.total_size. */
+static OFF_T entry_size(struct file_struct *fp)
+{
+	if (!F_IS_ACTIVE(fp) || !(S_ISREG(fp->mode) || S_ISLNK(fp->mode)))
+		return 0;
+	return F_LENGTH(fp);
+}
+
+/* Without incremental recursion the generator walks the one file list in
+ * sorted order, so once an entry is being transferred every earlier entry has
+ * been checked, and at the end of the list all of them have.  Given the
+ * number of sorted entries that have been checked, keep the size of the ones
+ * that are still ahead of the transfer. */
+static void note_checked_files(int checked)
+{
+	static int next_unchecked = -1;
+	int j;
+
+	if (inc_recurse)
+		return;
+
+	if (next_unchecked < 0) {
+		for (j = 0; j < cur_flist->used; j++)
+			unchecked_size += entry_size(cur_flist->sorted[j]);
+		next_unchecked = 0;
+	}
+
+	while (next_unchecked < checked)
+		unchecked_size -= entry_size(cur_flist->sorted[next_unchecked++]);
+}
+
+/* The total that progress2 measures the transferred size against.  When the
+ * whole file list is known up front this is the size transferred so far plus
+ * the size of the entries that have not been checked yet, which leaves out
+ * the files that needed no transfer and counts a file that is sent again as
+ * often as it is sent. */
+static OFF_T overall_size(void)
+{
+	if (inc_recurse)
+		return stats.total_size;
+	return stats.total_transferred_size + unchecked_size;
+}
+
 void set_current_file_index(struct file_struct *file, int ndx)
 {
 	if (!file)
@@ -154,6 +199,8 @@ void set_current_file_index(struct file_struct *file, int ndx)
 		current_file_index = flist_find(cur_flist, file) + cur_flist->ndx_start;
 	else
 		current_file_index = ndx;
+	/* Every sorted entry up to and including this one has been checked. */
+	note_checked_files(current_file_index - cur_flist->ndx_start + 1);
 	current_file_index -= cur_flist->flist_num;
 }
 
@@ -173,7 +220,7 @@ void end_progress(OFF_T size)
 		gettimeofday(&now, NULL);
 		if (INFO_GTE(PROGRESS, 2) || want_progress_now) {
 			rprint_progress(stats.total_transferred_size,
-					stats.total_size, &now, True, False);
+					overall_size(), &now, True, False);
 		} else {
 			rprint_progress(size, size, &now, True, False);
 			memset(&ph_start, 0, sizeof ph_start);
@@ -189,7 +236,7 @@ void finish_progress(void)
 		return;
 
 	gettimeofday(&now, NULL);
-	rprint_progress(stats.total_transferred_size, stats.total_size, &now, True, True);
+	rprint_progress(stats.total_transferred_size, overall_size(), &now, True, True);
 }
 
 void show_progress(OFF_T ofs, OFF_T size)
@@ -212,7 +259,7 @@ void show_progress(OFF_T ofs, OFF_T size)
 
 	if (INFO_GTE(PROGRESS, 2)) {
 		ofs = stats.total_transferred_size - size + ofs;
-		size = stats.total_size;
+		size = overall_size();
 	}
 
 	if (!ph_start.time.tv_sec) {

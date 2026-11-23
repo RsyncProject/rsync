@@ -10,6 +10,11 @@
   verified sender root. Avoid a redundant directory probe for sender file
   reads. Set close-on-exec at open time where supported.
 - Avoid redundant stats when creating children of a fresh receiver directory.
+- Without incremental recursion (for example with `--no-inc-recursive`), the
+  `--info=progress2` percentage and time remaining leave out files that
+  needed no transfer once the transfer has passed them. The percentage ends
+  at 100% and no longer passes it when a file is sent again. The file list,
+  the transfer and `--stats` are unchanged.
 - Try an exact `--link-dest` match without a destination stat in new
   incremental directories. Use the normal lookup path if the link fails.
 - Keep the checked root of a single absolute alternate destination open
