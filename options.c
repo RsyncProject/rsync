@@ -75,6 +75,7 @@ int omit_dir_times = 0;
 int omit_link_times = 0;
 int trust_sender = 0;
 int update_only = 0;
+int update_links = 0;
 int open_noatime = 0;
 int cvs_exclude = 0;
 int dry_run = 0;
@@ -726,6 +727,7 @@ static struct poptOption long_options[] = {
   {"no-one-file-system",0, POPT_ARG_VAL,    &one_file_system, 0, 0, 0 },
   {"no-x",             0,  POPT_ARG_VAL,    &one_file_system, 0, 0, 0 },
   {"update",          'u', POPT_ARG_NONE,   &update_only, 0, 0, 0 },
+  {"update-links",     0,  POPT_ARG_NONE,   &update_links, 0, 0, 0 },
   {"existing",         0,  POPT_ARG_NONE,   &ignore_non_existing, 0, 0, 0 },
   {"ignore-non-existing",0,POPT_ARG_NONE,   &ignore_non_existing, 0, 0, 0 },
   {"ignore-non-existing-directory",0,POPT_ARG_NONE,&ignore_non_existing_dirs, 0, 0, 0 },
@@ -3238,6 +3240,8 @@ void server_options(char **args, int *argc_p)
 
 		if (ignore_non_existing_dirs)
 			ADD_SERVER_ARG("--ignore-non-existing-directory");
+		if (update_links)
+			ADD_SERVER_ARG("--update-links");
 
 		if (tmpdir) {
 			ADD_SERVER_ARG("--temp-dir");
