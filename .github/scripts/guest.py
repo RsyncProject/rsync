@@ -124,6 +124,8 @@ def main():
             if args.platform == 'netbsd':
                 flags.append('--enable-xattr-support')
                 features = ['xattrs']
+            else:
+                flags.append('--enable-pam')
         elif args.platform == 'openbsd':
             env.update(AUTOCONF_VERSION='2.71', AUTOMAKE_VERSION='1.16',
                        CPPFLAGS='-I/usr/local/include -DXXH_INLINE_ALL=1', LDFLAGS='-L/usr/local/lib',
