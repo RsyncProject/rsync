@@ -198,12 +198,12 @@ static void print_info_flags(enum logcode f)
 		if (!str || *str == '*')
 			item_len = 1000;
 		else if (as_json) {
-			char *space = strchr(str, ' ');
+			const char *space = strchr(str, ' ');
 			int is_no = space && strncmp(str, "no ", 3) == 0;
 			int is_bits = space && isDigit(str);
-			char *quot = space && !is_no && !is_bits ? "\"" : "";
-			char *item = space ? space + 1 : str;
-			char *val = !space ? "true" : is_no ? "false" : str;
+			const char *quot = space && !is_no && !is_bits ? "\"" : "";
+			const char *item = space ? space + 1 : str;
+			const char *val = !space ? "true" : is_no ? "false" : str;
 			int val_len = !space ? 4 : is_no ? 5 : space - str;
 			if (is_bits && (space = strchr(val, '-')) != NULL)
 			    val_len = space - str;

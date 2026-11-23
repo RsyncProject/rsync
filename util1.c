@@ -1087,20 +1087,14 @@ size_t pathjoin(char *dest, size_t destsize, const char *p1, const char *p2)
 	return len;
 }
 
-/* Join any number of strings together, putting them in "dest".  The return
- * value is the length of all the strings, regardless of whether the null-
- * terminated whole fits in destsize.  Your list of string pointers must end
- * with a NULL to indicate the end of the list. */
-size_t stringjoin(char *dest, size_t destsize, ...)
+/* Join up to count parts, stopping at the first NULL. Return the full
+ * length even if the result is truncated. */
+size_t stringjoin(char *dest, size_t destsize, const char *const *parts, size_t count)
 {
-	va_list ap;
 	size_t len, ret = 0;
 	const char *src;
 
-	va_start(ap, destsize);
-	while (1) {
-		if (!(src = va_arg(ap, const char *)))
-			break;
+	for (; count && (src = *parts++) != NULL; count--) {
 		len = strlen(src);
 		ret += len;
 		if (destsize > 1) {
@@ -1111,8 +1105,8 @@ size_t stringjoin(char *dest, size_t destsize, ...)
 			dest += len;
 		}
 	}
-	*dest = '\0';
-	va_end(ap);
+	if (destsize)
+		*dest = '\0';
 
 	return ret;
 }

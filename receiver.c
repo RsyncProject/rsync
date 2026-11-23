@@ -407,7 +407,7 @@ int get_tmpname(char *fnametmp, const char *fname, BOOL make_unique)
 		 * link, or symlink to fail to be created.  Also: avoid
 		 * using mktemp() due to gcc's annoying warning. */
 		while (1) {
-			snprintf(suf, TMPNAME_SUFFIX_LEN+1, ".%d", counter);
+			snprintf(suf, TMPNAME_SUFFIX_LEN+1, ".%u", counter);
 			if (access(fnametmp, 0) < 0)
 				break;
 			if (++counter >= counter_limit)

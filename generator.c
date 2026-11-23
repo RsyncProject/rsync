@@ -64,6 +64,7 @@ extern int update_only;
 extern int human_readable;
 extern int ignore_existing;
 extern int ignore_non_existing;
+extern int ignore_non_existing_dirs;
 extern int want_xattr_optim;
 extern int modify_window;
 extern int inplace;
@@ -1967,14 +1968,21 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 					exit_cleanup(RERR_PROTOCOL);
 				}
 			}
-			if (relative_paths && !implied_dirs && file->mode != 0
-			 && do_stat_at(dn, &sx.st) < 0) {
-				if (dry_run)
-					goto parent_is_dry_missing;
-				if (make_path(fname, MKP_DROP_NAME | MKP_SKIP_SLASH) < 0) {
-					rsyserr(FERROR_XFER, errno,
-						"recv_generator: mkdir %s failed",
-						full_fname(dn));
+			if (relative_paths && !implied_dirs && file->mode != 0) {
+				int parent_stat = do_stat_at(dn, &sx.st);
+				if (ignore_non_existing_dirs > 0
+				 && (parent_stat < 0 || !S_ISDIR(sx.st.st_mode))) {
+					if (parent_stat < 0 && errno != ENOENT && errno != ENOTDIR)
+						rsyserr(FERROR_XFER, errno, "recv_generator: stat %s failed",
+							full_fname(dn));
+					goto skipping_non_existing;
+				}
+				if (parent_stat < 0) {
+					if (dry_run)
+						goto parent_is_dry_missing;
+					if (make_path(fname, MKP_DROP_NAME | MKP_SKIP_SLASH) < 0)
+						rsyserr(FERROR_XFER, errno,
+							"recv_generator: mkdir %s failed", full_fname(dn));
 				}
 			}
 			if (fuzzy_basis) {
@@ -2029,7 +2037,13 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 		return;
 	}
 
-	if (ignore_non_existing > 0 && statret == -1 && stat_errno == ENOENT) {
+	if ((ignore_non_existing > 0 && statret == -1 && stat_errno == ENOENT)
+	 || (ignore_non_existing_dirs > 0 && is_dir
+	  && (statret != 0 || !S_ISDIR(sx.st.st_mode)))) {
+		if (is_dir > 0 && statret != 0 && stat_errno != ENOENT && stat_errno != ENOTDIR)
+			rsyserr(FERROR_XFER, stat_errno, "recv_generator: stat %s failed",
+				full_fname(fname));
+	  skipping_non_existing:
 		if (is_dir) {
 			if (is_dir < 0)
 				return;
