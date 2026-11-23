@@ -625,8 +625,6 @@ static void flist_expand(struct file_list *flist, int extra)
 			goto too_large;
 		flist->malloced += FLIST_LINEAR;
 	} else if (flist->malloced < FLIST_START_LARGE/16) {
-		if (flist->malloced > INT_MAX/4)
-			goto too_large;
 		flist->malloced *= 4;
 	} else {
 		if (flist->malloced > INT_MAX/2)

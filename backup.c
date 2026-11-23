@@ -88,6 +88,7 @@ static int validate_backup_dir(void)
 static BOOL copy_valid_path(const char *fname)
 {
 	const char *f;
+	const char *const parts[] = { fname, backup_suffix };
 	int val;
 	BOOL ret = True;
 	stat_x sx;
@@ -98,7 +99,7 @@ static BOOL copy_valid_path(const char *fname)
 			name = b + 1;
 	}
 
-	if (stringjoin(rel, backup_dir_remainder, fname, backup_suffix, NULL) >= backup_dir_remainder) {
+	if (stringjoin(rel, backup_dir_remainder, parts, sizeof parts / sizeof parts[0]) >= backup_dir_remainder) {
 		rprintf(FERROR, "backup filename too long\n");
 		*name = '\0';
 		return False;
@@ -192,6 +193,8 @@ static BOOL copy_valid_path(const char *fname)
 /* Make a complete pathname for backup file and verify any new path elements. */
 char *get_backup_name(const char *fname)
 {
+	const char *const parts[] = { fname, backup_suffix };
+
 	if (backup_dir) {
 		static int initialized = 0;
 		if (!initialized) {
@@ -215,7 +218,7 @@ char *get_backup_name(const char *fname)
 		return NULL;
 	}
 
-	if (stringjoin(backup_dir_buf, MAXPATHLEN, fname, backup_suffix, NULL) < MAXPATHLEN)
+	if (stringjoin(backup_dir_buf, MAXPATHLEN, parts, sizeof parts / sizeof parts[0]) < MAXPATHLEN)
 		return backup_dir_buf;
 
 	rprintf(FERROR, "backup filename too long\n");

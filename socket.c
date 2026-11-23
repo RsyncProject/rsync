@@ -70,8 +70,8 @@ static int establish_proxy_connection(int fd, char *host, int port, char *proxy_
 	}
 
 	if (proxy_user && proxy_pass) {
-		stringjoin(buffer, PROXY_BUF_SIZE,
-			 proxy_user, ":", proxy_pass, NULL);
+		const char *const parts[] = { proxy_user, ":", proxy_pass };
+		stringjoin(buffer, PROXY_BUF_SIZE, parts, sizeof parts / sizeof parts[0]);
 		len = strlen(buffer);
 
 		if ((len*8 + 5) / 6 >= PROXY_BUF_SIZE - 3) {

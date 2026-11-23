@@ -601,6 +601,7 @@ has its own detailed description later in this manpage.
 --rsync-path=PROGRAM     specify the rsync to run on remote machine
 --existing               skip creating new files on receiver
 --ignore-non-existing    skip creating new files on receiver
+--ignore-non-existing-directory  skip new destination directories
 --ignore-existing        skip updating files that exist on receiver
 --remove-source-files    sender removes synchronized files (non-directory)
 --del                    an alias for --delete-during
@@ -2137,6 +2138,24 @@ sign) if you want the local shell to expand it.
 
     This option is a [TRANSFER RULE](#TRANSFER_RULES), so don't expect any
     exclude side effects.
+
+0.  `--ignore-non-existing-directory`
+
+    Skip a source directory and its contents unless the corresponding
+    destination directory already exists. A non-directory entry at that path
+    is left in place. This also applies to implied parent directories in a
+    [`--relative`](#opt) transfer.
+
+    New files can still be copied into existing directories. Use
+    [`--existing`](#opt) as well to skip new files. This option is a
+    [TRANSFER RULE](#TRANSFER_RULES) and does not alter deletion in existing
+    directories. It does not change how rsync creates the destination path
+    itself.
+
+    The receiver must support this option. Older senders can still be used.
+    Combining this option with `--relative --no-implied-dirs` requires
+    protocol 30 or higher because older senders omit the implied parents
+    from the file list.
 
 0.  `--ignore-existing`
 

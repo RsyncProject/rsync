@@ -43,7 +43,7 @@ jobs:
       interoperability: ${{ steps.select.outputs.interoperability }}
       asan: ${{ steps.select.outputs.asan }}
       coverage: ${{ steps.select.outputs.coverage }}
-      clang: ${{ steps.select.outputs.clang }}
+      static_analysis: ${{ steps.select.outputs.static_analysis }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -106,7 +106,7 @@ jobs:
       python_37: *regular
       asan: ${{ needs.changes.outputs.asan == 'true' && (github.event_name != 'schedule' || github.event.schedule == '42 9 * * 1') }}
       coverage: ${{ needs.changes.outputs.coverage == 'true' && (github.event_name != 'schedule' || github.event.schedule == '42 9 * * 1') }}
-      clang_21: ${{ needs.changes.outputs.clang == 'true' && (github.event_name != 'schedule' || github.event.schedule == '42 9 * * 1') }}
+      static_analysis: ${{ needs.changes.outputs.static_analysis == 'true' && (github.event_name != 'schedule' || github.event.schedule == '42 9 * * 1') }}
       versions: &versions_selected ${{ needs.changes.outputs.versions == 'true' && (github.event_name != 'schedule' || github.event.schedule == '52 8 * * 1') }}
 
   valgrind:
