@@ -34,87 +34,74 @@
 #define CVAL(buf,pos) (((unsigned char *)(buf))[pos])
 #define UVAL(buf,pos) ((uint32)CVAL(buf,pos))
 
-#if CAREFUL_ALIGNMENT
-
+/* Keep one definition per helper so coverage can merge both builds. */
 static inline uint32
 IVALu(const uchar *buf, int pos)
 {
+#if CAREFUL_ALIGNMENT
 	return UVAL(buf, pos)
 	     | UVAL(buf, pos + 1) << 8
 	     | UVAL(buf, pos + 2) << 16
 	     | UVAL(buf, pos + 3) << 24;
+#else
+	/* Fixed-size copies permit unaligned access without type punning. */
+	uint32 val;
+	memcpy(&val, buf + pos, sizeof val);
+	return val;
+#endif
 }
 
 static inline void
 SIVALu(uchar *buf, int pos, uint32 val)
 {
+#if CAREFUL_ALIGNMENT
 	CVAL(buf, pos)     = val;
 	CVAL(buf, pos + 1) = val >> 8;
 	CVAL(buf, pos + 2) = val >> 16;
 	CVAL(buf, pos + 3) = val >> 24;
+#else
+	memcpy(buf + pos, &val, sizeof val);
+#endif
 }
 
 static inline int64
 IVAL64(const char *buf, int pos)
 {
+#if CAREFUL_ALIGNMENT
 	uint32 lower = IVALu((const uchar *)buf, pos);
-#if SIZEOF_INT64 >= 8
+# if SIZEOF_INT64 >= 8
 	const int64 word_range = (int64)1 << 32;
 	int64 upper = IVALu((const uchar *)buf, pos + 4);
 
 	if (upper >= word_range / 2)
 		upper -= word_range;
 	return upper * word_range + (int64)lower;
-#else
+# else
 	return lower;
-#endif
-}
-
-static inline void
-SIVAL64(char *buf, int pos, int64 val)
-{
-#if SIZEOF_INT64 >= 8
-	/* Complement first so the shifted operand is non-negative. */
-	uint32 upper = val < 0 ? ~(uint32)((-1 - val) >> 32) : (uint32)(val >> 32);
+# endif
 #else
-	uint32 upper = val < 0 ? (uint32)-1 : 0;
-#endif
-	SIVALu((uchar*)buf, pos, val);
-	SIVALu((uchar*)buf, pos + 4, upper);
-}
-
-#else /* !CAREFUL_ALIGNMENT */
-
-/* Fixed-size copies permit unaligned access without type punning. */
-static inline uint32
-IVALu(const uchar *buf, int pos)
-{
-	uint32 val;
-	memcpy(&val, buf + pos, sizeof val);
-	return val;
-}
-
-static inline void
-SIVALu(uchar *buf, int pos, uint32 val)
-{
-	memcpy(buf + pos, &val, sizeof val);
-}
-
-static inline int64
-IVAL64(const char *buf, int pos)
-{
 	int64 val;
 	memcpy(&val, buf + pos, sizeof val);
 	return val;
+#endif
 }
 
 static inline void
 SIVAL64(char *buf, int pos, int64 val)
 {
+#if CAREFUL_ALIGNMENT
+# if SIZEOF_INT64 >= 8
+	/* Complement first so the shifted operand is non-negative. */
+	uint32 upper = val < 0 ? ~(uint32)((-1 - val) >> 32) : (uint32)(val >> 32);
+# else
+	uint32 upper = val < 0 ? (uint32)-1 : 0;
+# endif
+	SIVALu((uchar*)buf, pos, val);
+	SIVALu((uchar*)buf, pos + 4, upper);
+#else
 	memcpy(buf + pos, &val, sizeof val);
+#endif
 }
-
-#endif /* !CAREFUL_ALIGNMENT */
 
 static inline uint32
 IVAL(const char *buf, int pos)
