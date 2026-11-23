@@ -199,6 +199,7 @@ char *basis_dir[MAX_BASIS_DIRS+1];
 char *config_file = NULL;
 char *shell_cmd = NULL;
 char *logfile_name = NULL;
+char *rrsync_logfile_name = NULL;
 char *logfile_format = NULL;
 char *stdout_format = NULL;
 char *password_file = NULL;
@@ -807,6 +808,7 @@ static struct poptOption long_options[] = {
   {"no-prune-empty-dirs",0,POPT_ARG_VAL,    &prune_empty_dirs, 0, 0, 0 },
   {"no-m",             0,  POPT_ARG_VAL,    &prune_empty_dirs, 0, 0, 0 },
   {"log-file",         0,  POPT_ARG_STRING, &logfile_name, 0, 0, 0 },
+  {"rrsync-log-file",  0,  POPT_ARG_STRING | POPT_ARGFLAG_DOC_HIDDEN, &rrsync_logfile_name, 0, 0, 0 },
   {"log-file-format",  0,  POPT_ARG_STRING, &logfile_format, 0, 0, 0 },
   {"out-format",       0,  POPT_ARG_STRING, &stdout_format, 0, 0, 0 },
   {"log-format",       0,  POPT_ARG_STRING, &stdout_format, 0, 0, 0 }, /* DEPRECATED */
@@ -2636,6 +2638,15 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 	}
 	if (stdout_format_has_i || log_format_has(stdout_format, 'o'))
 		stdout_format_has_o_or_i = 1;
+
+	if (rrsync_logfile_name) {
+		if (!am_server || am_daemon || confine_rootlen <= 1
+		 || *rrsync_logfile_name != '/' || logfile_name || logfile_format) {
+			snprintf(err_buf, sizeof err_buf, "invalid restricted server log configuration\n");
+			return 0;
+		}
+		logfile_name = rrsync_logfile_name;
+	}
 
 	if (logfile_name && !am_daemon) {
 		if (!logfile_format) {

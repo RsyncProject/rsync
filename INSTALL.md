@@ -73,6 +73,12 @@ To support copying ACL file information, make sure you have an acl development
 library installed. It also helps to have the helper programs installed to
 manipulate ACLs and to run the rsync testsuite.
 
+## Daemon PAM account policy
+
+Install the PAM development library and configure with `--enable-pam` to allow
+daemon modules to opt in to PAM account checks. Configure the system's `rsync`
+PAM service before setting `use pam = yes` in [rsyncd.conf](rsyncd.conf.5.md).
+
 ## Xattr support
 
 To support copying xattr file information, make sure you have an attr
