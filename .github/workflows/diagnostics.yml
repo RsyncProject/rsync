@@ -15,7 +15,7 @@ on:
       coverage:
         required: true
         type: boolean
-      clang_21:
+      static_analysis:
         required: true
         type: boolean
       versions:
@@ -195,11 +195,13 @@ jobs:
             coverage
             coverage-tcp
 
-  clang_21:
-    if: ${{ inputs.clang_21 }}
+  static_analysis:
+    if: ${{ inputs.static_analysis }}
     runs-on: ubuntu-26.04
     timeout-minutes: 45
-    name: Clang 21
+    name: Static analysis
+    env:
+      LLVM_MAJOR: '23'
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -207,26 +209,41 @@ jobs:
           persist-credentials: false
       - name: Install dependencies
         run: |
-          sudo apt-get update
-          sudo apt-get install -y clang-21 clang-tools-21 acl libacl1-dev attr libattr1-dev liblz4-dev libidn2-dev libzstd-dev libxxhash-dev libpopt-dev openssl
-      - name: Compiler version
-        run: clang-21 --version
+          curl --fail --silent --show-error --location --proto '=https' --retry 3 --max-time 30 \
+            --output "$RUNNER_TEMP/llvm.asc" https://apt.llvm.org/llvm-snapshot.gpg.key
+          sudo install -D -m 644 "$RUNNER_TEMP/llvm.asc" /etc/apt/keyrings/llvm.asc
+          printf '%s %s\n' \
+            'deb [signed-by=/etc/apt/keyrings/llvm.asc,6084F3CF814B57C1CF12EFD515CF4D18AF4F7421] https://apt.llvm.org/resolute/' \
+            "llvm-toolchain-resolute-$LLVM_MAJOR main" |
+            sudo tee /etc/apt/sources.list.d/llvm.list > /dev/null
+          sudo apt-get -o Acquire::Retries=3 update
+          sudo apt-get -o Acquire::Retries=3 install -y --no-install-recommends \
+            "clang-$LLVM_MAJOR" "clang-tools-$LLVM_MAJOR" cppcheck acl libacl1-dev attr libattr1-dev \
+            liblz4-dev libidn2-dev libzstd-dev libxxhash-dev libpopt-dev libssl-dev openssl
+      - name: Tool versions
+        run: |
+          "clang-$LLVM_MAJOR" --version
+          cppcheck --version
       - name: Configure
-        run: scan-build-21 ./configure --with-rrsync --disable-md2man
-      - name: Analyse
-        run: python3 -S .github/scripts/diagnostics.py scan
+        run: |
+          "scan-build-$LLVM_MAJOR" --use-cc="clang-$LLVM_MAJOR" --use-c++="clang++-$LLVM_MAJOR" \
+            ./configure --with-rrsync --disable-md2man
+      - name: Clang static analyser
+        run: python3 -B -S .github/scripts/diagnostics.py scan "$LLVM_MAJOR"
+      - name: Cppcheck
+        run: python3 -B -S .github/scripts/diagnostics.py cppcheck
       - name: Upload report
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           retention-days: 45
-          name: scan-build-report-clang21
+          name: scan-build-report
           path: scan-report
           if-no-files-found: ignore
 
   versions:
     name: Archived peers
-    needs: [lint, python_37, asan, coverage, clang_21]
+    needs: [lint, python_37, asan, coverage, static_analysis]
     if: ${{ !cancelled() && inputs.versions }}
     runs-on: ubuntu-24.04
     timeout-minutes: 45

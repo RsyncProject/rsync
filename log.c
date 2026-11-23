@@ -657,7 +657,7 @@ void rwrite(enum logcode code, const char *buf, int len, int is_utf8)
 			ierrno = errno;
 			if (outbuf.len) {
 				char trailing = inbuf.len ? '\0' : trailing_NL;
-				filtered_fwrite(f, convbuf, outbuf.len, FILTER_CONSOLE_LOCALE, trailing);
+				filtered_fwrite(f, outbuf.buf, outbuf.len, FILTER_CONSOLE_LOCALE, trailing);
 				if (trailing) {
 					trailing_NL = '\0';
 					flush_log_stream(f);

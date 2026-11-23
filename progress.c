@@ -123,7 +123,7 @@ static void rprint_progress(OFF_T ofs, OFF_T size, struct timeval *now,
 	pct = ofs == size ? 100 : (int) (100.0 * ofs / size);
 	/* Keep progress rates scaled while byte counts retain the level-1 default. */
 	rate_human_level = human_readable == 1 ? 2 : human_readable;
-	rate_str = rate >= INT64_MAX ? ">MAX "
+	rate_str = rate >= (double)INT64_MAX ? ">MAX "
 		: do_big_num((int64)rate, rate_human_level, NULL);
 	rput_progress();
 	rprintf(FCLIENT, "%15sB %3d%% %7sB/s %s%s", human_num(ofs), pct,
