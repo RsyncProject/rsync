@@ -80,7 +80,7 @@ echo "Building package.."
 (
     cd "$FAKE_ROOT" || exit 1
     pkgmk -d . -r . -f ./prototype -o &&
-        pkgtrans -os . "$OUTPUTFILE" "$PKGNAME"
+    pkgtrans -os . "$OUTPUTFILE" "$PKGNAME"
 ) || exit 1
 
 mv "$FAKE_ROOT/$OUTPUTFILE" . || exit 1
