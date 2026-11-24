@@ -12,7 +12,7 @@ from harness.rsync import rsync_argv, under_valgrind
           mutates={'filesystem', 'process'}, tags={'transfer', 'regression'})
 def test(context: TestContext):
     if under_valgrind():
-        test_skipped('requires direct read interposition', capability='linux_interpose')
+        test_skipped('requires direct write interposition', capability='linux_interpose')
 
     fixture = context.repository / 'testsuite/fixtures/backup-delta-size-change.c'
     library = context.scratch / 'backup-delta-size-change.so'
@@ -33,10 +33,12 @@ def test(context: TestContext):
         backup.mkdir()
         (source / 'file').write_bytes(new)
         original = destination / 'file'
+        saved = backup / 'outer' / 'file'
         original.write_bytes(old)
         marker = base / 'changed'
         env = {**os.environ, 'LD_PRELOAD': str(library),
                'RSYNC_TEST_OLD_FILE': str(original),
+               'RSYNC_TEST_BACKUP_FILE': str(saved),
                'RSYNC_TEST_CHANGE_MARKER': str(marker),
                'RSYNC_TEST_BACKUP_MUTATION': mutation}
         result = subprocess.run(
@@ -45,14 +47,17 @@ def test(context: TestContext):
             env=env, capture_output=True, text=True, timeout=20,
         )
         if not marker.exists():
-            test_fail(f'{mutation}: the old destination did not change during backup')
+            test_fail(f'{mutation}: the fixture did not change the basis during a partial backup write')
         if mutation == 'grow':
-            if result.returncode or (backup / 'outer' / 'file').read_bytes() != old:
+            if result.returncode or saved.read_bytes() != old:
                 test_fail(f'growth was not capped at the captured size: {result.stderr}')
             if original.read_bytes() != new:
                 test_fail('the updated file has incorrect contents after growth')
-        elif result.returncode == 0 or original.read_bytes() != old[:8192]:
-            test_fail(f'short input allowed the in-place update: {result.stderr}')
+        else:
+            if result.returncode != 23 or 'shrank while copying' not in result.stderr:
+                test_fail(f'expected a short-copy failure, got exit {result.returncode}: {result.stderr}')
+            if original.read_bytes() != old[:8192]:
+                test_fail('short input allowed the in-place update')
 
 
 if __name__ == '__main__':
