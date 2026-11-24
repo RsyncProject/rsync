@@ -1184,9 +1184,10 @@ sign) if you want the local shell to expand it.
     holding their backed-up contents. The suffix applies to non-directory
     backups. If a suffixed backup and a directory need the same path, rsync
     reports the conflict without replacing the existing backup. When reusing
-    an owned backup subdirectory, rsync may temporarily make it writable and
-    restore its mode after the backup operation. This does not change the
-    permissions of DIR.
+    an owned backup subdirectory, rsync may temporarily grant itself search or
+    write access and restore the directory's mode after the backup operation.
+    This does not change the permissions of DIR. An uncatchable termination or
+    system failure can leave the temporary access in place.
 
     Note that if you specify a relative path, the backup directory will be
     relative to the destination directory, so you probably want to specify

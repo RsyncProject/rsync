@@ -2607,26 +2607,14 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 
 	if (read_batch || whole_file) {
 		if (inplace && make_backups > 0 && fnamecmp_type == FNAMECMP_FNAME) {
-			/* The --backup-dir (backupptr) is an operator path; this in-place
-			 * backup bypasses make_backup(), so set operator_path_resolve here
-			 * too -- get_backup_name() (make_path) and copy_file() then resolve
-			 * it with the ownership walk instead of following any symlink. */
-			operator_path_resolve = 1;
-			if (!(backupptr = get_backup_name(fname))) {
-				operator_path_resolve = 0;
-				goto cleanup;
-			}
-			if (!(back_file = make_file(fname, NULL, NULL, 0, NO_FILTERS))) {
-				operator_path_resolve = 0;
+			if (!(back_file = make_file(fname, NULL, NULL, 0, NO_FILTERS)))
 				goto pretend_missing;
-			}
 			if (copy_inplace_backup(fname, back_file->mode) < 0) {
-				operator_path_resolve = 0;
 				unmake_file(back_file);
 				back_file = NULL;
 				goto cleanup;
 			}
-			operator_path_resolve = 0;
+			backupptr = get_backup_name(fname);
 		}
 		goto notify_others;
 	}
@@ -2655,24 +2643,14 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 	}
 
 	if (inplace && make_backups > 0 && fnamecmp_type == FNAMECMP_FNAME) {
-		/* Operator --backup-dir, bypassing make_backup(): resolve get_backup_name()
-		 * (make_path), the unlink and the create with the ownership walk. */
-		operator_path_resolve = 1;
-		if (!(backupptr = get_backup_name(fname))) {
-			operator_path_resolve = 0;
-			goto cleanup;
-		}
-		if (!(back_file = make_file(fname, NULL, NULL, 0, NO_FILTERS))) {
-			operator_path_resolve = 0;
+		if (!(back_file = make_file(fname, NULL, NULL, 0, NO_FILTERS)))
 			goto pretend_missing;
-		}
-		if ((f_copy = open_inplace_backup()) < 0) {
-			operator_path_resolve = 0;
+		if ((f_copy = open_inplace_backup(fname, 0600)) < 0) {
 			unmake_file(back_file);
 			back_file = NULL;
 			goto cleanup;
 		}
-		operator_path_resolve = 0;
+		backupptr = get_backup_name(fname);
 		fnamecmp_type = FNAMECMP_BACKUP;
 	}
 
@@ -2763,7 +2741,10 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 		 * try_dests_reg).  The static --backup-dir escape is already closed; a
 		 * parent-symlink flipped in after the confined create races only these
 		 * chmod/chown/times -- a documented residual. */
-		set_file_attrs(backupptr, back_file, NULL, NULL, 0);
+		if (begin_backup_read()) {
+			set_file_attrs(backupptr, back_file, NULL, NULL, 0);
+			end_backup_access();
+		}
 		preserve_xattrs = save_preserve_xattrs;
 		if (INFO_GTE(BACKUP, 1)) {
 			rprintf(FINFO, "backed up %s to %s\n",

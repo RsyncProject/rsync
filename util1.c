@@ -344,7 +344,7 @@ static int safe_read(int desc, char *ptr, size_t len)
 }
 
 /* Remove existing file @dest and reopen, creating a new file with @mode */
-static int unlink_and_reopen(const char *dest, mode_t mode)
+int open_copy_destination(const char *dest, mode_t mode)
 {
 	int ofd;
 
@@ -388,7 +388,7 @@ static int unlink_and_reopen(const char *dest, mode_t mode)
  *
  * This is used in conjunction with the --temp-dir, --backup, and
  * --copy-dest options. */
-int copy_file(const char *source, const char *dest, int tmpfilefd, mode_t mode)
+int open_copy_source(const char *source)
 {
 	int ifd;
 
@@ -434,6 +434,15 @@ int copy_file(const char *source, const char *dest, int tmpfilefd, mode_t mode)
 		return -1;
 	}
 
+	return ifd;
+}
+
+int copy_file(const char *source, const char *dest, int tmpfilefd, mode_t mode)
+{
+	int ifd = open_copy_source(source);
+
+	if (ifd < 0)
+		return -1;
 	return copy_file_from_fd(source, ifd, dest, tmpfilefd, mode);
 }
 
@@ -448,7 +457,7 @@ int copy_file_from_fd(const char *source, int ifd, const char *dest, int tmpfile
 	if (tmpfilefd >= 0) {
 		ofd = tmpfilefd;
 	} else {
-		ofd = unlink_and_reopen(dest, mode);
+		ofd = open_copy_destination(dest, mode);
 		if (ofd < 0) {
 			int save_errno = errno;
 			close(ifd);

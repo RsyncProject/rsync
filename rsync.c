@@ -30,6 +30,7 @@
 extern int dry_run;
 extern int preserve_acls;
 extern int preserve_xattrs;
+extern char backup_dir_buf[MAXPATHLEN];
 extern int preserve_perms;
 extern int preserve_executability;
 extern int preserve_mtimes;
@@ -915,6 +916,7 @@ int finish_transfer(const char *fname, const char *fnametmp,
 		    int overwriting_basis)
 {
 	int ret;
+	BOOL backup_basis = False;
 	const char *temp_copy_name = partialptr && *partialptr != '/' ? partialptr : NULL;
 
 	if (inplace) {
@@ -928,8 +930,9 @@ int finish_transfer(const char *fname, const char *fnametmp,
 		int ok = make_backup(fname, False);
 		if (!ok)
 			exit_cleanup(RERR_FILEIO);
-		if (ok == 1 && fnamecmp == fname)
+		if (ok == 1 && fnamecmp == fname) {
 			fnamecmp = get_backup_name(fname);
+		}
 	}
 
 	/* Change permissions before putting the file into place.  An absolute
@@ -937,10 +940,15 @@ int finish_transfer(const char *fname, const char *fnametmp,
 	 * dirfd, so resolve its metadata through the ownership walk (op_pin); a
 	 * flipped temp-dir parent then can't redirect the chmod/chown/times/etc.
 	 * (in-tree temps keep their held dirfd, so op_pin stays off there). */
+	backup_basis = preserve_xattrs && fnamecmp == backup_dir_buf;
+	if (backup_basis && !begin_backup_read())
+		return 0;
 	operator_path_resolve = 1;
 	set_file_attrs(fnametmp, file, NULL, fnamecmp,
 		       ok_to_set_time ? ATTRS_ACCURATE_TIME : ATTRS_SKIP_MTIME | ATTRS_SKIP_ATIME | ATTRS_SKIP_CRTIME);
 	operator_path_resolve = 0;
+	if (backup_basis && !end_backup_access())
+		return 0;
 
 	/* move tmp file over real file */
 	if (DEBUG_GTE(RECV, 1))
@@ -964,8 +972,13 @@ int finish_transfer(const char *fname, const char *fnametmp,
 	fnametmp = temp_copy_name ? temp_copy_name : fname;
 
   do_set_file_attrs:
+	backup_basis = preserve_xattrs && fnamecmp == backup_dir_buf;
+	if (backup_basis && !begin_backup_read())
+		return 0;
 	set_file_attrs(fnametmp, file, NULL, fnamecmp,
 		       ok_to_set_time ? ATTRS_ACCURATE_TIME : ATTRS_SKIP_MTIME | ATTRS_SKIP_ATIME | ATTRS_SKIP_CRTIME);
+	if (backup_basis && !end_backup_access())
+		return 0;
 
 	if (temp_copy_name) {
 		if (do_rename_at(fnametmp, fname) < 0) {
