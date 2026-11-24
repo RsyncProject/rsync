@@ -22,7 +22,7 @@ def check(label, inplace):
         backup, _ = plant_operator_symlink(ctx, dest)
         args = ['-a', '--backup', f'--backup-dir={backup}']
         if inplace:
-            args.append('--inplace')
+            args.extend(('--inplace', '--no-whole-file'))
         if ctx.insecure:
             args.append('--insecure-links')
         subprocess.run(rsync_argv(*args, 'src/', 'dest/'), cwd=ctx.base,

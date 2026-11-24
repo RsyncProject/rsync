@@ -192,7 +192,7 @@ int group_to_gid(const char *name, gid_t *gid_p, BOOL num_ok)
 	return 1;
 }
 
-static int is_in_group(gid_t gid)
+int is_in_group(gid_t gid)
 {
 #ifdef HAVE_GETGROUPS
 	static gid_t last_in;

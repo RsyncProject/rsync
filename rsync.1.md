@@ -1180,6 +1180,17 @@ sign) if you want the local shell to expand it.
     using the [`--suffix`](#opt) option (otherwise the files backed up in the
     specified directory will keep their original filenames).
 
+    During deletion, directory backups use the same names as the directories
+    holding their backed-up contents. The suffix applies to non-directory
+    backups. If a suffixed backup and a directory need the same path, rsync
+    reports the conflict without replacing the existing backup. When reusing
+    an owned backup subdirectory, rsync may temporarily grant itself search or
+    write access and restore the directory's mode after the backup operation.
+    This does not change the permissions of DIR. An uncatchable termination or
+    system failure can leave the temporary access in place.
+    A failed file-backup copy can leave an incomplete file at its backup name;
+    a failed transfer does not establish a complete snapshot.
+
     Note that if you specify a relative path, the backup directory will be
     relative to the destination directory, so you probably want to specify
     either an absolute path or a path that starts with "../".  If an rsync

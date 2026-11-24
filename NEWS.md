@@ -40,6 +40,12 @@
   initial buffer.
 - Report buffered diagnostic and logfile write failures instead of returning
   success after dropping output.
+- Preserve directories and their requested attributes in `--backup-dir`
+  when removing them during a deletion pass. Leave the original directory
+  in place if its backup fails.
+- Treat xattr copy errors as file-copy failures. Refuse an in-place delta
+  update before changing its destination when copying the backup fails to
+  write, copy xattrs or close.
 - Send keepalives during file-list checksumming on multiplexed streams.
   Client uploads using protocols below 30 cannot send these keepalives.
 

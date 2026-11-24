@@ -225,6 +225,7 @@
 #define ATTRS_ACCURATE_TIME	(1<<2)
 #define ATTRS_SKIP_ATIME	(1<<3)
 #define ATTRS_SKIP_CRTIME	(1<<5)
+#define ATTRS_REQUIRE_SUCCESS	(1<<6)
 
 #define MSG_FLUSH	2
 #define FULL_FLUSH	1
