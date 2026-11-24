@@ -845,7 +845,7 @@ static void sum_sizes_sqroot(struct sum_struct *sum, int64 len)
  *
  * Generate approximately one checksum every block_len bytes.
  */
-static int generate_and_send_sums(int fd, OFF_T len, int f_out, int f_copy)
+static int generate_and_send_sums(int fd, OFF_T len, int f_out)
 {
 	int32 i;
 	struct map_struct *mapbuf;
@@ -857,7 +857,7 @@ static int generate_and_send_sums(int fd, OFF_T len, int f_out, int f_copy)
 		return -1;
 	write_sum_head(f_out, &sum);
 
-	if (append_mode > 0 && f_copy < 0)
+	if (append_mode > 0)
 		return 0;
 
 	if (len > 0)
@@ -873,12 +873,6 @@ static int generate_and_send_sums(int fd, OFF_T len, int f_out, int f_copy)
 
 		len -= n1;
 		offset += n1;
-
-		if (f_copy >= 0) {
-			full_write(f_copy, map, n1);
-			if (append_mode > 0)
-				continue;
-		}
 
 		sum1 = get_checksum1(map, n1);
 		get_checksum2(map, n1, sum2);
@@ -1040,7 +1034,7 @@ static int copy_altdest_file(const char *src, const char *dest, struct file_stru
 		copy_to = buf;
 	}
 	cleanup_set(copy_to, NULL, NULL, -1, -1);
-	ok = fd_r >= 0 ? copy_file_from_fd(src, fd_r, copy_to, fd_w, file->mode)
+	ok = fd_r >= 0 ? copy_file_from_fd(src, fd_r, copy_to, fd_w, file->mode, -1)
 		       : copy_file(src, copy_to, fd_w, file->mode);
 	if (ok < 0) {
 		if (INFO_GTE(COPY, 1)) {
@@ -1882,7 +1876,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 	static int fresh_link_fallback_flist = -1;
 #endif
 	struct file_struct *fuzzy_file = NULL;
-	int fd = -1, f_copy = -1;
+	int fd = -1;
 	stat_x sx = {0}, real_sx = {0};
 	STRUCT_STAT partial_st;
 	struct file_struct *back_file = NULL;
@@ -2609,7 +2603,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 		if (inplace && make_backups > 0 && fnamecmp_type == FNAMECMP_FNAME) {
 			if (!(back_file = make_file(fname, NULL, NULL, 0, NO_FILTERS)))
 				goto pretend_missing;
-			if (copy_inplace_backup(fname, back_file->mode) < 0) {
+			if (copy_inplace_backup(fname, -1, back_file->mode, -1) < 0) {
 				unmake_file(back_file);
 				back_file = NULL;
 				goto cleanup;
@@ -2645,7 +2639,14 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 	if (inplace && make_backups > 0 && fnamecmp_type == FNAMECMP_FNAME) {
 		if (!(back_file = make_file(fname, NULL, NULL, 0, NO_FILTERS)))
 			goto pretend_missing;
-		if ((f_copy = open_inplace_backup(fname, 0600)) < 0) {
+		if (copy_inplace_backup(fname, fd, back_file->mode, sx.st.st_size) < 0) {
+			unmake_file(back_file);
+			back_file = NULL;
+			goto cleanup;
+		}
+		/* dup() shares the file offset; map_file() starts reading at zero. */
+		if (do_lseek(fd, 0, SEEK_SET) != 0) {
+			rsyserr(FERROR_XFER, errno, "cannot rewind delta basis %s", full_fname(fname));
 			unmake_file(back_file);
 			back_file = NULL;
 			goto cleanup;
@@ -2700,7 +2701,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 	else if (sx.st.st_size <= 0) {
 		write_sum_head(f_out, NULL);
 	} else {
-		if (generate_and_send_sums(fd, sx.st.st_size, f_out, f_copy) < 0) {
+		if (generate_and_send_sums(fd, sx.st.st_size, f_out) < 0) {
 			rprintf(FWARNING,
 				"WARNING: file is too large for checksum sending: %s\n",
 				fnamecmp);
@@ -2712,40 +2713,15 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 	if (fd >= 0)
 		close(fd);
 	if (back_file) {
-		int save_preserve_xattrs = preserve_xattrs;
-#ifdef SUPPORT_XATTRS
-		/* The delta-backup path wrote backupptr via the held f_copy, so
-		 * copy its xattrs through that fd here.  The whole-file/inplace
-		 * path (f_copy < 0) backed it up via copy_file(), which already
-		 * copied the xattrs through its own held fd -- don't repeat it
-		 * with a path-based set a parent-symlink race could redirect. */
-		if (preserve_xattrs && f_copy >= 0) {
-			/* Read fname's xattrs through a confined fd so the copy onto the
-			 * held backup fd can't be fed an out-of-module source by a raced
-			 * parent symlink; a hardened race skips rather than path-reads. */
-			int bfd = backup_source_fd(fname);
-			if (!backup_metadata_hardened() || bfd >= 0)
-				copy_xattrs(fname, bfd, backupptr, f_copy);
-			if (bfd >= 0)
-				close(bfd);
-			preserve_xattrs = 0;
-		}
-#endif
-		if (f_copy >= 0)
-			close(f_copy);
-		/* backupptr's data/xattrs were written safely (confined create under
-		 * operator_path_resolve, held-fd xattr copy above).  This metadata set
-		 * re-resolves backupptr by path and is NOT wrapped in operator mode:
-		 * set_file_attrs() also drives the path-based xattr set whose held-fd
-		 * race-fix operator mode would defeat (cf. the copy-dest note in
-		 * try_dests_reg).  The static --backup-dir escape is already closed; a
-		 * parent-symlink flipped in after the confined create races only these
-		 * chmod/chown/times -- a documented residual. */
+		int save_resolve = operator_path_resolve;
+		/* The backup data and xattrs were written through held descriptors.
+		 * Pin the backup inode before applying its remaining attributes. */
 		if (begin_backup_read()) {
+			operator_path_resolve = 1;
 			set_file_attrs(backupptr, back_file, NULL, NULL, 0);
+			operator_path_resolve = save_resolve;
 			end_backup_access();
 		}
-		preserve_xattrs = save_preserve_xattrs;
 		if (INFO_GTE(BACKUP, 1)) {
 			rprintf(FINFO, "backed up %s to %s\n",
 				fname, backupptr);

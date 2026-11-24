@@ -1188,6 +1188,8 @@ sign) if you want the local shell to expand it.
     write access and restore the directory's mode after the backup operation.
     This does not change the permissions of DIR. An uncatchable termination or
     system failure can leave the temporary access in place.
+    A failed file-backup copy can leave an incomplete file at its backup name;
+    a failed transfer does not establish a complete snapshot.
 
     Note that if you specify a relative path, the backup directory will be
     relative to the destination directory, so you probably want to specify

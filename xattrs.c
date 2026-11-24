@@ -38,6 +38,8 @@ extern int preserve_devices;
 extern int preserve_specials;
 extern int checksum_seed;
 extern int saw_xattr_filter;
+extern char *backup_dir;
+extern char backup_dir_buf[MAXPATHLEN];
 
 extern struct name_num_item *xattr_sum_nni;
 extern int xattr_sum_len;
@@ -1004,6 +1006,8 @@ static int rsync_xal_set(const char *fname, item_list *xalp,
 #endif
 	size_t name_len;
 	int ret = 0;
+	int basis_fd = -1;
+	BOOL path_only_basis = False;
 
 	/* This puts the current name list into the "namebuf" buffer. */
 	if ((list_len = get_xattr_names(fname, fd)) < 0)
@@ -1017,9 +1021,25 @@ static int rsync_xal_set(const char *fname, item_list *xalp,
 				errno = EINVAL;
 				return -1;
 			}
+			if (backup_dir && fnamecmp == backup_dir_buf && basis_fd < 0 && !path_only_basis) {
+				if (symlink_optout_allowed() && backup_basis_path_fallback(fnamecmp, 0))
+					path_only_basis = True;
+				else
+					basis_fd = open_backup_basis(fnamecmp);
+				if (!path_only_basis && basis_fd < 0) {
+					int open_error = errno;
+					if (backup_basis_path_fallback(fnamecmp, open_error))
+						path_only_basis = True;
+					else {
+						rsyserr(FERROR_XFER, errno, "cannot open backup basis %s",
+							full_fname(fnamecmp));
+						return -1;
+					}
+				}
+			}
 			/* See if the fnamecmp version is identical. */
 			len = name_len = rxas[i].name_len;
-			if ((ptr = get_xattr_data(fnamecmp, -1, name, &len, 1)) == NULL) {
+			if ((ptr = get_xattr_data(fnamecmp, basis_fd, name, &len, 1)) == NULL) {
 			  still_abbrev:
 				if (am_generator)
 					continue;
@@ -1111,6 +1131,8 @@ static int rsync_xal_set(const char *fname, item_list *xalp,
 		}
 	}
 
+	if (basis_fd >= 0)
+		close(basis_fd);
 	return ret;
 }
 

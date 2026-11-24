@@ -9,13 +9,13 @@ from harness.rsync import run_rsync
 from harness.xattrs import get_value, is_supported, set_value
 
 
-@requires(features={'backup_metadata', 'nonroot'}, transports={'pipe'},
+@requires(features={'xattr_runtime', 'nonroot'}, transports={'pipe'},
           mutates={'filesystem', 'process'}, tags={'transfer', 'regression'})
 def test(context: TestContext):
     if os.geteuid() == 0:
         test_skipped('requires non-root directory permissions', capability='nonroot')
     if not is_supported():
-        test_skipped('xattrs are unavailable', capability='backup_metadata')
+        test_skipped('xattrs are unavailable', capability='xattr_runtime')
 
     source = context.source / 'outer' / 'nested'
     destination = context.destination / 'outer' / 'nested'

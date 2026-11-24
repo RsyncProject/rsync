@@ -12,6 +12,8 @@ from harness.rsync import rsync_argv, under_valgrind
 @requires(features={'linux_interpose', 'nonroot'}, transports={'pipe'},
           mutates={'filesystem', 'process'}, tags={'transfer', 'regression'})
 def test(context: TestContext):
+    if os.geteuid() == 0:
+        test_skipped('requires non-root directory permissions', capability='nonroot')
     if under_valgrind():
         test_skipped('requires direct fchmod interposition', capability='linux_interpose')
 

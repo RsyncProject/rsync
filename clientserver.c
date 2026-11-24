@@ -1081,6 +1081,8 @@ static int rsync_module(int f_in, int f_out, int i, const char *addr, const char
 		/* Save gcov counters before chroot makes the build tree unreachable.
 		 * Work after chroot cannot be recorded in those files. */
 		gcov_flush();
+		if (!read_only)
+			init_backup_access(True);
 		if (chroot(module_chdir)) {
 			rsyserr(FLOG, errno, "chroot(\"%s\") failed", module_chdir);
 			io_printf(f_out, "@ERROR: chroot failed\n");
@@ -1524,6 +1526,7 @@ int start_daemon(int f_in, int f_out)
 	if (*p) {
 		log_init(0); /* Make use we've initialized syslog before chrooting. */
 		tzset();
+		init_backup_access(True);
 		if (chroot(p) < 0) {
 			rsyserr(FLOG, errno, "daemon chroot(\"%s\") failed", p);
 			return -1;

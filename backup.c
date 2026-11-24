@@ -77,27 +77,30 @@ static int backup_lock_fd = -1;
 static int backup_lock_error;
 #endif
 
-void init_backup_access(void)
+void init_backup_access(BOOL before_chroot)
 {
 #ifdef BACKUP_DIR_ACCESS
 	FILE *lock_file;
 
 	/* The generator and receiver inherit one anonymous file. Record locks
 	 * on it are process-owned and disappear if either process exits. */
-	if (backup_dir && !dry_run && am_root <= 0) {
-		if (!(lock_file = tmpfile()))
+	if (backup_lock_fd >= 0 || (!before_chroot && (!backup_dir || dry_run || am_root > 0)))
+		return;
+	backup_lock_error = 0;
+	if (!(lock_file = tmpfile()))
+		backup_lock_error = errno;
+	else {
+		backup_lock_fd = dup(fileno(lock_file));
+		if (backup_lock_fd >= 0 && fcntl(backup_lock_fd, F_SETFD, FD_CLOEXEC) < 0) {
 			backup_lock_error = errno;
-		else {
-			backup_lock_fd = dup(fileno(lock_file));
-			if (backup_lock_fd >= 0 && fcntl(backup_lock_fd, F_SETFD, FD_CLOEXEC) < 0) {
-				backup_lock_error = errno;
-				close(backup_lock_fd);
-				backup_lock_fd = -1;
-			} else if (backup_lock_fd < 0)
-				backup_lock_error = errno;
-			fclose(lock_file);
-		}
+			close(backup_lock_fd);
+			backup_lock_fd = -1;
+		} else if (backup_lock_fd < 0)
+			backup_lock_error = errno;
+		fclose(lock_file);
 	}
+#else
+	(void)before_chroot;
 #endif
 }
 
@@ -214,9 +217,15 @@ static int allow_backup_dir_access(const STRUCT_STAT *st, mode_t permission)
 	else if (root_st.st_dev == st->st_dev && root_st.st_ino == st->st_ino) {
 		close(root_fd);
 		return 0;
-	} else
+	} else {
+		int save = operator_path_resolve;
+
+		/* The verified root fd is the boundary for this relative walk. */
+		operator_path_resolve = 0;
 		fd = secure_relative_open_at_beneath(root_fd, backup_dir_buf + backup_dir_len,
 			O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC, 0);
+		operator_path_resolve = save;
+	}
 	save_errno = errno;
 	close(root_fd);
 	errno = save_errno;
@@ -518,6 +527,47 @@ char *get_backup_name(const char *fname)
 	return NULL;
 }
 
+/* Open the selected backup under the operator path policy. */
+int open_backup_basis(const char *name)
+{
+	int save = operator_path_resolve, fd, error;
+
+	if (!backup_dir || name != backup_dir_buf) {
+		errno = EINVAL;
+		return -1;
+	}
+	operator_path_resolve = 1;
+	fd = do_open_at(name, O_RDONLY, 0);
+	error = errno;
+	operator_path_resolve = save;
+	if (fd >= 0 && fcntl(fd, F_SETFD, FD_CLOEXEC) < 0) {
+		error = errno;
+		close(fd);
+		fd = -1;
+	}
+	errno = error;
+	return fd;
+}
+
+/* Some targets need pathname access for symlink or unreadable-leaf xattrs.
+ * Check the parent under the active policy before retaining that legacy read. */
+BOOL backup_basis_path_fallback(const char *name, int open_error)
+{
+	STRUCT_STAT st;
+	int save = operator_path_resolve, ret, error;
+
+	if (!backup_dir || name != backup_dir_buf)
+		return False;
+	operator_path_resolve = 1;
+	ret = do_lstat_at(name, &st);
+	error = errno;
+	operator_path_resolve = save;
+	if (ret == 0 && (S_ISLNK(st.st_mode) || open_error == EACCES || open_error == EPERM))
+		return True;
+	errno = ret < 0 ? error : open_error;
+	return False;
+}
+
 /* Keep search access while the caller opens an existing backup or sets its
  * attributes. A read must not create or replace a backup directory. */
 BOOL begin_backup_read(void)
@@ -552,7 +602,7 @@ BOOL begin_backup_read(void)
 	return ok;
 }
 
-int open_inplace_backup(const char *fname, mode_t mode)
+static int open_inplace_backup(const char *fname, mode_t mode)
 {
 	int save = operator_path_resolve, fd = -1;
 
@@ -568,16 +618,27 @@ int open_inplace_backup(const char *fname, mode_t mode)
 	return fd;
 }
 
-int copy_inplace_backup(const char *fname, mode_t mode)
+int copy_inplace_backup(const char *fname, int source_fd, mode_t mode, OFF_T max_len)
 {
-	int ifd = open_copy_source(fname);
+	/* A delta backup must use the inode later used for checksums. */
+	int ifd = source_fd >= 0 ? dup(source_fd) : open_copy_source(fname);
 	int ofd;
 
-	if (ifd < 0)
+	if (ifd < 0) {
+		if (source_fd >= 0)
+			rsyserr(FERROR_XFER, errno, "cannot duplicate backup source %s", full_fname(fname));
 		return -1;
+	}
+	if (source_fd >= 0 && lseek(ifd, 0, SEEK_SET) < 0) {
+		int error = errno;
+		rsyserr(FERROR_XFER, error, "cannot rewind backup source %s", full_fname(fname));
+		close(ifd);
+		errno = error;
+		return -1;
+	}
 	ofd = open_inplace_backup(fname, mode);
 	if (ofd >= 0)
-		return copy_file_from_fd(fname, ifd, backup_dir_buf, ofd, mode);
+		return copy_file_from_fd(fname, ifd, backup_dir_buf, ofd, mode, max_len);
 	close(ifd);
 	return -1;
 }

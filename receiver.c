@@ -75,6 +75,7 @@ extern struct name_num_item *xfer_sum_nni;
 extern int xfer_sum_len;
 extern int use_secure_symlinks;
 extern int operator_path_resolve;
+extern char *backup_dir;
 
 static struct bitbag *delayed_bits = NULL;
 static int phase = 0, redoing = 0;
@@ -1099,6 +1100,8 @@ int recv_files(int f_in, int f_out, char *local_name)
 
 			if (backup_basis && !begin_backup_read())
 				fd1 = -1;
+			else if (backup_basis && backup_dir)
+				fd1 = open_backup_basis(fnamecmp);
 			else if (fnamecmp_type == FNAMECMP_PARTIAL_DIR
 			 && fnamecmp && *fnamecmp != '/') {
 				/* The relative partial path contains peer-derived directory

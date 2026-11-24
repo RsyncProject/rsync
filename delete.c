@@ -289,6 +289,20 @@ static enum delret delete_item_with_stat(char *fbuf, uint16 mode, uint16 flags,
 		if (make_backups > 0 && !(flags & DEL_FOR_BACKUP) && (backup_dir || !is_backup_file(fbuf))) {
 			what = "make_backup";
 			ok = make_backup(fbuf, True);
+			if (!ok) {
+				int error = errno;
+				STRUCT_STAT current;
+
+				/* ENOENT can name the backup path rather than the original. */
+				if (error == ENOENT && do_lstat_at(fbuf, &current) < 0 && errno == ENOENT) {
+					ret = DR_SUCCESS;
+					goto check_ret;
+				}
+				rsyserr(FERROR_XFER, error ? error : EIO,
+					"delete_file: make_backup(%s) failed", fbuf);
+				ret = DR_FAILURE;
+				goto check_ret;
+			}
 			if (ok == 2) {
 				what = "unlink";
 				ok = del_unlink(fbuf) == 0;

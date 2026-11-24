@@ -1056,7 +1056,7 @@ static int do_recv(int f_in, int f_out, char *local_name)
 		if (backup_dir_len > 1)
 			backup_dir_buf[backup_dir_len-1] = '/';
 	}
-	init_backup_access();
+	init_backup_access(False);
 
 	if (tmpdir) {
 		STRUCT_STAT st;
