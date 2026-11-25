@@ -72,7 +72,7 @@ def assert_only_names(directory, expected, label):
     if actual != set(expected):
         test_fail(f'{label}: names {actual!r}, expected {set(expected)!r}')
 
-def invoke(*args, env=None, expected=0):
+def invoke(*args, env=None, expected=0, optional_charset=None):
     proc = subprocess.run(
         rsync_argv(*args),
         stdout=subprocess.PIPE,
@@ -80,9 +80,17 @@ def invoke(*args, env=None, expected=0):
         env=env,
     )
     if proc.returncode != expected:
+        error = proc.stderr.decode(errors='replace')
+        # A receiver's conversion refusal can appear as a stream error on the sender.
+        if optional_charset and proc.returncode in (4, 12):
+            pairs = (('UTF-8', optional_charset), (optional_charset, 'UTF-8'))
+            if any(f'iconv_open("{target}", "{source}") failed' in error
+                   for target, source in pairs):
+                print(f'Skipping {optional_charset} progress check: conversion unavailable')
+                return None
         test_fail(
             f'rsync exited {proc.returncode}, expected {expected} for {args!r}: '
-            f'{proc.stderr.decode(errors="replace")}'
+            f'{error}'
         )
     return proc
 
@@ -132,11 +140,13 @@ if RSYNC_PEER == RSYNC:
         write_raw(progress_src, name.encode('utf-8'))
     progress = invoke('-r', '--no-inc-recursive', '--info=progress2',
                       '--iconv=UTF-8,KOI8-R', '-e', ssh, rpath,
-                      f'{progress_src}/', f'localhost:{progress_dst}/')
-    assert_only_names(progress_dst, (b'\xc0', b'\xc1'), 'progress push')
-    first = re.search(rb'(\d+)%[^\r\n]*\(xfr#1,', progress.stdout)
-    if not first or first[1] != b'50':
-        test_fail(f'progress push: expected 50% after the first file: {progress.stdout!r}')
+                      f'{progress_src}/', f'localhost:{progress_dst}/',
+                      optional_charset='KOI8-R')
+    if progress is not None:
+        assert_only_names(progress_dst, (b'\xc0', b'\xc1'), 'progress push')
+        first = re.search(rb'(\d+)%[^\r\n]*\(xfr#1,', progress.stdout)
+        if not first or first[1] != b'50':
+            test_fail(f'progress push: expected 50% after the first file: {progress.stdout!r}')
 
 invoke('-rl', convert, '-e', ssh, rpath,
        f'localhost:{push_dst}/', f'{pull_dst}/')
