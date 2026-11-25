@@ -87,10 +87,9 @@ The ssl helper scripts are affected by the following environment variables:
     Set to `1` to verify the certificate **chain** but skip the **hostname**
     (identity) check, for the openssl and stunnel backends.  Use this only when
     the server certificate legitimately cannot match the host you connect to --
-    for example connecting by bare IP address, or to a server whose internal-CA
-    certificate carries a different name.  The CA chain is still validated, so
-    this is much narrower than disabling validation with an empty
-    `RSYNC_SSL_CA_CERT`.
+    for example when the server's internal-CA certificate carries a different
+    name. The CA chain is still checked. This is narrower than disabling
+    validation with an empty `RSYNC_SSL_CA_CERT`.
 
 0.  `RSYNC_SSL_OPENSSL`
 
@@ -143,6 +142,11 @@ opts out of server-certificate validation.
 The `openssl` type uses `openssl s_client`, which is retained for
 compatibility.  If your OpenSSL version's `s_client` has trouble handling
 rsync traffic, try `--type=socat` or `--type=stunnel`.
+
+For verified OpenSSL connections, an IP literal must match an IP subject
+alternative name in the server certificate. A scoped IPv6 address retains its
+scope for the connection but only the address is checked against the certificate.
+IP connections do not request DNS-based server name indication (SNI).
 
 This script also supports a `--type=gnutls` option, but at the time of this
 release the gnutls-cli command was dropping output, making it unusable.  If

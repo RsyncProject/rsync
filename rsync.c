@@ -30,6 +30,7 @@
 extern int dry_run;
 extern int preserve_acls;
 extern int preserve_xattrs;
+extern char backup_dir_buf[MAXPATHLEN];
 extern int preserve_perms;
 extern int preserve_executability;
 extern int preserve_mtimes;
@@ -68,26 +69,26 @@ extern char *iconv_opt;
 #define UPDATED_MODE  (1<<5)
 #define UPDATED_CRTIME (1<<6)
 
+const char *get_locale_charset(void)
+{
+#if defined HAVE_LIBCHARSET_H && defined HAVE_LOCALE_CHARSET
+	return locale_charset();
+#elif defined HAVE_LANGINFO_H && defined HAVE_NL_LANGINFO
+	return nl_langinfo(CODESET);
+#else
+	return ""; /* Works with (at the very least) gnu iconv... */
+#endif
+}
+
 #ifdef ICONV_CONST
 iconv_t ic_chck = (iconv_t)-1;
 # ifdef ICONV_OPTION
 iconv_t ic_send = (iconv_t)-1, ic_recv = (iconv_t)-1;
 # endif
 
-static const char *default_charset(void)
-{
-# if defined HAVE_LIBCHARSET_H && defined HAVE_LOCALE_CHARSET
-	return locale_charset();
-# elif defined HAVE_LANGINFO_H && defined HAVE_NL_LANGINFO
-	return nl_langinfo(CODESET);
-# else
-	return ""; /* Works with (at the very least) gnu iconv... */
-# endif
-}
-
 void setup_iconv(void)
 {
-	const char *defset = default_charset();
+	const char *defset = get_locale_charset();
 # ifdef ICONV_OPTION
 	const char *charset;
 	char *cp;
@@ -505,6 +506,8 @@ int set_file_attrs(const char *fname, struct file_struct *file, stat_x *sxp,
 		   const char *fnamecmp, int flags)
 {
 	int updated = 0;
+	int attr_error = 0;
+	int mtime_stale = 0;
 	stat_x sx2;
 	int change_uid, change_gid;
 	mode_t new_mode = file->mode;
@@ -534,7 +537,7 @@ int set_file_attrs(const char *fname, struct file_struct *file, stat_x *sxp,
 		if (sret < 0) {
 			rsyserr(FERROR_XFER, errno, "stat %s failed",
 				full_fname(fname));
-			return 0;
+			return flags & ATTRS_REQUIRE_SUCCESS ? -1 : 0;
 		}
 		init_stat_x(&sx2);
 		sxp = &sx2;
@@ -638,6 +641,15 @@ int set_file_attrs(const char *fname, struct file_struct *file, stat_x *sxp,
 #endif
 	}
 
+	if ((flags & ATTRS_REQUIRE_SUCCESS) && (op_refuse
+#if defined SUPPORT_XATTRS || defined SUPPORT_ACLS
+	    || xattr_refuse
+#endif
+	    )) {
+		errno = ELOOP;
+		goto failed;
+	}
+
 	if (inherit && S_ISDIR(new_mode) && sxp->st.st_mode & S_ISGID) {
 		/* We just created this directory and its setgid
 		 * bit is on, so make sure it stays on. */
@@ -685,7 +697,7 @@ int set_file_attrs(const char *fname, struct file_struct *file, stat_x *sxp,
 				rsyserr(FERROR_XFER, errno, "%s %s failed",
 					change_uid ? "chown" : "chgrp",
 					full_fname(fname));
-				goto cleanup;
+				goto failed;
 			}
 			if (uid == (uid_t)-1 && sxp->st.st_uid != (uid_t)-1)
 				rprintf(FERROR_XFER, "uid 4294967295 (-1) is impossible to set on %s\n", full_fname(fname));
@@ -710,8 +722,13 @@ int set_file_attrs(const char *fname, struct file_struct *file, stat_x *sxp,
 	}
 
 #ifdef SUPPORT_XATTRS
-	if (am_root < 0 && !op_refuse && !xattr_refuse)
-		set_stat_xattr(fname, file, new_mode, held_fd);
+	if (am_root < 0 && !op_refuse && !xattr_refuse) {
+		/* Changing the fake stat xattr can change mtime on disk. */
+		int ret = set_stat_xattr(fname, file, new_mode, held_fd);
+		if (ret < 0 && (flags & ATTRS_REQUIRE_SUCCESS))
+			goto failed;
+		mtime_stale = ret > 0;
+	}
 	if (preserve_xattrs && fnamecmp && !op_refuse && !xattr_refuse)
 		set_xattr(fname, file, fnamecmp, sxp, held_fd);
 #endif
@@ -730,7 +747,8 @@ int set_file_attrs(const char *fname, struct file_struct *file, stat_x *sxp,
 	}
 	if (sxp != &sx2)
 		memcpy(&sx2.st, &sxp->st, sizeof sx2.st);
-	if (!(flags & ATTRS_SKIP_MTIME) && !same_mtime(file, &sxp->st, flags & ATTRS_ACCURATE_TIME)) {
+	if (!(flags & ATTRS_SKIP_MTIME)
+	 && (mtime_stale || !same_mtime(file, &sxp->st, flags & ATTRS_ACCURATE_TIME))) {
 		sx2.st.st_mtime = file->modtime;
 #ifdef ST_MTIME_NSEC
 		sx2.st.ST_MTIME_NSEC = F_MOD_NSEC_or_0(file);
@@ -753,16 +771,17 @@ int set_file_attrs(const char *fname, struct file_struct *file, stat_x *sxp,
 		if (sxp->crtime == 0)
 			sxp->crtime = get_create_time(fname, &sxp->st);
 		if (!same_time(sxp->crtime, 0L, file_crtime, 0L)) {
-			if (
 #ifdef HAVE_GETATTRLIST
-			     do_setattrlist_crtime(fname, file_crtime) == 0
+			int ret = do_setattrlist_crtime(fname, file_crtime);
 #elif defined __CYGWIN__
-			     do_SetFileTime(fname, file_crtime) == 0
+			int ret = do_SetFileTime(fname, file_crtime);
 #else
 #error Unknown crtimes implementation
 #endif
-			)
+			if (ret == 0)
 				updated |= UPDATED_CRTIME;
+			else if (flags & ATTRS_REQUIRE_SUCCESS)
+				goto failed;
 		}
 	}
 #endif
@@ -782,7 +801,7 @@ int set_file_attrs(const char *fname, struct file_struct *file, stat_x *sxp,
 		}
 		if (ret < 0) {
 			rsyserr(FERROR_XFER, errno, "failed to set times on %s", full_fname(fname));
-			goto cleanup;
+			goto failed;
 		}
 		if (ret > 0) { /* ret == 1 if symlink could not be set */
 			updated &= ~(UPDATED_MTIME|UPDATED_ATIME);
@@ -798,25 +817,28 @@ int set_file_attrs(const char *fname, struct file_struct *file, stat_x *sxp,
 	 * an access ACL, it changes sxp->st.st_mode so we know whether we
 	 * need to chmod(). */
 	if (preserve_acls && !S_ISLNK(new_mode) && !op_refuse && !xattr_refuse) {
-		if (set_acl_fdat(held_fd, dfd, leaf, fname, file, sxp, new_mode) > 0)
+		int ret = set_acl_fdat(held_fd, dfd, leaf, fname, file, sxp, new_mode);
+		if (ret < 0 && (flags & ATTRS_REQUIRE_SUCCESS))
+			goto failed;
+		if (ret > 0)
 			updated |= UPDATED_ACLS;
 	}
 #endif
 
 #ifdef HAVE_CHMOD
 	if (!BITS_EQUAL(sxp->st.st_mode, new_mode, CHMOD_BITS)) {
+		BOOL best_effort = !preserve_perms && !preserve_executability
+			       && !preserve_acls && !daemon_chmod_modes;
 		int ret = am_root < 0 ? 0
-			: op_leaf_fd >= 0 ? do_fchmod(op_leaf_fd, new_mode)
 			: op_refuse ? (errno = ELOOP, -1)
-			: dfd >= 0 && !S_ISLNK(new_mode) ? do_chmod_atfd(dfd, leaf, new_mode)
-			: do_chmod_at(fname, new_mode);
+			: do_chmod_attrs(fname, new_mode, op_leaf_fd, dfd, leaf, best_effort);
 		if (ret < 0) {
 			rsyserr(FERROR_XFER, errno,
 				"failed to set permissions on %s",
 				full_fname(fname));
-			goto cleanup;
+			goto failed;
 		}
-		if (ret == 0) /* ret == 1 if symlink could not be set */
+		if (ret == 0)
 			updated |= UPDATED_MODE;
 	}
 #endif
@@ -827,6 +849,13 @@ int set_file_attrs(const char *fname, struct file_struct *file, stat_x *sxp,
 		else
 			rprintf(FCLIENT, "%s is uptodate\n", fname);
 	}
+	goto cleanup;
+
+  failed:
+	if (flags & ATTRS_REQUIRE_SUCCESS) {
+		attr_error = errno ? errno : EIO;
+		updated = -1;
+	}
   cleanup:
 #if defined SUPPORT_XATTRS || defined SUPPORT_ACLS
 	if (held_fd >= 0 && held_fd != op_leaf_fd)	/* may alias op_leaf_fd (cross-tree) */
@@ -836,6 +865,8 @@ int set_file_attrs(const char *fname, struct file_struct *file, stat_x *sxp,
 		close(op_leaf_fd);
 	if (sxp == &sx2)
 		free_stat_x(&sx2);
+	if (attr_error)
+		errno = attr_error;
 	return updated;
 }
 
@@ -885,6 +916,7 @@ int finish_transfer(const char *fname, const char *fnametmp,
 		    int overwriting_basis)
 {
 	int ret;
+	BOOL backup_basis = False;
 	const char *temp_copy_name = partialptr && *partialptr != '/' ? partialptr : NULL;
 
 	if (inplace) {
@@ -898,8 +930,9 @@ int finish_transfer(const char *fname, const char *fnametmp,
 		int ok = make_backup(fname, False);
 		if (!ok)
 			exit_cleanup(RERR_FILEIO);
-		if (ok == 1 && fnamecmp == fname)
+		if (ok == 1 && fnamecmp == fname) {
 			fnamecmp = get_backup_name(fname);
+		}
 	}
 
 	/* Change permissions before putting the file into place.  An absolute
@@ -907,10 +940,15 @@ int finish_transfer(const char *fname, const char *fnametmp,
 	 * dirfd, so resolve its metadata through the ownership walk (op_pin); a
 	 * flipped temp-dir parent then can't redirect the chmod/chown/times/etc.
 	 * (in-tree temps keep their held dirfd, so op_pin stays off there). */
+	backup_basis = preserve_xattrs && fnamecmp == backup_dir_buf;
+	if (backup_basis && !begin_backup_read())
+		return 0;
 	operator_path_resolve = 1;
 	set_file_attrs(fnametmp, file, NULL, fnamecmp,
 		       ok_to_set_time ? ATTRS_ACCURATE_TIME : ATTRS_SKIP_MTIME | ATTRS_SKIP_ATIME | ATTRS_SKIP_CRTIME);
 	operator_path_resolve = 0;
+	if (backup_basis && !end_backup_access())
+		return 0;
 
 	/* move tmp file over real file */
 	if (DEBUG_GTE(RECV, 1))
@@ -934,8 +972,13 @@ int finish_transfer(const char *fname, const char *fnametmp,
 	fnametmp = temp_copy_name ? temp_copy_name : fname;
 
   do_set_file_attrs:
+	backup_basis = preserve_xattrs && fnamecmp == backup_dir_buf;
+	if (backup_basis && !begin_backup_read())
+		return 0;
 	set_file_attrs(fnametmp, file, NULL, fnamecmp,
 		       ok_to_set_time ? ATTRS_ACCURATE_TIME : ATTRS_SKIP_MTIME | ATTRS_SKIP_ATIME | ATTRS_SKIP_CRTIME);
+	if (backup_basis && !end_backup_access())
+		return 0;
 
 	if (temp_copy_name) {
 		if (do_rename_at(fnametmp, fname) < 0) {

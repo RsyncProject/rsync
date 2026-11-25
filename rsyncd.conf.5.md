@@ -19,6 +19,9 @@ modules.
 
 ## FILE FORMAT
 
+Configuration keywords use ASCII letters and are matched without regard to
+ASCII letter case. Locale settings do not change the meaning of a keyword.
+
 The file consists of modules and parameters. A module begins with the name of
 the module in square brackets and continues until the next module begins.
 Modules contain parameters of the form `name = value`.
@@ -63,6 +66,17 @@ daemon using `rsync --daemon --no-detach`, while `rsync.socket` and
 files may need local adjustment to match your installed rsync path, packaging
 layout, and module policy.
 
+The optional `50-rsync-hardening.conf` example restricts process execution.
+To opt in, copy it into `rsync.service.d/` or `rsync@.service.d/` under
+`/etc/systemd/system/` for the service in use. Reload systemd and restart
+the standalone daemon if it is running. Remove the drop-in and repeat these
+steps to return to the shipped defaults.
+
+The drop-in does not change module paths or network settings. It can affect
+programs started by daemon hooks, such as programs that need executable
+memory generated at runtime or invoke a non-native system call ABI. Verify
+the modules and hooks used by the installation before enabling it.
+
 When run via inetd you should add a line like this to /etc/services:
 
 >     rsync           873/tcp
@@ -75,8 +89,13 @@ Replace "@BINDIR@/rsync" with the path to where you have rsync installed on
 your system.  You will then need to send inetd a HUP signal to tell it to
 reread its config file.
 
-Note that you should **not** send the rsync daemon a HUP signal to force it to
-reread the `rsyncd.conf` file. The file is re-read on each client connection.
+A standalone rsync daemon reads global settings at startup and opens the
+configuration again for each client connection. Keep the file readable for
+as long as the daemon is running. A pipe, such as a pipe-backed process
+substitution, cannot supply a fresh configuration for each connection.
+Do not send the rsync daemon a HUP signal to reload this file. Changes to
+listener settings such as the port require a restart. A daemon started by
+inetd or a remote shell reads the configuration for its single connection.
 
 ## GLOBAL PARAMETERS
 
@@ -121,6 +140,7 @@ parameters:
     **setsockopt()** system call for details on some of the options you may be
     able to set. By default no special socket options are set.  These settings
     can also be specified via the `--sockopts` command-line option.
+    See [the client option](rsync.1#opt--sockopts) for the value syntax.
 
 0.  `listen backlog`
 
@@ -302,9 +322,8 @@ in the values of parameters.  See that section for details.
     This global parameter lists the socket peer IP addresses that are allowed
     to supply a `proxy protocol` header.  The syntax is the same token format
     used by `hosts allow`.  When `proxy protocol = true`, this list must match
-    the direct peer before rsync trusts the forwarded client address. Please
-    note the special values `unix:` and `unknown:` as described in `hosts allow`
-    might be useful here.
+    the direct peer before rsync trusts the forwarded client address.
+    The `unix:` module access rule is not available for proxy trust.
 
 0.  `name converter`
 
@@ -443,6 +462,10 @@ in the values of parameters.  See that section for details.
     is called, allowing it to be placed outside the transfer.  If this value is
     set on a per-module basis instead of globally, the global log will still
     contain any authorization failures or config-file error messages.
+
+    File logging uses the daemon's locale and follows the same byte escaping
+    and line termination rules as [`--log-file`](rsync.1#opt--log-file).
+    These rules do not change what the daemon sends to syslog.
 
     If the daemon fails to open the specified file, it will fall back to using
     syslog and output an error about the failure.  (Note that the failure to
@@ -776,6 +799,26 @@ in the values of parameters.  See that section for details.
     the exact check.  If the file is not found or is rejected, no logins for an
     "[auth users](#)" module will be possible.
 
+0.  `use pam`
+
+    Apply the PAM account policy for the `rsync` service after the normal rsync
+    challenge-response check succeeds. The daemon passes the connection address
+    to PAM as the remote host. A refused or expired account cannot access the
+    module. Rsync does not use PAM to verify the password, change passwords,
+    open a PAM session or answer interactive prompts.
+
+    The default is false. A module with this option enabled requires
+    "[auth users](#)" and a build configured with `--enable-pam`. The daemon
+    refuses access to the module if either is missing.
+
+    Configure an account policy for the `rsync` PAM service before enabling
+    this option. PAM can use the system's default policy when no service
+    policy is configured.
+
+    Older rsync daemons ignore this setting and do not enforce PAM account
+    policy. Enable it only after every daemon serving the module supports it.
+    Take the module out of service before rolling back to an older daemon.
+
 0.  `auth digest`
 
     This parameter sets the *minimum* message digest that the daemon will accept
@@ -832,7 +875,7 @@ in the values of parameters.  See that section for details.
     client's hostname and IP address.  If none of the patterns match, then the
     connection is rejected.
 
-    Each pattern can be in one of six forms:
+    Each pattern can be in one of these forms:
 
     - a dotted decimal IPv4 address of the form a.b.c.d, or an IPv6 address of
       the form a:b:c::d:e:f. In this case the incoming machine's IP address
@@ -854,10 +897,11 @@ in the values of parameters.  See that section for details.
       is enabled, as it is by default).  Any match will be allowed in.
     - an '@' followed by a netgroup name, which will match if the reverse DNS
       of the connecting IP is in the specified netgroup.
-    - special values. `unix:` matches when the incoming connection is from a Unix
-      domain socket; `unknown:` matches when the incoming connection's address
-      family is unknown (i.e. not AF_INET, AF_INET6, or AF_UNIX), which might
-      happen when the incoming connection is handed over from inetd-like services.
+    - `unix:`, which matches a direct connection accepted on a named Unix
+      domain socket passed to the daemon on standard input. This rule
+      applies to the transport, not the client's user or group. It does not
+      match a client forwarded through the PROXY protocol or replace the
+      module's authentication checks.
 
     If rsync was built with IDN support (look for "IDN" in `rsync --version`),
     a hostname pattern may contain non-ASCII characters: this file is read as
@@ -1229,12 +1273,12 @@ in the values of parameters.  See that section for details.
 
     Specifies a directory that rsync should use for temporary files created
     during the transfer of updated files. If that directory is on a different
-    partition, after transfer file is being copied instead of unlinked. 
+    partition, after transfer file is being copied instead of unlinked.
 
     This parameter equals with `--temp-dir` option, so please consult rsync
-    manpage for further information. 
+    manpage for further information.
 
-    
+
 ## CONFIG DIRECTIVES
 
 There are currently two config directives available that allow a config file to
@@ -1461,7 +1505,14 @@ The /etc/rsyncd.secrets file would look something like this:
 
 ## FILES
 
-/etc/rsyncd.conf or rsyncd.conf
+The system daemon normally reads `/etc/rsyncd.conf`. A build configured with
+`--with-rsyncd-distconf=PATH` uses the vendor file at PATH only if the system
+configuration file is absent. With no path argument the vendor file is
+`/usr/etc/rsyncd.conf`. The fallback is disabled by default.
+
+An explicit `--config` does not fall back. An unprivileged daemon started
+through a remote shell still uses `rsyncd.conf` in the working directory by
+default.
 
 ## SEE ALSO
 

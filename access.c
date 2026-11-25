@@ -193,15 +193,10 @@ static int match_address(const char *addr, char *tok)
 	int bits;
 #endif
 	char mask[16];
-	char *a = NULL, *t = NULL;
+	const char *a = NULL, *t = NULL;
 
 	if (!addr || !*addr)
 		return 0;
-
-	for (const char * const *special = client_special_addrs; *special != NULL; special ++) {
-		if (addr == *special && strcmp(tok, *special) == 0)
-			return 1;
-	}
 
 	p = strchr(tok,'/');
 	if (p)
@@ -329,7 +324,8 @@ static int match_address(const char *addr, char *tok)
 	return ret;
 }
 
-static int access_match(const char *list, const char *addr, const char **host_ptr, int deny)
+static int access_match(const char *list, const char *addr, const char **host_ptr,
+			int deny, BOOL named_unix)
 {
 	char *tok;
 	char *list2 = strdup(list);
@@ -337,7 +333,9 @@ static int access_match(const char *list, const char *addr, const char **host_pt
 	strlower(list2);
 
 	for (tok = strtok(list2, " ,\t"); tok; tok = strtok(NULL, " ,\t")) {
-		if (match_hostname(host_ptr, addr, tok, deny) || match_address(addr, tok)) {
+		int match = strcmp(tok, "unix:") == 0 ? named_unix
+			  : match_hostname(host_ptr, addr, tok, deny) || match_address(addr, tok);
+		if (match) {
 			free(list2);
 			return 1;
 		}
@@ -347,7 +345,7 @@ static int access_match(const char *list, const char *addr, const char **host_pt
 	return 0;
 }
 
-int allow_access(const char *addr, const char **host_ptr, int i)
+int allow_access(const char *addr, const char **host_ptr, int i, BOOL named_unix)
 {
 	const char *allow_list = lp_hosts_allow(i);
 	const char *deny_list = lp_hosts_deny(i);
@@ -361,7 +359,7 @@ int allow_access(const char *addr, const char **host_ptr, int i)
 
 	/* If we match an allow-list item, we always allow access. */
 	if (allow_list) {
-		if (access_match(allow_list, addr, host_ptr, 0))
+		if (access_match(allow_list, addr, host_ptr, 0, named_unix))
 			return 1;
 		/* For an allow-list w/o a deny-list, disallow non-matches. */
 		if (!deny_list)
@@ -370,7 +368,7 @@ int allow_access(const char *addr, const char **host_ptr, int i)
 
 	/* If we match a deny-list item (and got past any allow-list
 	 * items), we always disallow access. */
-	if (deny_list && access_match(deny_list, addr, host_ptr, 1))
+	if (deny_list && access_match(deny_list, addr, host_ptr, 1, named_unix))
 		return 0;
 
 	/* Allow all other access. */
@@ -382,5 +380,5 @@ int allow_proxy_protocol_peer(const char *list, const char *addr, const char **h
 	if (!list || !*list)
 		return 0;
 	allow_forward_dns = 0;
-	return access_match(list, addr, host_ptr, 0);
+	return access_match(list, addr, host_ptr, 0, False);
 }

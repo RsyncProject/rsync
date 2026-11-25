@@ -25,6 +25,7 @@
  * emulate it using the KAME implementation. */
 
 #include "rsync.h"
+#include <limits.h>
 #include <poll.h>
 #include "itypes.h"
 #include "ifuncs.h"
@@ -70,8 +71,8 @@ static int establish_proxy_connection(int fd, char *host, int port, char *proxy_
 	}
 
 	if (proxy_user && proxy_pass) {
-		stringjoin(buffer, PROXY_BUF_SIZE,
-			 proxy_user, ":", proxy_pass, NULL);
+		const char *const parts[] = { proxy_user, ":", proxy_pass };
+		stringjoin(buffer, PROXY_BUF_SIZE, parts, sizeof parts / sizeof parts[0]);
 		len = strlen(buffer);
 
 		if ((len*8 + 5) / 6 >= PROXY_BUF_SIZE - 3) {
@@ -787,50 +788,100 @@ void start_accept_loop(int port, int (*fn)(int, int))
 }
 
 
-enum SOCK_OPT_TYPES {OPT_BOOL,OPT_INT,OPT_ON};
+enum socket_option_kind { SOCKOPT_INTEGER, SOCKOPT_FIXED, SOCKOPT_CONGESTION, SOCKOPT_UNAVAILABLE };
 
-struct
-{
-  char *name;
-  int level;
-  int option;
-  int value;
-  int opttype;
-} socket_options[] = {
-  {"SO_KEEPALIVE",      SOL_SOCKET,    SO_KEEPALIVE,    0,                 OPT_BOOL},
-  {"SO_REUSEADDR",      SOL_SOCKET,    SO_REUSEADDR,    0,                 OPT_BOOL},
+/* Linux TCP_CA_NAME_MAX includes the NUL terminator. */
+#define LINUX_CONGESTION_NAME_SIZE 16
+
+struct socket_option {
+	const char *name;
+	int level;
+	int option;
+	int value;
+	enum socket_option_kind kind;
+};
+
+#define INTEGER_OPTION(name, level) { #name, level, name, 0, SOCKOPT_INTEGER }
+#define UNAVAILABLE_OPTION(name) { #name, 0, 0, 0, SOCKOPT_UNAVAILABLE }
+
+static const struct socket_option socket_options[] = {
+	INTEGER_OPTION(SO_KEEPALIVE, SOL_SOCKET),
+	INTEGER_OPTION(SO_REUSEADDR, SOL_SOCKET),
 #ifdef SO_BROADCAST
-  {"SO_BROADCAST",      SOL_SOCKET,    SO_BROADCAST,    0,                 OPT_BOOL},
+	INTEGER_OPTION(SO_BROADCAST, SOL_SOCKET),
+#else
+	UNAVAILABLE_OPTION(SO_BROADCAST),
 #endif
 #ifdef TCP_NODELAY
-  {"TCP_NODELAY",       IPPROTO_TCP,   TCP_NODELAY,     0,                 OPT_BOOL},
+	INTEGER_OPTION(TCP_NODELAY, IPPROTO_TCP),
+#else
+	UNAVAILABLE_OPTION(TCP_NODELAY),
 #endif
-#ifdef IPTOS_LOWDELAY
-  {"IPTOS_LOWDELAY",    IPPROTO_IP,    IP_TOS,          IPTOS_LOWDELAY,    OPT_ON},
+#if defined IPTOS_LOWDELAY && defined IP_TOS
+	{ "IPTOS_LOWDELAY", IPPROTO_IP, IP_TOS, IPTOS_LOWDELAY, SOCKOPT_FIXED },
+#else
+	UNAVAILABLE_OPTION(IPTOS_LOWDELAY),
 #endif
-#ifdef IPTOS_THROUGHPUT
-  {"IPTOS_THROUGHPUT",  IPPROTO_IP,    IP_TOS,          IPTOS_THROUGHPUT,  OPT_ON},
+#if defined IPTOS_THROUGHPUT && defined IP_TOS
+	{ "IPTOS_THROUGHPUT", IPPROTO_IP, IP_TOS, IPTOS_THROUGHPUT, SOCKOPT_FIXED },
+#else
+	UNAVAILABLE_OPTION(IPTOS_THROUGHPUT),
 #endif
 #ifdef SO_SNDBUF
-  {"SO_SNDBUF",         SOL_SOCKET,    SO_SNDBUF,       0,                 OPT_INT},
+	INTEGER_OPTION(SO_SNDBUF, SOL_SOCKET),
+#else
+	UNAVAILABLE_OPTION(SO_SNDBUF),
 #endif
 #ifdef SO_RCVBUF
-  {"SO_RCVBUF",         SOL_SOCKET,    SO_RCVBUF,       0,                 OPT_INT},
+	INTEGER_OPTION(SO_RCVBUF, SOL_SOCKET),
+#else
+	UNAVAILABLE_OPTION(SO_RCVBUF),
 #endif
 #ifdef SO_SNDLOWAT
-  {"SO_SNDLOWAT",       SOL_SOCKET,    SO_SNDLOWAT,     0,                 OPT_INT},
+	INTEGER_OPTION(SO_SNDLOWAT, SOL_SOCKET),
+#else
+	UNAVAILABLE_OPTION(SO_SNDLOWAT),
 #endif
 #ifdef SO_RCVLOWAT
-  {"SO_RCVLOWAT",       SOL_SOCKET,    SO_RCVLOWAT,     0,                 OPT_INT},
+	INTEGER_OPTION(SO_RCVLOWAT, SOL_SOCKET),
+#else
+	UNAVAILABLE_OPTION(SO_RCVLOWAT),
 #endif
 #ifdef SO_SNDTIMEO
-  {"SO_SNDTIMEO",       SOL_SOCKET,    SO_SNDTIMEO,     0,                 OPT_INT},
+	INTEGER_OPTION(SO_SNDTIMEO, SOL_SOCKET),
+#else
+	UNAVAILABLE_OPTION(SO_SNDTIMEO),
 #endif
 #ifdef SO_RCVTIMEO
-  {"SO_RCVTIMEO",       SOL_SOCKET,    SO_RCVTIMEO,     0,                 OPT_INT},
+	INTEGER_OPTION(SO_RCVTIMEO, SOL_SOCKET),
+#else
+	UNAVAILABLE_OPTION(SO_RCVTIMEO),
 #endif
-  {NULL,0,0,0,0}
+#if defined __linux__ && defined TCP_CONGESTION
+	{ "TCP_CONGESTION", IPPROTO_TCP, TCP_CONGESTION, 0, SOCKOPT_CONGESTION },
+#else
+	UNAVAILABLE_OPTION(TCP_CONGESTION),
+#endif
+	{ NULL, 0, 0, 0, SOCKOPT_UNAVAILABLE }
 };
+
+#undef INTEGER_OPTION
+#undef UNAVAILABLE_OPTION
+
+static BOOL parse_socket_integer(const char *text, int *value)
+{
+	const char *digits = text + (*text == '+' || *text == '-');
+	long parsed;
+
+	if (!*digits || digits[strspn(digits, "0123456789")])
+		return False;
+	errno = 0;
+	parsed = strtol(text, NULL, 10);
+	if (errno == ERANGE || parsed < INT_MIN || parsed > INT_MAX)
+		return False;
+	*value = (int)parsed;
+	return True;
+}
 
 
 /* Set user socket options. */
@@ -842,54 +893,66 @@ void set_socket_options(int fd, char *options)
 		return;
 
 	options = strdup(options);
+	if (!options)
+		out_of_memory("set_socket_options");
 
-	for (tok = strtok(options, " \t,"); tok; tok = strtok(NULL," \t,")) {
-		int ret=0,i;
-		int value = 1;
-		char *p;
-		int got_value = 0;
+	for (tok = strtok(options, " \t,"); tok; tok = strtok(NULL, " \t,")) {
+		const struct socket_option *option;
+		int number = 1;
+		char *value = strchr(tok, '=');
+		const char *argument = (const char *)&number;
+		socklen_t length = sizeof number;
 
-		if ((p = strchr(tok,'='))) {
-			*p = 0;
-			value = atoi(p+1);
-			got_value = 1;
-		}
-
-		for (i = 0; socket_options[i].name; i++) {
-			if (strcmp(socket_options[i].name,tok)==0)
+		if (value)
+			*value++ = '\0';
+		for (option = socket_options; option->name; option++) {
+			if (strcmp(option->name, tok) == 0)
 				break;
 		}
 
-		if (!socket_options[i].name) {
-			rprintf(FERROR,"Unknown socket option %s\n",tok);
+		if (!option->name) {
+			rprintf(FERROR, "Unknown socket option %s\n", tok);
 			continue;
 		}
 
-		switch (socket_options[i].opttype) {
-		case OPT_BOOL:
-		case OPT_INT:
-			ret = setsockopt(fd,socket_options[i].level,
-					 socket_options[i].option,
-					 (char *)&value, sizeof (int));
-			break;
-
-		case OPT_ON:
-			if (got_value)
-				rprintf(FERROR,"syntax error -- %s does not take a value\n",tok);
-
-			{
-				int on = socket_options[i].value;
-				ret = setsockopt(fd,socket_options[i].level,
-						 socket_options[i].option,
-						 (char *)&on, sizeof (int));
+		switch (option->kind) {
+		case SOCKOPT_UNAVAILABLE:
+			rprintf(FERROR, "Unavailable socket option %s in this build\n", tok);
+			continue;
+		case SOCKOPT_INTEGER:
+			if (value && !parse_socket_integer(value, &number)) {
+				rprintf(FERROR, "Invalid integer value for socket option %s\n", tok);
+				continue;
 			}
 			break;
+		case SOCKOPT_FIXED:
+			if (value) {
+				rprintf(FERROR, "Socket option %s does not take a value\n", tok);
+				continue;
+			}
+			number = option->value;
+			break;
+		case SOCKOPT_CONGESTION: {
+			size_t size;
+
+			if (!value || !*value) {
+				rprintf(FERROR, "Socket option %s requires a non-empty value\n", tok);
+				continue;
+			}
+			size = strlen(value) + 1;
+			if (size > LINUX_CONGESTION_NAME_SIZE) {
+				rprintf(FERROR, "Value for socket option %s is too long\n", tok);
+				continue;
+			}
+			argument = value;
+			length = (socklen_t)size;
+			break;
+		}
 		}
 
-		if (ret != 0) {
+		if (setsockopt(fd, option->level, option->option, argument, length) < 0)
 			rsyserr(FERROR, errno,
 				"failed to set socket option %s", tok);
-		}
 	}
 
 	free(options);

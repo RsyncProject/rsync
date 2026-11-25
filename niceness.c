@@ -1,4 +1,5 @@
 #include "rsync.h"
+#include "itypes.h"
 
 #ifdef HAVE_SYS_RESOURCE_H
 #include <sys/resource.h>
@@ -73,22 +74,9 @@ static void default_setting(struct priority_setting *setting)
 	setting->io_data = 0;
 }
 
-static uchar ascii_lower(uchar ch)
-{
-	return ch >= 'A' && ch <= 'Z' ? ch + ('a' - 'A') : ch;
-}
-
 static int token_equal(const char *str, size_t len, const char *word)
 {
-	size_t i;
-
-	if (strlen(word) != len)
-		return 0;
-	for (i = 0; i < len; i++) {
-		if (ascii_lower((uchar)str[i]) != ascii_lower((uchar)word[i]))
-			return 0;
-	}
-	return 1;
+	return strlen(word) == len && ascii_strncasecmp(str, word, len) == 0;
 }
 
 static int parse_io_priority(const char *str, size_t len, int *class_p, int *data_p)
@@ -118,9 +106,9 @@ static int parse_priority(const char *str, const char *end, struct priority_sett
 	clear_setting(setting);
 	if (parse_io_priority(str, end - str, &setting->io_class, &setting->io_data))
 		return 1;
-	if (!isdigit((uchar)*str)
+	if (!ascii_is_digit((uchar)*str)
 	 && !((*str == '+' || *str == '-') && str + 1 < end
-	   && isdigit((uchar)str[1])))
+	   && ascii_is_digit((uchar)str[1])))
 		return 0;
 
 	errno = 0;

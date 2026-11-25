@@ -1,11 +1,11 @@
 #ifdef SUPPORT_XATTRS
 
-#if defined HAVE_SYS_XATTR_H
+#if defined HAVE_BSD_EXTATTRS
+#include <sys/extattr.h>
+#elif defined HAVE_SYS_XATTR_H
 #include <sys/xattr.h>
 #elif defined HAVE_ATTR_XATTR_H
 #include <attr/xattr.h>
-#elif defined HAVE_SYS_EXTATTR_H
-#include <sys/extattr.h>
 #endif
 
 /* Linux 2.4 does not define this as a distinct errno value: */

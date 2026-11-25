@@ -218,6 +218,19 @@ AC_ARG_WITH(rsyncd-conf,
 
 AC_DEFINE_UNQUOTED(RSYNCD_SYSCONF, "$RSYNCD_SYSCONF", [location of configuration file for rsync server])
 
+AC_ARG_WITH([rsyncd-distconf],
+	AS_HELP_STRING([--with-rsyncd-distconf=PATH],[use PATH when the system daemon configuration is absent (disabled by default)]),
+	[case "$withval" in
+		no) RSYNCD_DISTCONF= ;;
+		yes) RSYNCD_DISTCONF=/usr/etc/rsyncd.conf ;;
+		/*) RSYNCD_DISTCONF="$withval" ;;
+		*) AC_MSG_ERROR([You must specify an absolute path to --with-rsyncd-distconf=PATH]) ;;
+	esac],
+	[RSYNCD_DISTCONF=])
+if test -n "$RSYNCD_DISTCONF"; then
+	AC_DEFINE_UNQUOTED(RSYNCD_DISTCONF, "$RSYNCD_DISTCONF", [vendor fallback configuration file for rsync server])
+fi
+
 AC_ARG_WITH(rsh,
 	AS_HELP_STRING([--with-rsh=CMD],[set remote shell command to CMD (default: ssh)]))
 
@@ -486,35 +499,69 @@ AC_MSG_CHECKING([whether to use included zlib])
 if test x"$with_included_zlib" = x"yes"; then
     AC_MSG_RESULT($srcdir/zlib)
     BUILD_ZLIB='$(zlib_OBJS)'
+    BUNDLED_ZLIB_HEADERS='zlib/zconf.h zlib/zlib.h'
     CFLAGS="-I$srcdir/zlib $CFLAGS"
 else
+    BUNDLED_ZLIB_HEADERS=''
     AC_DEFINE(EXTERNAL_ZLIB, 1, [Define to 1 if using external zlib])
     AC_MSG_RESULT(no)
 fi
 
-AC_MSG_CHECKING([whether to enable use of openssl crypto library])
 AC_ARG_ENABLE([openssl],
 	AS_HELP_STRING([--disable-openssl],[disable to omit openssl crypto library]))
+AC_ARG_VAR([PKG_CONFIG], [pkg-config for target libraries (set to : to disable)])
 AH_TEMPLATE([USE_OPENSSL],
 [Undefine if you do not want to use openssl crypto library.  By default this is defined.])
 if test x"$enable_openssl" != x"no"; then
-    if test x"$ac_cv_header_openssl_md4_h" = x"yes" && test x"$ac_cv_header_openssl_md5_h" = x"yes"; then
-      AC_MSG_RESULT(yes)
-      AC_SEARCH_LIBS(EVP_MD_CTX_copy, crypto,
-          [AC_DEFINE(USE_OPENSSL)
-	   enable_openssl=yes],
-          [err_msg="$err_msg$nl- Failed to find EVP_MD_CTX_copy function in openssl crypto lib.";
-	   no_lib="$no_lib openssl"])
+    if test -z "$PKG_CONFIG"; then
+	if test "$cross_compiling" != yes || test -n "$PKG_CONFIG_LIBDIR"; then
+	    AC_PATH_TOOL([PKG_CONFIG], [pkg-config], [:])
+	elif test -n "$ac_tool_prefix"; then
+	    AC_PATH_PROG([PKG_CONFIG], [${ac_tool_prefix}pkg-config], [:])
+	fi
+    fi
+
+    have_openssl=no
+    if test -n "$PKG_CONFIG" &&
+       openssl_cflags=$("$PKG_CONFIG" --cflags libcrypto 2>/dev/null) &&
+       openssl_libs=$("$PKG_CONFIG" --static --libs libcrypto 2>/dev/null) &&
+       test -n "$openssl_libs"; then
+	openssl_save_CPPFLAGS=$CPPFLAGS
+	openssl_save_LIBS=$LIBS
+	CPPFLAGS="$CPPFLAGS $openssl_cflags"
+	LIBS="$openssl_libs $LIBS"
+	AC_MSG_CHECKING([whether libcrypto links with its pkg-config dependencies])
+	AC_LINK_IFELSE([AC_LANG_PROGRAM([[
+#include <openssl/evp.h>
+#include <openssl/md4.h>
+#include <openssl/md5.h>
+	]], [[return EVP_MD_CTX_copy(0, 0);]])], [have_openssl=yes])
+	AC_MSG_RESULT([$have_openssl])
+	if test "$have_openssl" = no; then
+	    CPPFLAGS=$openssl_save_CPPFLAGS
+	    LIBS=$openssl_save_LIBS
+	fi
+    fi
+
+    if test "$have_openssl" = no; then
+	if test "$ac_cv_header_openssl_md4_h" = yes && test "$ac_cv_header_openssl_md5_h" = yes; then
+	    AC_SEARCH_LIBS(EVP_MD_CTX_copy, crypto, [have_openssl=yes],
+		[err_msg="$err_msg$nl- Failed to find EVP_MD_CTX_copy function in openssl crypto lib."])
+	else
+	    err_msg="$err_msg$nl- Failed to find openssl/md4.h and openssl/md5.h for openssl crypto lib support."
+	fi
+    fi
+    if test "$have_openssl" = yes; then
+	AC_DEFINE(USE_OPENSSL)
+	enable_openssl=yes
     else
-        AC_MSG_RESULT(no)
-	err_msg="$err_msg$nl- Failed to find openssl/md4.h and openssl/md5.h for openssl crypto lib support."
 	no_lib="$no_lib openssl"
     fi
     if test x"$enable_md5_asm" != x"yes"; then
 	enable_md5_asm=no
     fi
 else
-    AC_MSG_RESULT(no)
+    AC_MSG_NOTICE([OpenSSL crypto library disabled])
 fi
 
 MD5_ASM=
@@ -653,6 +700,55 @@ if test x"$enable_idn" != x"no"; then
     fi
 else
     AC_MSG_RESULT(no)
+fi
+
+AC_ARG_ENABLE([pam],
+    AS_HELP_STRING([--enable-pam], [enable daemon PAM account checks (default is no)]))
+if test x"$enable_pam" = x"yes"; then
+    AC_CHECK_HEADERS([security/pam_appl.h pam/pam_appl.h])
+    if test x"$ac_cv_header_security_pam_appl_h" != x"yes" &&
+       test x"$ac_cv_header_pam_pam_appl_h" != x"yes"; then
+        AC_MSG_ERROR([PAM development headers are required for --enable-pam])
+    fi
+    AC_CACHE_CHECK([for the PAM conversation message qualifier], [rsync_cv_pam_conv_qualifier], [
+        rsync_cv_pam_conv_qualifier=unsupported
+        # Old Solaris headers without a prototype accept either form.
+        case "$host_os" in
+            solaris*) pam_conv_qualifiers="mutable const" ;;
+            *)        pam_conv_qualifiers="const mutable" ;;
+        esac
+        rsync_save_c_werror_flag=$ac_c_werror_flag
+        AC_LANG_WERROR
+        for pam_conv_qualifier in $pam_conv_qualifiers; do
+            pam_conv_const=
+            if test "$pam_conv_qualifier" = const; then
+                pam_conv_const=const
+            fi
+            AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[
+#ifdef HAVE_SECURITY_PAM_APPL_H
+# include <security/pam_appl.h>
+#else
+# include <pam/pam_appl.h>
+#endif
+extern int probe_conversation(int, $pam_conv_const struct pam_message **,
+                              struct pam_response **, void *);
+            ]], [[
+                struct pam_conv conv = { probe_conversation, 0 };
+                (void)conv;
+            ]])], [rsync_cv_pam_conv_qualifier=$pam_conv_qualifier; break])
+        done
+        ac_c_werror_flag=$rsync_save_c_werror_flag
+    ])
+    case "$rsync_cv_pam_conv_qualifier" in
+        const)
+            AC_DEFINE([PAM_CONST_MESSAGES], [1], [Define if PAM conversations take const messages.])
+            ;;
+        mutable) ;;
+        *) AC_MSG_ERROR([Unsupported PAM conversation callback type]) ;;
+    esac
+    AC_SEARCH_LIBS([pam_start], [pam],
+        [AC_DEFINE([SUPPORT_PAM], [1], [Define if daemon PAM account checks are enabled.])],
+        [AC_MSG_ERROR([libpam is required for --enable-pam])])
 fi
 
 if test x"$no_lib" != x; then
@@ -975,10 +1071,40 @@ AC_CHECK_FUNCS(waitpid wait4 getcwd chown chmod lchmod mknod mkfifo fdopendir \
     memmove lchown vsnprintf snprintf vasprintf asprintf setsid strpbrk \
     strlcat strlcpy stpcpy strtol mallinfo mallinfo2 getgroups setgroups geteuid getegid \
     setlocale setmode open64 lseek64 mkstemp64 mtrace va_copy __va_copy \
-    seteuid strerror putenv iconv_open locale_charset nl_langinfo getxattr \
+    seteuid strerror putenv iconv_open getxattr \
     extattr_get_link sigaction sigprocmask setattrlist getgrouplist \
     initgroups utimensat futimens posix_fallocate attropen setvbuf nanosleep usleep \
     setenv unsetenv mbrtowc setpriority)
+
+dnl A link-only probe can find a symbol hidden by the target SDK headers.
+dnl Verify that each codeset query is declared and can actually be called.
+AC_CACHE_CHECK([for usable locale_charset()], [rsync_cv_HAVE_LOCALE_CHARSET], [
+    AC_LINK_IFELSE([AC_LANG_PROGRAM([[#include <libcharset.h>]], [[
+        const char *volatile charset;
+#ifndef locale_charset
+        (void) &locale_charset;
+#endif
+        charset = locale_charset();
+        return charset == 0;
+    ]])], [rsync_cv_HAVE_LOCALE_CHARSET=yes], [rsync_cv_HAVE_LOCALE_CHARSET=no])
+])
+if test x"$rsync_cv_HAVE_LOCALE_CHARSET" = xyes; then
+    AC_DEFINE([HAVE_LOCALE_CHARSET], 1, [Define to 1 if locale_charset() is usable.])
+fi
+
+AC_CACHE_CHECK([for usable nl_langinfo(CODESET)], [rsync_cv_HAVE_NL_LANGINFO_CODESET], [
+    AC_LINK_IFELSE([AC_LANG_PROGRAM([[#include <langinfo.h>]], [[
+        const char *volatile charset;
+#ifndef nl_langinfo
+        (void) &nl_langinfo;
+#endif
+        charset = nl_langinfo(CODESET);
+        return charset == 0;
+    ]])], [rsync_cv_HAVE_NL_LANGINFO_CODESET=yes], [rsync_cv_HAVE_NL_LANGINFO_CODESET=no])
+])
+if test x"$rsync_cv_HAVE_NL_LANGINFO_CODESET" = xyes; then
+    AC_DEFINE([HAVE_NL_LANGINFO], 1, [Define to 1 if nl_langinfo(CODESET) is usable.])
+fi
 
 dnl dirfd() is a macro or static inline on several systems (the BSDs), so the
 dnl default AC_CHECK_FUNCS link probe -- which declares `char dirfd(void);` and
@@ -1367,6 +1493,7 @@ AC_MSG_CHECKING([whether to use included libpopt])
 if test x"$with_included_popt" = x"yes"; then
     AC_MSG_RESULT($srcdir/popt)
     BUILD_POPT='$(popt_OBJS)'
+    BUNDLED_POPT_HEADERS='popt/popt.h'
     CFLAGS="-I$srcdir/popt $CFLAGS"
     AC_DEFINE(POPT_SYSCONFDIR, "/etc", [sysconfig dir for popt])
     AC_DEFINE(PACKAGE, "rsync", [package name for rsync])
@@ -1377,6 +1504,7 @@ if test x"$with_included_popt" = x"yes"; then
 	AC_MSG_WARN([included libpopt will use malloc, not alloca (which wastes a small amount of memory)])
     fi
 else
+    BUNDLED_POPT_HEADERS=''
     AC_MSG_RESULT(no)
 fi
 
@@ -1522,6 +1650,8 @@ AC_SUBST(OBJ_RESTORE)
 AC_SUBST(CC_SHOBJ_FLAG)
 AC_SUBST(BUILD_POPT)
 AC_SUBST(BUILD_ZLIB)
+AC_SUBST(BUNDLED_POPT_HEADERS)
+AC_SUBST(BUNDLED_ZLIB_HEADERS)
 AC_SUBST(MAKE_RRSYNC)
 AC_SUBST(MAKE_RRSYNC_1)
 AC_SUBST(GEN_RRSYNC)
@@ -1628,7 +1758,7 @@ if test x"$enable_xattr_support" = x"no"; then
     AC_MSG_RESULT(no)
 else
     case "$host_os" in
-    *linux*|*netbsd*|*cygwin*)
+    *linux*|*cygwin*)
 	AC_MSG_RESULT(Using Linux xattrs)
 	AC_DEFINE(HAVE_LINUX_XATTRS, 1, [True if you have Linux xattrs (or equivalent)])
 	AC_DEFINE(SUPPORT_XATTRS, 1)
@@ -1642,10 +1772,13 @@ else
 	AC_DEFINE(NO_DEVICE_XATTRS, 1, [True if device files do not support xattrs])
 	AC_DEFINE(NO_SPECIAL_XATTRS, 1, [True if special files do not support xattrs])
 	;;
-    freebsd*)
-	AC_MSG_RESULT(Using FreeBSD extattrs)
-	AC_DEFINE(HAVE_FREEBSD_XATTRS, 1, [True if you have FreeBSD xattrs])
+    freebsd*|*netbsd*)
+	AC_MSG_RESULT(Using BSD extattrs)
+	AC_DEFINE(HAVE_BSD_EXTATTRS, 1, [True if you use the BSD extattr interface])
 	AC_DEFINE(SUPPORT_XATTRS, 1)
+	case "$host_os" in
+	*netbsd*) AC_DEFINE(NO_SYMLINK_USER_XATTRS, 1) ;;
+	esac
 	;;
     solaris*)
 	AC_MSG_RESULT(Using Solaris xattrs)
@@ -1740,7 +1873,9 @@ case "$CC" in
     ;;
 esac
 
-AC_CONFIG_FILES([Makefile lib/dummy zlib/dummy popt/dummy shconfig])
+AC_CONFIG_FILES([Makefile lib/dummy shconfig])
+AS_IF([test x"$with_included_zlib" = x"yes"], [AC_CONFIG_FILES([zlib/dummy])])
+AS_IF([test x"$with_included_popt" = x"yes"], [AC_CONFIG_FILES([popt/dummy])])
 AC_OUTPUT
 
 AC_MSG_RESULT()

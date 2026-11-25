@@ -132,7 +132,7 @@ void check_batch_flags(void)
 	tweaked_iconv = iconv_opt != NULL;
 #endif
 	for (i = 0; flag_ptr[i]; i++) {
-		int set = batch_stream_flags & (1 << i) ? 1 : 0;
+		int set = (batch_stream_flags & (1 << i)) ? 1 : 0;
 		if (*flag_ptr[i] != set) {
 			if (i == 9) {
 				rprintf(FERROR,
@@ -248,8 +248,9 @@ void open_batch_files(void)
 	 * not owned by uid 0 or our euid anywhere in the path. */
 	if (write_batch) {
 		char filename[MAXPATHLEN];
+		const char *const parts[] = { batch_name, ".sh" };
 
-		stringjoin(filename, sizeof filename, batch_name, ".sh", NULL);
+		stringjoin(filename, sizeof filename, parts, sizeof parts / sizeof parts[0]);
 
 		batch_sh_fd = open_no_attacker_symlinks(filename, O_WRONLY | O_CREAT | O_TRUNC | O_BINARY, S_IRUSR | S_IWUSR | S_IXUSR);
 		if (batch_sh_fd < 0) {

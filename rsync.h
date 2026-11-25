@@ -225,6 +225,7 @@
 #define ATTRS_ACCURATE_TIME	(1<<2)
 #define ATTRS_SKIP_ATIME	(1<<3)
 #define ATTRS_SKIP_CRTIME	(1<<5)
+#define ATTRS_REQUIRE_SUCCESS	(1<<6)
 
 #define MSG_FLUSH	2
 #define FULL_FLUSH	1
@@ -835,11 +836,13 @@ struct ht_int64_node {
 
 #if defined __STDC_VERSION__ && __STDC_VERSION__ >= 199901L
 #define USE_FLEXIBLE_ARRAY 1
-#define SIZE_T_FMT_MOD "z" /* printf supports %zd */
+#define SIZE_T_FMT_MOD "z" /* printf has a size_t length modifier */
 #define SIZE_T_FMT_CAST size_t
+#define SSIZE_T_FMT_CAST ssize_t
 #else
-#define SIZE_T_FMT_MOD "l" /* printf supports %ld */
-#define SIZE_T_FMT_CAST long
+#define SIZE_T_FMT_MOD "l"
+#define SIZE_T_FMT_CAST unsigned long
+#define SSIZE_T_FMT_CAST long
 #endif
 
 union file_extras {
@@ -1235,6 +1238,11 @@ typedef struct {
 #define NSTR_CHECKSUM 0
 #define NSTR_COMPRESS 1
 
+#define NNI_BUILTIN (1<<0)
+#define NNI_EVP (1<<1)
+#define NNI_EVP_OK (1<<2)
+#define NNI_EXPLICIT_ONLY (1<<3)
+
 struct name_num_item {
 	int num, flags;
 	const char *name;
@@ -1562,10 +1570,3 @@ const char *get_panic_action(void);
 #elif defined HAVE_MALLINFO
 #define MEM_ALLOC_INFO mallinfo
 #endif
-
-/* sentinel value for client from special address families */
-extern const char * const client_special_addrs[];
-enum {
-	CLIENT_UNKNOWN_ADDR,
-	CLIENT_UNIX_ADDR,
-};
