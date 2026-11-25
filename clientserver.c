@@ -1429,13 +1429,13 @@ static void send_listing(int fd)
 		io_printf(fd,"@RSYNCD: EXIT\n");
 }
 
-static int proxy_peer_allowed(int fd)
+static int proxy_peer_allowed(int fd, BOOL named_unix)
 {
 	const char *host = undetermined_hostname;
 	const char *addr = client_addr(fd);
 
-	if (!allow_proxy_protocol_peer(lp_proxy_protocol_hosts(), addr, &host)) {
-		rprintf(FLOG, "proxy protocol rejected from untrusted peer %s (%s)\n", host, addr);
+	if (!allow_proxy_protocol_peer(lp_proxy_protocol_hosts(), addr, &host, named_unix)) {
+		rprintf(FLOG, "proxy protocol rejected from untrusted peer %s (%s)\n", host, named_unix ? "unix:" : addr);
 		return 0;
 	}
 	return 1;
@@ -1497,7 +1497,7 @@ static int start_daemon_session(int f_in, int f_out, BOOL named_unix)
 		set_daemon_handshake_timeout(daemon_handshake_timeout(-1));
 
 	if (lp_proxy_protocol()) {
-		if (!proxy_peer_allowed(f_in) || !read_proxy_protocol_header(f_in))
+		if (!proxy_peer_allowed(f_in, named_unix) || !read_proxy_protocol_header(f_in))
 			return -1;
 		/* Module rules apply to the forwarded client, not the proxy transport. */
 		named_unix = False;

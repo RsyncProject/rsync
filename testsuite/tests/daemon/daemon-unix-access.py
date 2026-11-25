@@ -33,6 +33,8 @@ def module_reply(listener, config, module, forwarded=False):
                     test_fail(f'{module}: unexpected daemon greeting {greeting!r}')
                 stream.write(b'@RSYNCD: 31.0\n' + module.encode('ascii') + b'\n')
                 return stream.readline()
+        except ConnectionResetError:
+            return None
         finally:
             client.close()
             try:
@@ -62,8 +64,8 @@ def test(context: TestContext):
     direct = write_daemon_conf(modules, common)
     proxy = write_daemon_conf(modules, {**common, 'proxy protocol': 'yes',
                                        'proxy protocol hosts': '*'}, name='proxy.conf')
-    untrusted = write_daemon_conf(modules, {**common, 'proxy protocol': 'yes',
-                                           'proxy protocol hosts': 'unix:'}, name='untrusted.conf')
+    unix_proxy = write_daemon_conf(modules, {**common, 'proxy protocol': 'yes',
+                                            'proxy protocol hosts': 'unix:'}, name='unix-proxy.conf')
 
     def check(listener, config, label, named_unix, forwarded=False):
         allowed = b'@RSYNCD: OK'
@@ -86,19 +88,22 @@ def test(context: TestContext):
             listener.listen(1)
             check(listener, direct, 'filesystem Unix', named_unix=True)
             check(listener, proxy, 'forwarded IP', named_unix=False, forwarded=True)
-            if module_reply(listener, untrusted, None):
-                test_fail('unix: granted trust to a proxy peer')
+            check(listener, unix_proxy, 'Unix proxy', named_unix=False, forwarded=True)
 
     if sys.platform.startswith('linux'):
         with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as listener:
             listener.bind(f'\0rsync-access-{os.getpid()}')
             listener.listen(1)
             check(listener, direct, 'abstract Unix', named_unix=True)
+            check(listener, unix_proxy, 'abstract Unix proxy',
+                  named_unix=False, forwarded=True)
 
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as listener:
         listener.bind(('127.0.0.1', 0))
         listener.listen(1)
         check(listener, direct, 'TCP', named_unix=False)
+        if module_reply(listener, unix_proxy, None, forwarded=True):
+            test_fail('unix: trusted a TCP peer to supply a proxy header')
 
 
 if __name__ == '__main__':

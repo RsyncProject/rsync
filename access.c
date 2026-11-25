@@ -375,10 +375,10 @@ int allow_access(const char *addr, const char **host_ptr, int i, BOOL named_unix
 	return 1;
 }
 
-int allow_proxy_protocol_peer(const char *list, const char *addr, const char **host_ptr)
+int allow_proxy_protocol_peer(const char *list, const char *addr, const char **host_ptr, BOOL named_unix)
 {
 	if (!list || !*list)
 		return 0;
 	allow_forward_dns = 0;
-	return access_match(list, addr, host_ptr, 0, False);
+	return access_match(list, addr, host_ptr, 0, named_unix);
 }
