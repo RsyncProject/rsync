@@ -75,6 +75,7 @@ extern struct name_num_item *xfer_sum_nni;
 extern int xfer_sum_len;
 extern int use_secure_symlinks;
 extern int operator_path_resolve;
+extern char *backup_dir;
 
 static struct bitbag *delayed_bits = NULL;
 static int phase = 0, redoing = 0;
@@ -1095,7 +1096,13 @@ int recv_files(int f_in, int f_out, char *local_name)
 		 * trusted absolute fnamecmp (e.g. an absolute --partial-dir basis). */
 		{
 			int bdfd;
-			if (fnamecmp_type == FNAMECMP_PARTIAL_DIR
+			BOOL backup_basis = fnamecmp_type == FNAMECMP_BACKUP && inplace && make_backups > 0;
+
+			if (backup_basis && !begin_backup_read())
+				fd1 = -1;
+			else if (backup_basis && backup_dir)
+				fd1 = open_backup_basis(fnamecmp);
+			else if (fnamecmp_type == FNAMECMP_PARTIAL_DIR
 			 && fnamecmp && *fnamecmp != '/') {
 				/* The relative partial path contains peer-derived directory
 				 * components.  It is not an operator-trusted path as a whole. */
@@ -1119,6 +1126,10 @@ int recv_files(int f_in, int f_out, char *local_name)
 					operator_path_resolve = 1;
 				fd1 = secure_basis_open(basedir, fnamecmp, O_RDONLY, 0);
 				operator_path_resolve = 0;
+			}
+			if (backup_basis && !end_backup_access() && fd1 >= 0) {
+				close(fd1);
+				fd1 = -1;
 			}
 		}
 		if (fnamecmp_type == FNAMECMP_PARTIAL_DIR && fd1 == -1) {

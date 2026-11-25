@@ -551,6 +551,7 @@ has its own detailed description later in this manpage.
 --backup-dir=DIR         make backups into hierarchy based in DIR
 --suffix=SUFFIX          backup suffix (default ~ w/o --backup-dir)
 --update, -u             skip files that are newer on the receiver
+--update-links           skip newer destination symlinks
 --inplace                update destination files in-place
 --append                 append data onto shorter files
 --append-verify          --append w/old data in file checksum
@@ -1179,6 +1180,17 @@ sign) if you want the local shell to expand it.
     using the [`--suffix`](#opt) option (otherwise the files backed up in the
     specified directory will keep their original filenames).
 
+    During deletion, directory backups use the same names as the directories
+    holding their backed-up contents. The suffix applies to non-directory
+    backups. If a suffixed backup and a directory need the same path, rsync
+    reports the conflict without replacing the existing backup. When reusing
+    an owned backup subdirectory, rsync may temporarily grant itself search or
+    write access and restore the directory's mode after the backup operation.
+    This does not change the permissions of DIR. An uncatchable termination or
+    system failure can leave the temporary access in place.
+    A failed file-backup copy can leave an incomplete file at its backup name;
+    a failed transfer does not establish a complete snapshot.
+
     Note that if you specify a relative path, the backup directory will be
     relative to the destination directory, so you probably want to specify
     either an absolute path or a path that starts with "../".  If an rsync
@@ -1215,6 +1227,19 @@ sign) if you want the local shell to expand it.
     transfer will probably **not** continue the interrupted file.  As such, it
     is usually best to avoid combining this with[ `--inplace`](#opt) unless you
     have implemented manual steps to handle any interrupted in-progress files.
+
+0.  `--update-links`
+
+    Skip an existing destination symlink if it is newer than the source
+    symlink. The comparison uses the links' own modification times and
+    respects [`--modify-window`](#opt). Subsecond comparison also requires
+    protocol 31 or higher.
+
+    This [transfer rule](#TRANSFER_RULES) applies only to matching symlink
+    types. It does not enable [`--links`](#opt), change how
+    [`--copy-links`](#opt) reads the source or alter file-type replacement.
+    It can be used independently of [`--update`](#opt). The receiving rsync
+    must support this option.
 
 0.  `--inplace`
 
@@ -3451,6 +3476,16 @@ sign) if you want the local shell to expand it.
     able to set.  By default no special socket options are set.  This only
     affects direct socket connections to a remote rsync daemon.
 
+    Separate options with commas, spaces or tabs. Existing integer options
+    take a decimal value and default to 1 when no value is given. Fixed
+    values such as `IPTOS_LOWDELAY` do not accept an argument. Where
+    supported on Linux, `TCP_CONGESTION=NAME` selects a congestion control
+    algorithm. The name must be non-empty and no longer than 15 bytes.
+    The kernel can refuse an algorithm that is unavailable or not permitted.
+
+    Unknown names, known but unavailable options, invalid arguments and
+    kernel refusals are reported. They do not stop the connection attempt.
+
     See also [the daemon version of the `--sockopts` option](#dopt--sockopts).
 
 0.  `--blocking-io`
@@ -3978,11 +4013,13 @@ sign) if you want the local shell to expand it.
     understate progress and it moves straight to 100% at the end if files
     needing no transfer follow the last one transferred.  A run that transfers
     nothing ends at 100%.  A file that has to be sent a second time is added
-    to the total again, which can make the percentage step back.  With
-    incremental recursion the total only covers the part of the file list
-    scanned so far and keeps the files that needed no transfer, so the
-    percentage can finish below 100%, or pass it when a file is sent a second
-    time.
+    to the total again, which can make the percentage step back.
+
+    With incremental recursion the total covers only the part of the file
+    list scanned so far. When pushing with [`--iconv`](#opt), the sender
+    cannot use its file list to infer the receiver's check order. In both
+    cases the estimate keeps files that needed no transfer. The percentage
+    can finish below 100% or exceed it after a retry.
 
     The time field estimates time remaining during the transfer and shows
     elapsed time in the final summary.

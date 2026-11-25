@@ -344,7 +344,7 @@ static int safe_read(int desc, char *ptr, size_t len)
 }
 
 /* Remove existing file @dest and reopen, creating a new file with @mode */
-static int unlink_and_reopen(const char *dest, mode_t mode)
+int open_copy_destination(const char *dest, mode_t mode)
 {
 	int ofd;
 
@@ -388,7 +388,7 @@ static int unlink_and_reopen(const char *dest, mode_t mode)
  *
  * This is used in conjunction with the --temp-dir, --backup, and
  * --copy-dest options. */
-int copy_file(const char *source, const char *dest, int tmpfilefd, mode_t mode)
+int open_copy_source(const char *source)
 {
 	int ifd;
 
@@ -434,21 +434,32 @@ int copy_file(const char *source, const char *dest, int tmpfilefd, mode_t mode)
 		return -1;
 	}
 
-	return copy_file_from_fd(source, ifd, dest, tmpfilefd, mode);
+	return ifd;
+}
+
+int copy_file(const char *source, const char *dest, int tmpfilefd, mode_t mode)
+{
+	int ifd = open_copy_source(source);
+
+	if (ifd < 0)
+		return -1;
+	return copy_file_from_fd(source, ifd, dest, tmpfilefd, mode, -1);
 }
 
 /* Own the already-open input; source is used only for diagnostics and
- * attribute reporting. Destination handling is the same as copy_file(). */
-int copy_file_from_fd(const char *source, int ifd, const char *dest, int tmpfilefd, mode_t mode)
+ * attribute reporting. A nonnegative max_len copies exactly that many bytes
+ * and refuses a short input; a negative value copies through EOF. */
+int copy_file_from_fd(const char *source, int ifd, const char *dest, int tmpfilefd,
+		      mode_t mode, OFF_T max_len)
 {
-	int ofd, len;
+	int ofd, len = 0;
 	char buf[1024 * 8];
 	OFF_T prealloc_len = 0, offset = 0;
 
 	if (tmpfilefd >= 0) {
 		ofd = tmpfilefd;
 	} else {
-		ofd = unlink_and_reopen(dest, mode);
+		ofd = open_copy_destination(dest, mode);
 		if (ofd < 0) {
 			int save_errno = errno;
 			close(ifd);
@@ -466,14 +477,24 @@ int copy_file_from_fd(const char *source, int ifd, const char *dest, int tmpfile
 		if (do_fstat(ifd, &srcst) < 0)
 			rsyserr(FWARNING, errno, "fstat %s", full_fname(source));
 		else if (srcst.st_size > 0) {
-			prealloc_len = do_fallocate(ofd, 0, srcst.st_size);
-			if (prealloc_len < 0)
-				rsyserr(FWARNING, errno, "do_fallocate %s", full_fname(dest));
+			OFF_T reserve_len = max_len >= 0 && srcst.st_size > max_len
+				? max_len : srcst.st_size;
+			if (reserve_len > 0) {
+				prealloc_len = do_fallocate(ofd, 0, reserve_len);
+				if (prealloc_len < 0)
+					rsyserr(FWARNING, errno, "do_fallocate %s", full_fname(dest));
+			}
 		}
 	}
 #endif
 
-	while ((len = safe_read(ifd, buf, sizeof buf)) > 0) {
+	while (max_len < 0 || offset < max_len) {
+		size_t wanted = sizeof buf;
+		if (max_len >= 0 && max_len - offset < (OFF_T)wanted)
+			wanted = (size_t)(max_len - offset);
+		len = safe_read(ifd, buf, (int)wanted);
+		if (len <= 0)
+			break;
 		if (full_write(ofd, buf, len) < 0) {
 			int save_errno = errno;
 			rsyserr(FERROR_XFER, errno, "write %s", full_fname(dest));
@@ -483,6 +504,14 @@ int copy_file_from_fd(const char *source, int ifd, const char *dest, int tmpfile
 			return -1;
 		}
 		offset += len;
+	}
+
+	if (len == 0 && max_len >= 0 && offset < max_len) {
+		errno = EIO;
+		rsyserr(FERROR_XFER, errno, "source %s shrank while copying", full_fname(source));
+		close(ifd);
+		close(ofd);
+		return -1;
 	}
 
 	if (len < 0) {
@@ -507,22 +536,27 @@ int copy_file_from_fd(const char *source, int ifd, const char *dest, int tmpfile
 #endif
 	}
 
-	if (do_fsync && fsync(ofd) < 0) {
-		int save_errno = errno;
-		rsyserr(FERROR, errno, "fsync failed on %s", full_fname(dest));
-		close(ofd);
-		close(ifd);	/* ifd is held open until after the xattr copy below */
-		errno = save_errno;
-		return -1;
-	}
-
 #ifdef SUPPORT_XATTRS
 	/* Read the source xattrs through the held source fd (ifd) and set them
 	 * through ofd while both are still held, so a parent-symlink race can't
 	 * redirect the read out of tree or the write onto a file outside it. */
-	if (preserve_xattrs)
-		copy_xattrs(source, ifd, dest, ofd);
+	if (preserve_xattrs && copy_xattrs(source, ifd, dest, ofd) < 0) {
+		int save_errno = errno;
+		close(ofd);
+		close(ifd);
+		errno = save_errno;
+		return -1;
+	}
 #endif
+
+	if (do_fsync && fsync(ofd) < 0) {
+		int save_errno = errno;
+		rsyserr(FERROR, errno, "fsync failed on %s", full_fname(dest));
+		close(ofd);
+		close(ifd);
+		errno = save_errno;
+		return -1;
+	}
 
 	if (close(ifd) < 0) {
 		rsyserr(FWARNING, errno, "close failed on %s",

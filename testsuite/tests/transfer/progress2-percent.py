@@ -75,7 +75,8 @@ def check(context, label, options, names, unchanged, expected, damaged=(), copie
             test_fail(f'{where}: the percentage went above 100\n{output}')
 
 
-@requires(transports={'pipe'}, mutates={'filesystem', 'process'}, tags={'progress', 'transfer'})
+@requires(transports={'pipe'}, min_peer={'primary': '4.0.0', 'secondary': '3.5.0'},
+          mutates={'filesystem', 'process'}, tags={'progress', 'transfer', 'version-mix'})
 def test(context: TestContext):
     names = ['a', 'b', 'c', 'd', 'e']
 

@@ -2,6 +2,10 @@
 
 ## Enhancements
 
+- Accept `TCP_CONGESTION=NAME` in socket options on supported Linux builds.
+  Distinguish unknown names, unavailable options and malformed values.
+- Add `--update-links` to skip newer destination symlinks independently
+  of `--update`.
 - Allow daemon modules to apply PAM account policy after rsync authentication.
   Both build-time support and the module setting are disabled by default.
 - Let rrsync administrators require a server-side transfer log outside the
@@ -15,9 +19,9 @@
 - Avoid redundant stats when creating children of a fresh receiver directory.
 - Without incremental recursion (for example with `--no-inc-recursive`), the
   `--info=progress2` percentage and time remaining leave out files that
-  needed no transfer once the transfer has passed them. The percentage ends
-  at 100% and no longer passes it when a file is sent again. The file list,
-  the transfer and `--stats` are unchanged.
+  needed no transfer once the transfer has passed them. Pushes with `--iconv`
+  retain the previous estimate because filename conversion can change the
+  check order. The file list, the transfer and `--stats` are unchanged.
 - Try an exact `--link-dest` match without a destination stat in new
   incremental directories. Use the normal lookup path if the link fails.
 - Keep the checked root of a single absolute alternate destination open
@@ -39,11 +43,16 @@
   because FFS can corrupt other attributes during that operation.
 - Fixed silent loss of xattrs on Cygwin when the name list did not fit the
   initial buffer.
-- Fixed `--progress` showing a meaningless percentage such as 2147483647% for
-  a file that was empty when the file list was built and had grown by the
-  time it was transferred.
+- Avoid division by zero in `--progress` when an empty file grows during a
+  transfer.
 - Report buffered diagnostic and logfile write failures instead of returning
   success after dropping output.
+- Preserve directories and their requested attributes in `--backup-dir`
+  when removing them during a deletion pass. Leave the original directory
+  in place if its backup fails.
+- Treat xattr copy errors as file-copy failures. Refuse an in-place delta
+  update before changing its destination when copying the backup fails to
+  write, copy xattrs or close.
 - Send keepalives during file-list checksumming on multiplexed streams.
   Client uploads using protocols below 30 cannot send these keepalives.
 

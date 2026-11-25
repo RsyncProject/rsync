@@ -38,6 +38,8 @@ extern int preserve_devices;
 extern int preserve_specials;
 extern int checksum_seed;
 extern int saw_xattr_filter;
+extern char *backup_dir;
+extern char backup_dir_buf[MAXPATHLEN];
 
 extern struct name_num_item *xattr_sum_nni;
 extern int xattr_sum_len;
@@ -240,13 +242,13 @@ static char *get_xattr_data(const char *fname, int fd, const char *name, size_t 
 	return ptr;
 }
 
-static int rsync_xal_get(const char *fname, int fd, item_list *xalp)
+static int rsync_xal_get(const char *fname, int fd, item_list *xalp, BOOL local_backup)
 {
 	ssize_t list_len, name_len;
 	size_t datum_len, name_offset;
 	char *name, *ptr;
 #ifdef HAVE_LINUX_XATTRS
-	int user_only = am_sender ? 0 : !am_root;
+	int user_only = !am_sender && (local_backup ? am_root <= 0 : !am_root);
 #endif
 	rsync_xa *rxa;
 	int count;
@@ -283,7 +285,7 @@ static int rsync_xal_get(const char *fname, int fd, item_list *xalp)
 		if (!(ptr = get_xattr_data(fname, fd, name, &datum_len, 0)))
 			return -1;
 
-		if (datum_len > MAX_FULL_DATUM) {
+		if (!local_backup && datum_len > MAX_FULL_DATUM) {
 			/* For large datums, we store a flag and a checksum. */
 			name_offset = 1 + MAX_XATTR_DIGEST_LEN;
 			sum_init(xattr_sum_nni, checksum_seed);
@@ -344,7 +346,7 @@ int get_xattr(const char *fname, int fd, stat_x *sxp)
 	} else if (IS_MISSING_FILE(sxp->st))
 		return 0;
 
-	if (rsync_xal_get(fname, fd, sxp->xattr) < 0) {
+	if (rsync_xal_get(fname, fd, sxp->xattr, False) < 0) {
 		free_xattr(sxp);
 		return -1;
 	}
@@ -990,7 +992,8 @@ void uncache_tmp_xattrs(void)
 /* Apply the wanted xattr set to fname.  When fd >= 0, the list/set/remove ops
  * that target fname go through that held fd (sys_f*xattr) so a parent-symlink
  * race can't redirect them; the abbreviated-value compare still reads the basis
- * via the fnamecmp path.  fd < 0 keeps the path-based behavior. */
+ * via the fnamecmp path.  fd < 0 keeps the path-based behavior.  A NULL sxp
+ * means the caller handles timestamps separately. */
 static int rsync_xal_set(const char *fname, item_list *xalp,
 			 const char *fnamecmp, stat_x *sxp, int fd)
 {
@@ -1003,6 +1006,8 @@ static int rsync_xal_set(const char *fname, item_list *xalp,
 #endif
 	size_t name_len;
 	int ret = 0;
+	int basis_fd = -1;
+	BOOL path_only_basis = False;
 
 	/* This puts the current name list into the "namebuf" buffer. */
 	if ((list_len = get_xattr_names(fname, fd)) < 0)
@@ -1012,9 +1017,29 @@ static int rsync_xal_set(const char *fname, item_list *xalp,
 		name = rxas[i].name;
 
 		if (XATTR_ABBREV(rxas[i])) {
+			if (!fnamecmp) {
+				errno = EINVAL;
+				return -1;
+			}
+			if (backup_dir && fnamecmp == backup_dir_buf && basis_fd < 0 && !path_only_basis) {
+				if (symlink_optout_allowed() && backup_basis_path_fallback(fnamecmp, 0))
+					path_only_basis = True;
+				else
+					basis_fd = open_backup_basis(fnamecmp);
+				if (!path_only_basis && basis_fd < 0) {
+					int open_error = errno;
+					if (backup_basis_path_fallback(fnamecmp, open_error))
+						path_only_basis = True;
+					else {
+						rsyserr(FERROR_XFER, errno, "cannot open backup basis %s",
+							full_fname(fnamecmp));
+						return -1;
+					}
+				}
+			}
 			/* See if the fnamecmp version is identical. */
 			len = name_len = rxas[i].name_len;
-			if ((ptr = get_xattr_data(fnamecmp, -1, name, &len, 1)) == NULL) {
+			if ((ptr = get_xattr_data(fnamecmp, basis_fd, name, &len, 1)) == NULL) {
 			  still_abbrev:
 				if (am_generator)
 					continue;
@@ -1044,7 +1069,7 @@ static int rsync_xal_set(const char *fname, item_list *xalp,
 					"rsync_xal_set: %ssetxattr(%s,\"%s\") failed",
 					fd >= 0 ? "f" : "l", full_fname(fname), name);
 				ret = -1;
-			} else /* make sure caller sets mtime */
+			} else if (sxp) /* make sure caller sets mtime */
 				sxp->st.st_mtime = (time_t)-1;
 
 			if (am_generator) { /* generator items stay abbreviated */
@@ -1066,7 +1091,7 @@ static int rsync_xal_set(const char *fname, item_list *xalp,
 				"rsync_xal_set: %ssetxattr(%s,\"%s\") failed",
 				fd >= 0 ? "f" : "l", full_fname(fname), name);
 			ret = -1;
-		} else /* make sure caller sets mtime */
+		} else if (sxp) /* make sure caller sets mtime */
 			sxp->st.st_mtime = (time_t)-1;
 	}
 
@@ -1101,11 +1126,29 @@ static int rsync_xal_set(const char *fname, item_list *xalp,
 					"rsync_xal_set: %sremovexattr(%s,\"%s\") failed",
 					fd >= 0 ? "f" : "l", full_fname(fname), name);
 				ret = -1;
-			} else /* make sure caller sets mtime */
+			} else if (sxp) /* make sure caller sets mtime */
 				sxp->st.st_mtime = (time_t)-1;
 		}
 	}
 
+	if (basis_fd >= 0)
+		close(basis_fd);
+	return ret;
+}
+
+/* A reused backup directory needs the selected set, not an additive copy.
+ * Keep full values and finish reading before changing the backup. */
+int reconcile_backup_xattrs(const char *source, int source_fd, const char *dest, int dest_fd)
+{
+	item_list attrs = EMPTY_ITEM_LIST;
+	int ret = rsync_xal_get(source, source_fd, &attrs, True);
+	int save_errno;
+
+	if (ret == 0)
+		ret = rsync_xal_set(dest, &attrs, NULL, NULL, dest_fd);
+	save_errno = errno;
+	rsync_xal_free(&attrs);
+	errno = save_errno;
 	return ret;
 }
 

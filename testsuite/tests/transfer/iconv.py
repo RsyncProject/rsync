@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import os
+import re
 import subprocess
 
 from harness.daemon_config import write_daemon_conf
@@ -120,6 +121,22 @@ push_target = LATIN1_TARGET if convert_symlink_target else UTF8_TARGET
 actual_target = os.readlink(raw_path(push_dst, b'link'))
 if actual_target != push_target:
     test_fail(f'push: symlink target {actual_target!r}, expected {push_target!r}')
+
+# KOI8-R sorts these two names in the reverse order from UTF-8. The sender
+# must not use its own sorted position to discount unchecked receiver entries.
+if RSYNC_PEER == RSYNC:
+    progress_src = base / 'progress-src'
+    progress_dst = base / 'progress-dst'
+    makepath(progress_src, progress_dst)
+    for name in ('\u0430', '\u044e'):
+        write_raw(progress_src, name.encode('utf-8'))
+    progress = invoke('-r', '--no-inc-recursive', '--info=progress2',
+                      '--iconv=UTF-8,KOI8-R', '-e', ssh, rpath,
+                      f'{progress_src}/', f'localhost:{progress_dst}/')
+    assert_only_names(progress_dst, (b'\xc0', b'\xc1'), 'progress push')
+    first = re.search(rb'(\d+)%[^\r\n]*\(xfr#1,', progress.stdout)
+    if not first or first[1] != b'50':
+        test_fail(f'progress push: expected 50% after the first file: {progress.stdout!r}')
 
 invoke('-rl', convert, '-e', ssh, rpath,
        f'localhost:{push_dst}/', f'{pull_dst}/')
