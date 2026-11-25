@@ -46,6 +46,7 @@ extern int inc_recurse;
 extern int blocking_io;
 extern int always_checksum;
 extern int time_only;
+extern struct chmod_mode_struct *dest_chmod_modes;
 extern int remove_source_files;
 extern int output_needs_newline;
 extern int called_from_signal_handler;
@@ -1559,6 +1560,10 @@ static int start_client(int argc, char *argv[])
 	}
 	if (time_only && am_sender && !local_server) {
 		rprintf(FERROR, "--time-only requires a local receiver or a remote source\n");
+		exit_cleanup(RERR_SYNTAX);
+	}
+	if (dest_chmod_modes && am_sender && !local_server) {
+		rprintf(FERROR, "--chmod-dest must be set on the receiver; use -M for a remote-shell receiver\n");
 		exit_cleanup(RERR_SYNTAX);
 	}
 

@@ -572,6 +572,7 @@ has its own detailed description later in this manpage.
 --perms, -p              preserve permissions
 --executability, -E      preserve executability
 --chmod=CHMOD            affect file and/or directory permissions
+--chmod-dest=CHMOD       set backup permissions with --fake-super
 --acls, -A               preserve ACLs (implies --perms)
 --xattrs, -X             preserve extended attributes
 --owner, -o              preserve owner (super-user only)
@@ -1796,6 +1797,27 @@ sign) if you want the local shell to expand it.
 
     See the [`--perms`](#opt) and [`--executability`](#opt) options for how the
     resulting permission value can be applied to the files in the transfer.
+
+0.  `--chmod-dest=CHMOD`
+
+    Apply a [`--chmod`](#opt) expression to the physical permissions of
+    backup files and directories. The stored permissions still describe
+    the permissions to restore. As with [`--fake-super`](#opt), rsync keeps
+    owner read and write access and owner search access on directories.
+    Setuid, setgid and sticky bits are not applied to the backup. Symlinks
+    and special files are not affected by this option.
+
+    Enable this option with `--fake-super` and [`--perms`](#opt) on the
+    receiver. For a remote-shell push, pass both receiver options with
+    [`--remote-option`](#opt), for example:
+
+    >     rsync -a -M--fake-super -M--chmod-dest=g+r /src/ host:/backup/
+
+    Applying this option to an existing regular file with multiple hard
+    links is refused. This option is not available to an rsync daemon. It requires
+    ordinary temporary-file transfers and cannot be combined with alternate
+    destinations, `--hard-links`, `--backup`, `--inplace`, `--partial`,
+    `--temp-dir`, `--remove-source-files` or batch mode.
 
 0.  `--owner`, `-o`
 

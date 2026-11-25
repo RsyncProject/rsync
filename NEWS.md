@@ -13,6 +13,8 @@
 - Let rrsync administrators require a server-side transfer log outside the
   restricted directory with `-log FILE`. Refuse transfers when the log cannot
   be opened and report later log write failures.
+- Add `--chmod-dest` for fake-super backups. Set physical file and directory
+  permissions independently of the permissions stored for restoration.
 - Reduce directory lookups when linking unchanged regular files with non-daemon
   `--link-dest` transfers. Reuse checked receiver and basis directories.
 - Reuse checked directories for ordinary scans and file reads beneath a
