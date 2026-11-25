@@ -1,0 +1,54 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 3.2//EN">
+<HTML>
+<HEAD>
+<TITLE>rsync examples</TITLE>
+</HEAD>
+<!--#include virtual="header.html" -->
+
+<H2 align="center">rsync examples</H2>
+
+If you have an interesting example of how you use rsync then please
+submit it to the 
+<A HREF="mailto:rsync-bugs@samba.org">rsync-bugs@samba.org</A>
+for inclusion on this page.
+
+<h2>backup to a central backup server with 7 day incremental</h2>
+
+<pre><small>
+<!--#include virtual="backup.txt" -->
+</small></pre>
+
+<H2>backup to a spare disk</H2>
+
+<pre><small>
+<!--#include virtual="horus.txt" -->
+</small></pre>
+
+<H2>mirroring vger CVS tree</H2>
+
+<pre><small>
+<!--#include virtual="vger.txt" -->
+</small></pre>
+
+<H2>automated backup at home</H2>
+
+<pre><small>
+<!--#include virtual="susan.txt" -->
+</small></pre>
+
+<H2>Fancy footwork with remote file lists</H2>
+
+<pre><small>
+One little known feature of rsync is the fact that when run over a
+remote shell (such as rsh or ssh) you can give any shell command as
+the remote file list. The shell command is expanded by your remote
+shell before rsync is called. For example, see if you can work out
+what this does:
+
+	rsync -avR remote:'`find /home -name "*.[ch]"`' /tmp/
+
+note that that is backquotes enclosed by quotes (some browsers don't
+show that correctly).
+</small></pre>
+
+<!--#include virtual="footer.html" -->

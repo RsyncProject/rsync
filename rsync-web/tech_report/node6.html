@@ -1,0 +1,299 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 3.2 Final//EN">
+<!--Converted with LaTeX2HTML 98.1p1 release (March 2nd, 1998)
+originally by Nikos Drakos (nikos@cbl.leeds.ac.uk), CBLU, University of Leeds
+* revised and updated by:  Marcus Hennecke, Ross Moore, Herb Swan
+* with significant contributions from:
+  Jens Lippmann, Marek Rouchal, Martin Wilck and others -->
+<HTML>
+<HEAD>
+<TITLE>Results</TITLE>
+<META NAME="description" CONTENT="Results">
+<META NAME="keywords" CONTENT="tech_report">
+<META NAME="resource-type" CONTENT="document">
+<META NAME="distribution" CONTENT="global">
+<META HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=iso-8859-1">
+<LINK REL="STYLESHEET" HREF="tech_report.css">
+<LINK REL="next" HREF="node7.html">
+<LINK REL="previous" HREF="node5.html">
+<LINK REL="up" HREF="tech_report.html">
+<LINK REL="next" HREF="node7.html">
+</HEAD>
+<BODY >
+<!--Navigation Panel-->
+<A NAME="tex2html72"
+ HREF="node7.html">
+<IMG WIDTH="37" HEIGHT="24" ALIGN="BOTTOM" BORDER="0" ALT="next"
+ SRC="next.gif"></A> 
+<A NAME="tex2html70"
+ HREF="tech_report.html">
+<IMG WIDTH="26" HEIGHT="24" ALIGN="BOTTOM" BORDER="0" ALT="up"
+ SRC="up.gif"></A> 
+<A NAME="tex2html64"
+ HREF="node5.html">
+<IMG WIDTH="63" HEIGHT="24" ALIGN="BOTTOM" BORDER="0" ALT="previous"
+ SRC="previous.gif"></A>   
+<BR>
+<B> Next:</B> <A NAME="tex2html73"
+ HREF="node7.html">Availability</A>
+<B> Up:</B> <A NAME="tex2html71"
+ HREF="tech_report.html">The rsync algorithm</A>
+<B> Previous:</B> <A NAME="tex2html65"
+ HREF="node5.html">Pipelining</A>
+<BR>
+<BR>
+<!--End of Navigation Panel-->
+
+<H1><A NAME="SECTION00060000000000000000">
+Results</A>
+</H1>
+
+<P>
+To test the algorithm, tar files were created of the Linux kernel
+sources for two versions of the kernel. The two kernel versions were
+1.99.10 and 2.0.0. These tar files are approximately 24MB in size and
+are separated by 5 released patch levels.
+
+<P>
+Out of the 2441 files in the 1.99.10 release, 291 files had changed in
+the 2.0.0 release, 19 files had been removed and 25 files had been
+added.
+
+<P>
+A ``diff'' of the two tar files using the standard GNU diff utility
+produced over 32 thousand lines of output totalling 2.1 MB.
+
+<P>
+The following table shows the results for rsync between the two files
+with a varying block size.<A NAME="tex2html2"
+ HREF="footnode.html#foot24"><SUP>2</SUP></A>
+
+<P>
+<BR>
+<BR>
+<TABLE CELLPADDING=3 BORDER="1">
+<TR><TD ALIGN="LEFT"><B> block</B></TD>
+<TD ALIGN="LEFT"><B> matches</B></TD>
+<TD ALIGN="LEFT"><B> tag</B></TD>
+<TD ALIGN="LEFT"><B> false</B></TD>
+<TD ALIGN="LEFT"><B> data</B></TD>
+<TD ALIGN="LEFT"><B> written</B></TD>
+<TD ALIGN="LEFT"><B> read</B></TD>
+</TR>
+<TR><TD ALIGN="LEFT"><B> size</B></TD>
+<TD ALIGN="LEFT">&nbsp;</TD>
+<TD ALIGN="LEFT"><B> hits</B></TD>
+<TD ALIGN="LEFT"><B> alarms</B></TD>
+<TD ALIGN="LEFT">&nbsp;</TD>
+<TD ALIGN="LEFT">&nbsp;</TD>
+<TD ALIGN="LEFT">&nbsp;</TD>
+</TR>
+<TR><TD ALIGN="LEFT"><P>
+300</TD>
+<TD ALIGN="LEFT">64247</TD>
+<TD ALIGN="LEFT">3817434</TD>
+<TD ALIGN="LEFT">948</TD>
+<TD ALIGN="LEFT">5312200</TD>
+<TD ALIGN="LEFT">5629158</TD>
+<TD ALIGN="LEFT">1632284</TD>
+</TR>
+<TR><TD ALIGN="LEFT">500</TD>
+<TD ALIGN="LEFT">46989</TD>
+<TD ALIGN="LEFT">620013</TD>
+<TD ALIGN="LEFT">64</TD>
+<TD ALIGN="LEFT">1091900</TD>
+<TD ALIGN="LEFT">1283906</TD>
+<TD ALIGN="LEFT">979384</TD>
+</TR>
+<TR><TD ALIGN="LEFT">700</TD>
+<TD ALIGN="LEFT">33255</TD>
+<TD ALIGN="LEFT">571970</TD>
+<TD ALIGN="LEFT">22</TD>
+<TD ALIGN="LEFT">1307800</TD>
+<TD ALIGN="LEFT">1444346</TD>
+<TD ALIGN="LEFT">699564</TD>
+</TR>
+<TR><TD ALIGN="LEFT">900</TD>
+<TD ALIGN="LEFT">25686</TD>
+<TD ALIGN="LEFT">525058</TD>
+<TD ALIGN="LEFT">24</TD>
+<TD ALIGN="LEFT">1469500</TD>
+<TD ALIGN="LEFT">1575438</TD>
+<TD ALIGN="LEFT">544124</TD>
+</TR>
+<TR><TD ALIGN="LEFT">1100</TD>
+<TD ALIGN="LEFT">20848</TD>
+<TD ALIGN="LEFT">496844</TD>
+<TD ALIGN="LEFT">21</TD>
+<TD ALIGN="LEFT">1654500</TD>
+<TD ALIGN="LEFT">1740838</TD>
+<TD ALIGN="LEFT">445204</TD>
+</TR>
+</TABLE>
+<BR>
+<BR>
+
+<P>
+In each case, the CPU time taken was less than the
+time it takes to run ``diff'' on the two files.<A NAME="tex2html3"
+ HREF="footnode.html#foot40"><SUP>3</SUP></A>
+
+<P>
+The columns in the table are as follows:
+
+<P>
+<DL>
+<DT><STRONG>block size</STRONG>
+<DD>The size in bytes of the checksummed blocks.
+<DT><STRONG>matches</STRONG>
+<DD>The number of times a block of <I>B</I> was found in <I>A</I>.
+<DT><STRONG>tag hits</STRONG>
+<DD>The number of times the 16 bit hash of the rolling
+checksum matched a hash of one of the checksums from <I>B</I>.
+<DT><STRONG>false alarms</STRONG>
+<DD>The number of times the 32 bit rolling checksum
+  matched but the strong checksum didn't.
+<DT><STRONG>data</STRONG>
+<DD>The amount of file data transferred verbatim, in bytes.
+<DT><STRONG>written</STRONG>
+<DD>The total number of bytes written by <IMG
+ WIDTH="15" HEIGHT="13" ALIGN="BOTTOM" BORDER="0"
+ SRC="img1.gif"
+ ALT="$\alpha$">
+including protocol overheads. This is almost all file data.
+<DT><STRONG>read</STRONG>
+<DD>The total number of bytes read by <IMG
+ WIDTH="15" HEIGHT="13" ALIGN="BOTTOM" BORDER="0"
+ SRC="img1.gif"
+ ALT="$\alpha$">
+including
+  protocol overheads. This is almost all checksum information.
+</DL>
+<P>
+The results demonstrate that for block sizes above 300 bytes, only a
+small fraction (around 5%) of the file was transferred. The amount
+transferred was also considerably less than the size of the diff file
+that would have been transferred if the diff/patch method of updating
+a remote file was used.
+
+<P>
+The checksums themselves took up a considerable amount of space,
+although much less than the size of the data transferred in each
+case. Each pair of checksums consumes 20 bytes: 4 bytes for the
+rolling checksum plus 16 bytes for the 128-bit MD4 checksum.
+
+<P>
+The number of false alarms was less than 1/1000 of the number of
+true matches, indicating that the 32 bit rolling checksum is quite
+good at screening out false matches. 
+
+<P>
+The number of tag hits indicates that the second level of the
+checksum search algorithm was invoked about once every 50
+characters.  This is quite high because the total number of blocks in
+the file is a large fraction of the size of the tag hash table. For
+smaller files we would expect the tag hit rate to be much closer to
+the number of matches.  For extremely large files, we should probably
+increase the size of the hash table.
+
+<P>
+The next table shows similar results for a much smaller set of files.
+In this case the files were not packed into a tar file first. Rather,
+rsync was invoked with an option to recursively descend the directory
+tree. The files used were from two source releases of another software
+package called Samba. The total source code size is 1.7 MB and the
+diff between the two releases is 4155 lines long totalling 120 kB.
+
+<P>
+<BR>
+<BR>
+<TABLE CELLPADDING=3 BORDER="1">
+<TR><TD ALIGN="LEFT"><B> block</B></TD>
+<TD ALIGN="LEFT"><B> matches</B></TD>
+<TD ALIGN="LEFT"><B> tag</B></TD>
+<TD ALIGN="LEFT"><B> false</B></TD>
+<TD ALIGN="LEFT"><B> data</B></TD>
+<TD ALIGN="LEFT"><B> written</B></TD>
+<TD ALIGN="LEFT"><B> read</B></TD>
+</TR>
+<TR><TD ALIGN="LEFT"><B> size</B></TD>
+<TD ALIGN="LEFT">&nbsp;</TD>
+<TD ALIGN="LEFT"><B> hits</B></TD>
+<TD ALIGN="LEFT"><B> alarms</B></TD>
+<TD ALIGN="LEFT">&nbsp;</TD>
+<TD ALIGN="LEFT">&nbsp;</TD>
+<TD ALIGN="LEFT">&nbsp;</TD>
+</TR>
+<TR><TD ALIGN="LEFT"><P>
+300</TD>
+<TD ALIGN="LEFT">3727</TD>
+<TD ALIGN="LEFT">3899</TD>
+<TD ALIGN="LEFT">0</TD>
+<TD ALIGN="LEFT">129775</TD>
+<TD ALIGN="LEFT">153999</TD>
+<TD ALIGN="LEFT">83948</TD>
+</TR>
+<TR><TD ALIGN="LEFT">500</TD>
+<TD ALIGN="LEFT">2158</TD>
+<TD ALIGN="LEFT">2325</TD>
+<TD ALIGN="LEFT">0</TD>
+<TD ALIGN="LEFT">171574</TD>
+<TD ALIGN="LEFT">189330</TD>
+<TD ALIGN="LEFT">50908</TD>
+</TR>
+<TR><TD ALIGN="LEFT">700</TD>
+<TD ALIGN="LEFT">1517</TD>
+<TD ALIGN="LEFT">1649</TD>
+<TD ALIGN="LEFT">0</TD>
+<TD ALIGN="LEFT">195024</TD>
+<TD ALIGN="LEFT">210144</TD>
+<TD ALIGN="LEFT">36828</TD>
+</TR>
+<TR><TD ALIGN="LEFT">900</TD>
+<TD ALIGN="LEFT">1156</TD>
+<TD ALIGN="LEFT">1281</TD>
+<TD ALIGN="LEFT">0</TD>
+<TD ALIGN="LEFT">222847</TD>
+<TD ALIGN="LEFT">236471</TD>
+<TD ALIGN="LEFT">29048</TD>
+</TR>
+<TR><TD ALIGN="LEFT">1100</TD>
+<TD ALIGN="LEFT">921</TD>
+<TD ALIGN="LEFT">1049</TD>
+<TD ALIGN="LEFT">0</TD>
+<TD ALIGN="LEFT">250073</TD>
+<TD ALIGN="LEFT">262725</TD>
+<TD ALIGN="LEFT">23988</TD>
+</TR>
+</TABLE>
+<BR>
+<BR>
+
+<P>
+<HR>
+<!--Navigation Panel-->
+<A NAME="tex2html72"
+ HREF="node7.html">
+<IMG WIDTH="37" HEIGHT="24" ALIGN="BOTTOM" BORDER="0" ALT="next"
+ SRC="next.gif"></A> 
+<A NAME="tex2html70"
+ HREF="tech_report.html">
+<IMG WIDTH="26" HEIGHT="24" ALIGN="BOTTOM" BORDER="0" ALT="up"
+ SRC="up.gif"></A> 
+<A NAME="tex2html64"
+ HREF="node5.html">
+<IMG WIDTH="63" HEIGHT="24" ALIGN="BOTTOM" BORDER="0" ALT="previous"
+ SRC="previous.gif"></A>   
+<BR>
+<B> Next:</B> <A NAME="tex2html73"
+ HREF="node7.html">Availability</A>
+<B> Up:</B> <A NAME="tex2html71"
+ HREF="tech_report.html">The rsync algorithm</A>
+<B> Previous:</B> <A NAME="tex2html65"
+ HREF="node5.html">Pipelining</A>
+<!--End of Navigation Panel-->
+<ADDRESS>
+<I>Andrew Tridgell</I>
+<BR><I>1998-11-09</I>
+</ADDRESS>
+</BODY>
+</HTML>

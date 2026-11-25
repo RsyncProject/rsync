@@ -116,6 +116,8 @@ NORETURN void _exit_cleanup(int code, const char *file, int line)
 		exit_line = line < 0 ? -line : line;
 	}
 
+	end_backup_access();
+
 	/* If this is the exit at the end of the run, the server side
 	 * should not attempt to output a message (see log_exit()). */
 	if (am_server && code == 0)
@@ -162,7 +164,8 @@ NORETURN void _exit_cleanup(int code, const char *file, int line)
 				cleanup_fd_r = -1;
 			}
 			if (cleanup_fd_w != -1) {
-				flush_write_file(cleanup_fd_w);
+				if (!called_from_signal_handler)
+					flush_write_file(cleanup_fd_w);
 				close(cleanup_fd_w);
 				cleanup_fd_w = -1;
 			}
@@ -198,7 +201,7 @@ NORETURN void _exit_cleanup(int code, const char *file, int line)
 		switch_step++;
 
 		if (cleanup_fname)
-			do_unlink(cleanup_fname);
+			do_unlink_at(cleanup_fname);
 		if (exit_code)
 			kill_all(SIGUSR1);
 		if (cleanup_pid && cleanup_pid == getpid()) {
@@ -269,8 +272,16 @@ NORETURN void _exit_cleanup(int code, const char *file, int line)
 		break;
 	}
 
-	if (called_from_signal_handler)
+	if (called_from_signal_handler) {
+#ifdef GCOV_COVERAGE
+		/* _exit() bypasses the gcov atexit flush; rsync's generator (and
+		 * other processes) normally finish via the signal handler, so
+		 * without this they would write no .gcda. Harmless otherwise. */
+		extern void __gcov_dump(void);
+		__gcov_dump();
+#endif
 		_exit(exit_code);
+	}
 	exit(exit_code);
 }
 
