@@ -8,6 +8,8 @@
   of `--update`.
 - Allow daemon modules to apply PAM account policy after rsync authentication.
   Both build-time support and the module setting are disabled by default.
+- Accept `unix:` in module host rules for named Unix domain sockets.
+  Proxy protocol trust and module authentication are unchanged.
 - Let rrsync administrators require a server-side transfer log outside the
   restricted directory with `-log FILE`. Refuse transfers when the log cannot
   be opened and report later log write failures.
