@@ -117,10 +117,11 @@ static size_t maxColumnWidth(FILE *fp)
  */
 static inline size_t stringDisplayWidth(const char *s)
 {
-    size_t n = strlen(s);
+    size_t n;
 #ifdef HAVE_MBSRTOWCS
     mbstate_t t;
 
+    n = strlen(s);
     memset ((void *)&t, 0, sizeof (t));	/* In initial state.  */
     /* Determine number of display characters.  */
     n = mbsrtowcs (NULL, &s, n, &t);
@@ -667,7 +668,6 @@ static size_t singleOptionUsage(FILE * fp, columns_t columns,
     if (!(prtshort || prtlong))
 	return columns->cur;
 
-    len = sizeof(" []")-1;
     if (prtshort)
 	len += sizeof("-c")-1;
     if (prtlong) {

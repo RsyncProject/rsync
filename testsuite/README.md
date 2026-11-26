@@ -1,236 +1,82 @@
-# rsync testsuite
+# Testing rsync
 
-This directory holds rsync's automated regression tests. Ideally every code
-change or bug fix comes with a test that would have caught the problem.
+The runner and harness use Python 3.7 or later and its standard library. Some tests also need platform tools for ACLs, extended attributes, SSH or privilege changes. CommonMark is needed to build manual pages rather than to run tests.
 
-The tests are Python scripts named `testsuite/*_test.py`, driven by the
-`runtests.py` harness at the top of the tree (the old shell-based `runtests.sh`
-is gone). Shared helpers live in `testsuite/rsyncfns.py`. A handful of C helper
-programs (`tls`, `getgroups`, `trimslash`, …) are built alongside `rsync` and
-used by some tests. Coverage notes are in [COVERAGE.md](COVERAGE.md).
+## Running tests
 
-## Running the tests
-
-### Via make
-
-Run from the build directory:
-
-- **`make check`** — build the helper programs and run the whole suite in
-  parallel (`CHECK_J`, default 8) against the just-built `./rsync`. You do **not**
-  need `make install` first; indeed you generally should not install before
-  testing. Use `make check CHECK_J=1` to run serially.
-- **`make check29`** / **`make check30`** — the same, forcing protocol version 29
-  or 30.
-- **`make installcheck`** — run the suite against the *installed* binary (e.g.
-  `/usr/local/bin/rsync`). Per the GNU standards this does not search `$PATH`.
-  Handy for testing a distribution build.
-- **`make check-progs`** — (re)build just the C helper programs the tests need,
-  without running anything.
-- **`make coverage`** / **`coverage-tcp`** / **`coverage-all`** — generate an HTML
-  coverage report (needs `./configure --enable-coverage` and `gcovr`);
-  `coverage-all` merges runs across protocol versions and the tcp transport.
-
-### Via runtests.py directly
-
-`make check` just drives `runtests.py`; run it directly for finer control. It
-defaults `--rsync-bin` to `./rsync`, so run it from the build directory (or pass
-`--rsync-bin` / `--tooldir`):
-
+From a configured build directory:
 ```sh
-./runtests.py                 # all tests
-./runtests.py chmod-temp-dir  # a single test by name
-./runtests.py 'xattr*'        # a glob of test names
+make check
+make check29
+make check30
 ```
 
-Useful options:
+The first target runs the suite with the default protocol; the others force protocols 29 and 30. Make runs up to eight tests at once. Set CHECK_J to change that limit.
 
-- `-j N`, `--parallel N` — run up to N tests at once
-- `--use-tcp` — run daemon tests against a real `rsyncd` on `127.0.0.1` (the
-  default runs them over a stdio pipe). **Read the security warning below before
-  using this on a shared machine.**
-- `--protocol VER` — force a protocol version
-- `--preserve-scratch` — keep each test's scratch dir afterwards
-- `--log-level N`, `--always-log` — more verbose output / show logs for passing tests too
-- `--stop-on-fail` — stop after the first failure
-- `--timeout SECS` — per-test timeout (default 300)
-- `--valgrind`, `--valgrind-opts OPTS` — run rsync under valgrind
-- `--rsync-bin PATH`, `--tooldir DIR`, `--srcdir DIR` — locate the binary / build / source dirs
-- `--expect-skipped LIST` — see skip enforcement below
-
-### Security warning: `--use-tcp`
-
-> **⚠️ Do not use `--use-tcp` on a machine with untrusted local users.**
->
-> `--use-tcp` starts a real `rsync` daemon listening on a loopback TCP port
-> (`127.0.0.1` / `::1`) and **deliberately configures insecure test scenarios**
-> (daemon modules without authentication, unsafe options enabled, etc.). Loopback
-> addresses are reachable by *every* local user, so for as long as the tests run,
-> any other user on the machine can connect to that daemon and exploit those
-> deliberately-insecure modules — potentially reading or writing files with the
-> privileges of the user running the tests (which is **root** if you run the suite
-> as root).
->
-> Only run `--use-tcp` where there are **no possible local users who might try to
-> exploit it** — a single-user workstation or a dedicated, isolated CI machine.
-> The default stdio-pipe transport carries no such risk: it talks to the daemon
-> over a private pipe with nothing listening on the network, so prefer it on any
-> shared or multi-user host.
-
-### Results and exit codes
-
-Each test prints one result line — `PASS`, `FAIL`, `ERROR`, `SKIP` (with a
-reason), or `XFAIL` (an expected failure) — and the run ends with a
-`passed / failed / skipped` summary. Per-test exit-code convention:
-
-| code | meaning |
-|------|---------|
-| 0    | pass    |
-| 1    | fail    |
-| 2    | error   |
-| 77   | skip    |
-| 78   | xfail   |
-
-`runtests.py` exits non-zero if any test fails. Some tests need root or another
-precondition and otherwise `SKIP` — read the individual test scripts for details.
-
-**Skip enforcement:** on a full run, set `RSYNC_EXPECT_SKIPPED=a,b,c` (or
-`--expect-skipped a,b,c`) and the run fails if the set of skipped tests does not
-match. This is how the CI workflows pin each platform's expected skip set.
-
-### Scratch dirs and debugging
-
-Each test runs in `testtmp/<name>/`. On failure the scratch directory is left in
-place (also `--preserve-scratch`); including its logs in a bug report is helpful.
-
-### Preconditions
-
-You need `python3`, `/bin/sh`, and the normal build toolchain. The ACL/xattr
-tests need the `acl` and `attr` tools (`getfacl`/`setfacl`,
-`getfattr`/`setfattr`) and skip if they are absent. Some tests need root.
-
-These tests also run in CI via GitHub Actions (see `.github/workflows/`).
-
-## Fleet testing (fleettest.py)
-
-`testsuite/fleettest.py` builds the committed HEAD of an rsync checkout on a
-fleet of remote machines over ssh and runs the suite under both transports
-(stdio-pipe and `--use-tcp`) in parallel, reporting only the *unexpected*
-results. It is a fast local pre-flight for the GitHub CI matrix: each target
-mirrors a `.github/workflows/*.yml` job — its configure flags, and the
-`RSYNC_EXPECT_SKIPPED` list parsed straight from the workflow.
-
-Because every run includes a `--use-tcp` pass, the fleet stands up the insecure
-loopback test daemon on each target — so only point it at machines with **no
-untrusted local users** (see the [security warning](#security-warning---use-tcp)
-above).
-
-The fleet — which machines, and how to reach and build on each — is described in
-a JSON file. Copy the bundled example (it is git-ignored) and edit it for your
-hosts:
-
+For an in-tree build, individual tests and filename patterns can be selected after running `make check-progs`:
 ```sh
-cp testsuite/fleettest.json.example testsuite/fleettest.json   # then edit
-# (or symlink it, or point elsewhere with --fleet PATH)
+python3 -S testsuite/runtests.py -j8 chmod-temp-dir 'xattrs*'
+python3 -S testsuite/runtests.py --help
+python3 -S testsuite/runtests.py --describe-tests
 ```
 
-The config is looked up in order: `~/.fleettest.json` first, then
-`testsuite/fleettest.json`, unless overridden with `--fleet PATH`.
+The runner defaults to serial execution. For an out-of-tree build, invoke `$srcdir/testsuite/runtests.py` and pass `--srcdir`, `--tooldir` and `--rsync-bin`. The `installcheck` target uses the installed binary with the build directory's helpers.
 
-Each entry names an ssh host (`null` to run locally), the workflow it mirrors,
-and its configure flags, plus optional per-target settings (`make`, `privilege`,
-`env_prefix`, …). See the comments in `fleettest.json.example`.
+Scratch directories default to `testtmp/<name>/` and are retained after failures. Root and non-root runs need separate scratch directories. SIGTERM stops queued tests and terminates active test process groups; incomplete runs fail.
 
-A target with `"nonroot": true` does an extra pass, after the main (root) run,
-that reruns the privilege-sensitive tests as the unprivileged ssh user. Which
-tests those are is **not** listed in the fleet config — a test opts in by
-setting a module-level `fleet_nonroot = True`, so the set is maintained in the
-test files and new privilege-sensitive tests join automatically with no
-fleet-config change.
+Daemon tests normally use pipes. The --use-tcp option uses loopback listeners, some with unauthenticated writable modules or deliberately unsafe settings. Other local users can reach those listeners. Pipe transport is preferable on shared hosts. The --daemon-tests-only option selects tests which exercise the transport.
 
-A target with `"protocols": [30, 29]` runs one extra stdio-pipe pass per listed
-version, each forcing that older wire version with `runtests --protocol=N` — the
-fleet analogue of a workflow's `check30`/`check29` steps. The passes reuse the
-same parsed `RSYNC_EXPECT_SKIPPED` list as the pipe run and show up as `protoNN`
-columns in the report (and `--timing` breakdown). Targets that don't set
-`protocols` show `-` there.
+## Tests and profiles
 
-Run it from inside a checkout (it builds the current directory's HEAD; use
-`--repo PATH` for another tree):
+Tests are grouped under tests/ by build, daemon, metadata, path, protocol, rrsync, selftests and transfer. Reusable code lives in harness/ and fixture programs and data in fixtures/. Test names are lowercase, hyphen-separated filenames and must be unique across groups. Selectors and results use the filename without its `.py` ending.
 
+Tests declare applicability with `@requires(...)` or a top-level `metadata(...)` call. Transports, protocol versions, peer-version limits and required capabilities determine selection. A min_peer value can set separate primary and secondary release limits. The --describe-tests output lists these declarations.
+
+A TCP declaration requires a test that uses the daemon's TCP transport. Local transfers and remote-shell tests belong in the pipe selection. The Ubuntu 24.04 X86-64 job runs the explicit protocol and transport combinations in addition to the default-protocol suites.
+
+Regression tests should fail against the faulty implementation and check the affected behaviour directly. Fixtures must keep their data inside the test's scratch directory, tolerate parallel execution and stop their child processes. Sleeps cannot establish ordering or prove that a race was exercised.
+
+Tests which build mutated executables may report unavailable build capabilities as unsupported. Missing or ambiguous source replacement targets, missing compiler-flag replacements and failed configured builds are test failures rather than unavailable capabilities.
+
+Profiles under profiles/ distinguish tests which do not apply from missing capabilities. Root and nonroot profiles must match the effective UID. Peer profiles identify the archived release and wire protocol. Historical binaries and their build records are under [old_versions](../old_versions/README.md); --rsync-bin2 selects the secondary executable and --archived-role identifies which side runs the archived release.
+
+The tools/check.py launcher takes a build directory, binary, profile list and fresh output directory followed by runner options. It saves run.log and receipt.json, then checks the receipt against the executable and profiles.
+
+Result | Meaning
+--- | ---
+N/A | Excluded by applicability metadata
+PASS | Assertions passed
+FAIL | An assertion failed
+ERROR | The test or harness failed unexpectedly
+SKIP | Skipped without a capability
+UNSUPPORTED | A required capability was unavailable
+PROFILE_ERROR | A result disagreed with the active profile
+
+With profiles active, an unsupported result is accepted only when the test declares the capability and the profile permits its absence. A generic skip fails the run. Without profiles, skips and unsupported results are accepted. Receipts record raw outcomes, profile verdicts, exclusions, executable hashes and the effective UID.
+
+## CI
+
+[ci.yml](../.github/workflows/ci.yml) defines the platform groups and required checks. Native jobs exercise root and non-root transfers where available. Historical peers run applicable tests in both executable roles over pipe and TCP. Diagnostics cover the minimum Python version, static analysis with Clang and Cppcheck, sanitisers, coverage and Valgrind. Coverage reports omit daemon work after chroot because its counter files are outside the chroot.
+
+The minimum Python and lint jobs use the same helper test roster. Run those checks from the repository root with:
 ```sh
-python3 testsuite/fleettest.py                       # whole fleet, both transports
-python3 testsuite/fleettest.py --list                # list configured targets
-python3 testsuite/fleettest.py --targets NAME[,NAME]
-python3 testsuite/fleettest.py --fleet other.json --transport pipe
-python3 testsuite/fleettest.py --timing              # per-target wall-clock breakdown
+python3 -B -S .github/scripts/diagnostics.py check-helpers
 ```
 
-`--timing` adds a per-target breakdown after the report — total wall-clock plus
-the push / build / pipe / tcp / protoNN / nonroot phases, sorted slowest-first. Targets
-run in parallel, so the whole run is gated by the slowest one; the phase columns
-show whether that target's hold-up is the push, the build, or a test pass.
+Linux jobs cover both xattr syscall paths, nested user namespaces, older libc and OpenSSL versions, musl and 32-bit behaviour. We pin one BSD and macOS release unless another release exercises distinct rsync behaviour. Check the workflow files for exact versions.
 
-Each run gets its own randomly-named build dir on every target
-(`<builddir>-<run_id>`), so two or three runs can share the same fleet without
-interfering. The dir is removed when the run ends — on success or failure, and
-best-effort on Ctrl-C/kill; pass `--keep` to retain it for inspection. A hard
-kill (`SIGKILL`), or a signal arriving mid-push, can leave a stray
-`<builddir>-<id>` behind; sweep leftovers with
-`python3 testsuite/fleettest.py --cleanup` (scope it with `--targets`, and only
-run it when no other fleet runs are active, since it removes *all* matching run
-dirs on the selected targets).
+The NetBSD guest requires xattrs in the build and runs the user xattr tests on its workspace filesystem. The guest's `/tmp` is tmpfs and does not support the fixture. The existing-file test requires NetBSD to refuse xattr growth without damaging neighbouring attributes. OpenBSD must report xattrs as unsupported in the build metadata.
 
-Each target must be provisioned with the build toolchain its workflow installs
-(autoconf, automake, a C compiler, perl, a python3 markdown module such as
-cmarkgfm or commonmark unless the flags pass `--disable-md2man`, and the dev
-libraries its configure flags enable). A missing piece shows up as `BUILD-FAIL`.
+The Ubuntu 24.04 X86-64 non-root pipe run generates Turkish UTF-8 and ISO-8859-9 locale data alongside other legacy encodings. The test process uses `LOCPATH` to find that data without changing the host's default locale.
 
-## Differential regression hunting (abdiff.py)
+On pull requests we choose jobs from the changed paths. Known documentation and static website files stop after Changes and Required. General tests and shared runner changes run the native platforms, version mixes and relevant diagnostics. We add Android, archive, Valgrind or interoperability only when their own files or shared code change. Production, build and packaging changes run everything. A path without a selection rule fails Changes. Every push to master and every manual run selects the full matrix. A push containing several commits tests the pushed head. Scheduled runs keep their configured cadence.
 
-`testsuite/abdiff.py` is a developer tool — **not** a `*_test.py`, so `runtests.py`
-ignores it. It hunts *regressions* by running the **same benign transfer** with
-two rsync binaries (`A` = the build under test, `B` = a baseline) and comparing
-the OUTCOME. The oracle is: for a benign input, a correctness/behaviour change
-between the builds must be **invisible**, so A and B must produce an identical
-result. Any divergence is a regression candidate to investigate and, if real,
-minimize into a `*_test.py`.
+New runs cancel older runs only for the same pull request. Master pushes, scheduled runs and manual runs remain independent. Android and Archive wait for macOS. Archived peer checks run under Diagnostics after its other jobs and retain their separate Monday schedule. Both archived roles share one build and retain separate receipts. Selected jobs still run after a prerequisite fails or is skipped unless the CI run is cancelled. Valgrind remains parallel.
 
-It compares exit code, stderr (error markers + normalised text), `--stats`
-"Literal data", the destination tree (content + full metadata: mode/uid/gid/
-mtime/size/symlink target/xattrs/ACLs/hardlink grouping), the `--itemize` list,
-and — with `--cost` — peak process-group RSS (a resource-regression oracle that
-functional comparison misses). A **stability gate** runs each binary several
-times and escalates on a candidate diff; nondeterministic scenarios are
-quarantined `FLAKY`, never reported as regressions.
+Installed-binary checks exercise restricted SSH and local TLS with certificate and hostname verification. Archive qualification builds and tests the release source archive without Git or Autoconf, then checks installation and removal. Linux storage checks use disposable filesystems and loop devices for encrypted volumes, mount boundaries, space exhaustion, device transfers and --copy-as.
 
-Run it from the build directory (so `./rsync` and `old_versions/` resolve):
+Android jobs execute static Bionic binaries, then reuse the X86-64 binary in an emulator and the Termux application sandbox with SELinux enforcing. Interoperability jobs run directed transfers between Linux, FreeBSD, NetBSD, OpenBSD, macOS, Solaris and Cygwin. They compare data and metadata, check unsupported-feature refusals and restore fake-super backups on their originating platform. The separate [network document](../.github/INTEROPERABILITY.md) describes admission and cleanup.
 
-```sh
-testsuite/abdiff.py                       # default: ./rsync vs old_versions/rsync_3.4.1
-testsuite/abdiff.py --sweep all -j5       # broad single pass, 5-way parallel
-testsuite/abdiff.py --loop --timelimit 3600 --cost   # hunt for an hour, resource oracle on
-testsuite/abdiff.py --list --sweep all    # list scenarios without running
-```
+The Termux job allows one app reset after overlapping bootstrap installers lose staging files. It waits for the installers to finish before testing the binary in the app sandbox.
 
-Each finding is classed `DIFF` (regression candidate), `ALLOW` (an intentional,
-documented behaviour change listed in the tool's allowlist), `BETTER` (A succeeds
-where B fails), `FLAKY`, or `TIMEOUT`. Findings are printed and appended to a
-per-run `abdiff-log_<TIME>.txt` (and the curated `--findings` log).
-
-Key options: `-j N` parallelism; `--sweep NAME|all`; `--loop` (endless
-random + systematic-combo stream) bounded by `--timelimit SECS`; `--cost`
-(+`--scale N` for the large-tree fixtures); `--repeat N` (stability samples);
-`--rsync-a`/`--rsync-b` the two binaries. Run **as root** to fold in the
-owner/device/specials/fake-super and chroot-daemon sweeps automatically.
-
-Transport lanes (a feature broken only over the wire is invisible to a local
-copy): local, an ssh split (`support/lsh.sh`), a stdio-pipe daemon, a **real TCP
-daemon** (bound port + greeting/handshake, and an auth challenge-response
-variant), and the restricted **rrsync** wrapper (`support/rrsh.sh`). rrsync's
-behaviour ships in the *script*, so pair each binary with its own version's
-rrsync via `--rrsync-a`/`--rrsync-b` (give B's rrsync, e.g. one extracted from
-that release's `support/rrsync`).
-
-Cross-version baselines are the static binaries already in `old_versions/`;
-`old_versions/build_static.sh` builds more from a git tag (and you can grab a
-matching `support/rrsync` from the same tag for the rrsync lane).
+Jobs retain logs and receipts. The Required check rejects failed or missing selected jobs.

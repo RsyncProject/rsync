@@ -1,0 +1,182 @@
+#!/usr/bin/env python3
+
+import os
+import shlex
+import subprocess
+import sys
+
+from harness.filesystem import unlink_if_exists
+from harness.environment import SCRATCHDIR, SRCDIR
+from harness.filesystem import rmtree
+from harness.results import test_fail
+from harness import metadata
+
+metadata(transports={'pipe', 'tcp'})
+
+base = SCRATCHDIR / 'rsync-ssl'
+rmtree(base)
+base.mkdir(parents=True)
+wrapper = ['bash', str(SRCDIR / 'rsync-ssl')]
+helper = ['--HELPER', 'localhost', 'rsync', '--server', '--daemon', '.']
+
+def executable(path, body):
+    path.write_text(body)
+    path.chmod(0o755)
+    return path
+
+def invoke(script, args, env):
+    return subprocess.run(['bash', str(script), *args], env=env,
+                          stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+
+openssl_dir = base / 'openssl'
+openssl_dir.mkdir()
+openssl_args = openssl_dir / 'args'
+fake_openssl = executable(
+    openssl_dir / 'openssl',
+    f'#!{sys.executable}\nimport sys\nfrom pathlib import Path\n'
+    f'Path({str(openssl_args)!r}).write_text("".join(arg + "\\n" for arg in sys.argv[1:]))\n',
+)
+ca = openssl_dir / 'ca.pem'
+ca.write_text('dummy-ca\n')
+openssl_env = {
+    **os.environ,
+    'RSYNC_SSL_TYPE': 'openssl',
+    'RSYNC_SSL_OPENSSL': str(fake_openssl),
+    'RSYNC_SSL_CA_CERT': str(ca),
+}
+openssl_env.pop('RSYNC_SSL_SKIP_HOSTNAME_CHECK', None)
+
+invalid_helper = ['--HELPER', 'invalid host.example', *helper[2:]]
+result = invoke(SRCDIR / 'rsync-ssl', invalid_helper, openssl_env)
+if result.returncode != 1 or 'invalid rsync-ssl hostname' not in result.stdout:
+    test_fail(f'invalid hostname was not rejected:\n{result.stdout}')
+if openssl_args.exists():
+    test_fail('OpenSSL was started for an invalid hostname')
+
+def openssl_run(env):
+    unlink_if_exists(openssl_args)
+    invoke(SRCDIR / 'rsync-ssl', helper, env)
+    return openssl_args.read_text().splitlines() if openssl_args.exists() else []
+
+captured = openssl_run(openssl_env)
+if not {'-verify_hostname', 'localhost'} <= set(captured):
+    test_fail(f'OpenSSL hostname verification is missing: {captured}')
+captured = openssl_run({**openssl_env, 'RSYNC_SSL_SKIP_HOSTNAME_CHECK': '1'})
+if '-verify_hostname' in captured:
+    test_fail(f'hostname opt-out retained -verify_hostname: {captured}')
+if not {'-servername', 'localhost', '-CAfile'} <= set(captured):
+    test_fail(f'hostname opt-out removed SNI or chain verification: {captured}')
+
+fake_gnutls = executable(base / 'gnutls-cli', '#!/bin/sh\nprintf "%s\\n" "$@"\n')
+gnutls_env = {name: value for name, value in os.environ.items()
+              if not name.startswith('RSYNC_SSL_')}
+gnutls_env.update(RSYNC_SSL_TYPE='gnutls', RSYNC_SSL_GNUTLS=str(fake_gnutls),
+                  RSYNC_SSL_CA_CERT=str(base / 'ca cert.pem'),
+                  RSYNC_SSL_CERT=str(base / 'client cert.pem'),
+                  RSYNC_SSL_KEY=str(base / 'client key.pem'), RSYNC_PORT='8874')
+result = invoke(SRCDIR / 'rsync-ssl', helper, gnutls_env)
+expected = ['--logfile=/dev/null', f'--x509certfile={gnutls_env["RSYNC_SSL_CERT"]}',
+            f'--x509keyfile={gnutls_env["RSYNC_SSL_KEY"]}',
+            f'--x509cafile={gnutls_env["RSYNC_SSL_CA_CERT"]}', '--port=8874', 'localhost']
+if result.returncode or result.stdout.splitlines() != expected:
+    test_fail(f'GnuTLS did not receive the certificate paths and endpoint as separate arguments:\n{result.stdout}')
+
+gnutls_env.pop('RSYNC_SSL_CA_CERT')
+result = invoke(SRCDIR / 'rsync-ssl', helper, gnutls_env)
+if result.returncode != 1 or 'gnutls-cli requires RSYNC_SSL_CA_CERT' not in result.stdout:
+    test_fail(f'GnuTLS without a CA was not refused:\n{result.stdout}')
+
+stunnel_dir = base / 'stunnel'
+stunnel_dir.mkdir()
+stunnel_config = stunnel_dir / 'config'
+fake_stunnel = executable(
+    stunnel_dir / 'stunnel',
+    f'#!/usr/bin/env bash\ncat <&10 > {shlex.quote(str(stunnel_config))} 2>/dev/null\n',
+)
+stunnel_ca = stunnel_dir / 'ca.pem'
+stunnel_ca.write_text('dummy-ca\n')
+stunnel_env = {
+    **os.environ,
+    'RSYNC_SSL_TYPE': 'stunnel',
+    'RSYNC_SSL_STUNNEL': str(fake_stunnel),
+}
+for name in ('RSYNC_SSL_CA_CERT', 'RSYNC_SSL_ALLOW_INSECURE_STUNNEL',
+             'RSYNC_SSL_SKIP_HOSTNAME_CHECK'):
+    stunnel_env.pop(name, None)
+
+def stunnel_run(env):
+    unlink_if_exists(stunnel_config)
+    result = invoke(SRCDIR / 'rsync-ssl', helper, env)
+    config = stunnel_config.read_text() if stunnel_config.exists() else ''
+    return result, config
+
+_, config = stunnel_run({**stunnel_env, 'RSYNC_SSL_ALLOW_INSECURE_STUNNEL': '1'})
+if 'connect = localhost' not in config:
+    test_fail(f'fake stunnel did not capture a config:\n{config!r}')
+if 'verifyChain' in config or 'CAfile' in config or 'checkHost' in config:
+    test_fail(f'insecure stunnel config enabled verification:\n{config}')
+
+result, _ = stunnel_run(stunnel_env)
+if result.returncode == 0 or 'stunnel requires RSYNC_SSL_CA_CERT' not in result.stdout:
+    test_fail(f'stunnel without a CA was not rejected:\n{result.stdout}')
+
+_, config = stunnel_run({**stunnel_env, 'RSYNC_SSL_CA_CERT': str(stunnel_ca)})
+if 'verifyChain = yes' not in config or 'checkHost = localhost' not in config:
+    test_fail(f'stunnel did not verify the chain and hostname:\n{config}')
+
+_, config = stunnel_run({
+    **stunnel_env,
+    'RSYNC_SSL_CA_CERT': str(stunnel_ca),
+    'RSYNC_SSL_SKIP_HOSTNAME_CHECK': '1',
+})
+if 'verifyChain = yes' not in config or 'checkHost' in config:
+    test_fail(f'stunnel hostname opt-out changed chain verification:\n{config}')
+
+type_dir = base / 'type'
+fake_bin = type_dir / 'bin'
+fake_bin.mkdir(parents=True)
+rsync_args = type_dir / 'args'
+ssl_type = type_dir / 'type'
+executable(
+    fake_bin / 'rsync',
+    f'#!{sys.executable}\nimport os, sys\nfrom pathlib import Path\n'
+    f'Path({str(rsync_args)!r}).write_text("".join(arg + "\\n" for arg in sys.argv[1:]))\n'
+    f'Path({str(ssl_type)!r}).write_text(os.environ.get("RSYNC_SSL_TYPE", "UNSET") + "\\n")\n',
+)
+type_env = {**os.environ, 'PATH': str(fake_bin) + os.pathsep + os.environ.get('PATH', '')}
+for name in ('RSYNC_SSL_TYPE', 'RSYNC_SSL_OPENSSL', 'RSYNC_SSL_STUNNEL'):
+    type_env.pop(name, None)
+
+def type_run(args, expected):
+    unlink_if_exists(rsync_args)
+    unlink_if_exists(ssl_type)
+    result = invoke(SRCDIR / 'rsync-ssl', args, type_env)
+    if result.returncode:
+        test_fail(f'rsync-ssl exited {result.returncode} for {args!r}:\n{result.stdout}')
+    got = rsync_args.read_text().splitlines() if rsync_args.exists() else []
+    actual = ssl_type.read_text().strip() if ssl_type.exists() else 'UNSET'
+    if actual != expected:
+        test_fail(f'RSYNC_SSL_TYPE is {actual!r}, expected {expected!r} for {args!r}')
+    return got
+
+for args, expected in (
+    (['--dry-run', '--type=stunnel', 'host::mod'], 'stunnel'),
+    (['--type=stunnel', '--dry-run', 'host::mod'], 'stunnel'),
+    (['-av', 'host::mod', '--type=openssl'], 'openssl'),
+    (['-av', 'host::mod'], 'UNSET'),
+):
+    captured = type_run(args, expected)
+    if any(value.startswith('--type=') for value in captured):
+        test_fail(f'--type was passed to rsync for {args!r}: {captured}')
+    if any(value not in captured for value in args if not value.startswith('--type=')):
+        test_fail(f'rsync arguments were lost for {args!r}: {captured}')
+
+rsh = f"--rsh='{SRCDIR / 'rsync-ssl'}' --HELPER"
+captured = type_run(['--', '--type=stunnel', 'host::mod'], 'UNSET')
+if captured != [rsh, '--', '--type=stunnel', 'host::mod']:
+    test_fail(f'arguments after -- were changed: {captured}')
+captured = type_run(['--type=openssl', '--', '--type=stunnel', 'host::mod'], 'openssl')
+if captured != [rsh, '--', '--type=stunnel', 'host::mod']:
+    test_fail(f'arguments after -- were changed: {captured}')
+
+print('rsync-ssl validates hosts, verifies certificates and consumes wrapper options')

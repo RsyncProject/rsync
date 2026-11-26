@@ -1,5 +1,6 @@
 #!/bin/sh
 
+# shellcheck disable=3045
 ulimit -c unlimited
 
 # Some systems have "truss" or "tusc" instead of "strace".
