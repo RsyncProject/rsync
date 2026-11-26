@@ -101,6 +101,7 @@ extern struct stats stats;
 extern char *stdout_format;
 extern char *logfile_format;
 extern char *filesfrom_host;
+extern char *skip_dir_marker;
 extern char *partial_dir;
 extern char *rsync_path;
 extern char *shell_cmd;
@@ -1551,6 +1552,11 @@ static int start_client(int argc, char *argv[])
 		remote_argv = argv += argc - 1;
 		remote_argc = argc = 1;
 		rsync_port = 0;
+	}
+
+	if (skip_dir_marker && (!local_server || argc != 1)) {
+		rprintf(FERROR, "--skip-dir-with requires a local copy with one source directory\n");
+		exit_cleanup(RERR_SYNTAX);
 	}
 
 	/* A local transfer doesn't unbackslash anything, so leave the args alone. */

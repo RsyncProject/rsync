@@ -162,6 +162,7 @@ int32 block_size = 0;
 time_t stop_at_utime = 0;
 char *skip_compress = NULL;
 char *copy_as = NULL;
+char *skip_dir_marker = NULL;
 item_list dparam_list = EMPTY_ITEM_LIST;
 
 /** Network address family. **/
@@ -792,6 +793,7 @@ static struct poptOption long_options[] = {
   {"compress-choice",  0,  POPT_ARG_STRING, &compress_choice, 0, 0, 0 },
   {"zc",               0,  POPT_ARG_STRING, &compress_choice, 0, 0, 0 },
   {"skip-compress",    0,  POPT_ARG_STRING, &skip_compress, 0, 0, 0 },
+  {"skip-dir-with",    0,  POPT_ARG_STRING, &skip_dir_marker, 0, 0, 0 },
   {"compress-level",   0,  POPT_ARG_INT,    &do_compression_level, 0, 0, 0 },
   {"zl",               0,  POPT_ARG_INT,    &do_compression_level, 0, 0, 0 },
   {"compress-threads", 0,  POPT_ARG_INT,    &do_compression_threads, 0, 0, 0 },
@@ -2482,6 +2484,26 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 	if (refused_delete && (delete_mode || missing_args == 2)) {
 		create_refuse_error(refused_delete);
 		goto cleanup;
+	}
+
+	if (skip_dir_marker) {
+#if !defined HAVE_DIRFD || !defined AT_FDCWD || !defined AT_SYMLINK_NOFOLLOW
+		snprintf(err_buf, sizeof err_buf, "--skip-dir-with needs directory-relative stat support\n");
+		goto cleanup;
+#endif
+		if (!*skip_dir_marker || strcmp(skip_dir_marker, ".") == 0
+		 || strcmp(skip_dir_marker, "..") == 0 || strpbrk(skip_dir_marker, "/\\:")) {
+			snprintf(err_buf, sizeof err_buf, "--skip-dir-with requires a marker basename\n");
+			goto cleanup;
+		}
+		if (am_daemon || am_server || !recurse || relative_paths || files_from
+		 || delete_mode || missing_args == 2 || force_delete || remote_option_cnt
+		 || read_batch || write_batch) {
+			snprintf(err_buf, sizeof err_buf,
+				 "--skip-dir-with requires a recursive local copy without deletion,"
+				 " --relative, --files-from, remote options or batch files\n");
+			goto cleanup;
+		}
 	}
 
 	if (remove_source_files) {

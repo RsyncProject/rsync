@@ -38,6 +38,8 @@
 
 - Added the opt-in SHA-256 transfer checksum `sha256` for builds with OpenSSL
   SHA-256 support. Default negotiation is unchanged.
+- Add `--skip-dir-with` to omit source directories marked by a regular file
+  in recursive local copies without deletion.
 
 ## Bug fixes
 

@@ -646,6 +646,7 @@ has its own detailed description later in this manpage.
 --compress-level=NUM     explicitly set compression level (aka --zl)
 --compress-threads=NUM   explicitly set compression threads (aka --zt)
 --skip-compress=LIST     skip compressing files with suffix in LIST
+--skip-dir-with=FILE     skip source directories containing a marker file
 --cvs-exclude, -C        auto-ignore files in the same way CVS does
 --filter=RULE, -f        add a file-filtering RULE
 -F                       same as --filter='dir-merge /.rsync-filter'
@@ -3373,6 +3374,19 @@ sign) if you want the local shell to expand it.
     situation: a copy from a daemon rsync will add your skipped suffixes to its
     list of non-compressing files (and its list may be configured to a
     different default).
+
+0.  `--skip-dir-with=FILE`
+
+    In a recursive local copy with one source directory, omit a directory
+    and its contents if it contains a regular file with the given basename.
+    The source directory itself can be omitted even when it ends in a slash.
+    A symlink or directory with the marker name does not count as a marker.
+    An error checking the marker is reported rather than treated as absence.
+
+    The marker name cannot contain a slash, backslash or colon. This is a
+    filename test, not a test of the marker's contents. The option cannot
+    be used with `--delete`, `--delete-missing-args`, `--force`, `--relative`,
+    `--files-from`, `--remote-option` or batch mode.
 
 0.  `--numeric-ids`
 
