@@ -249,6 +249,7 @@ char *iconv_opt =
 #endif
 
 struct chmod_mode_struct *chmod_modes = NULL;
+struct chmod_mode_struct *dest_chmod_modes = NULL;
 
 static const char *const debug_verbosity[] = {
 	/*0*/ NULL,
@@ -613,7 +614,7 @@ enum {OPT_SERVER = 1000, OPT_DAEMON, OPT_SENDER, OPT_EXCLUDE, OPT_EXCLUDE_FROM,
       OPT_NO_D, OPT_APPEND, OPT_NO_ICONV, OPT_INFO, OPT_DEBUG, OPT_BLOCK_SIZE,
       OPT_USERMAP, OPT_GROUPMAP, OPT_CHOWN, OPT_BWLIMIT, OPT_STDERR,
       OPT_OLD_COMPRESS, OPT_NEW_COMPRESS, OPT_NO_COMPRESS, OPT_OLD_ARGS,
-      OPT_STOP_AFTER, OPT_STOP_AT, OPT_NICE, OPT_NO_NICE,
+      OPT_STOP_AFTER, OPT_STOP_AT, OPT_NICE, OPT_NO_NICE, OPT_CHMOD_DEST,
       OPT_REFUSED_BASE = 9000};
 
 static struct poptOption long_options[] = {
@@ -721,6 +722,7 @@ static struct poptOption long_options[] = {
   {"i-d",              0,  POPT_ARG_VAL,    &implied_dirs, 1, 0, 0 },
   {"no-i-d",           0,  POPT_ARG_VAL,    &implied_dirs, 0, 0, 0 },
   {"chmod",            0,  POPT_ARG_STRING, 0, OPT_CHMOD, 0, 0 },
+  {"chmod-dest",       0,  POPT_ARG_STRING, 0, OPT_CHMOD_DEST, 0, 0 },
   {"ignore-times",    'I', POPT_ARG_NONE,   &ignore_times, 0, 0, 0 },
   {"size-only",        0,  POPT_ARG_NONE,   &size_only, 0, 0, 0 },
   {"time-only",        0,  POPT_ARG_NONE,   &time_only, 0, 0, 0 },
@@ -1962,14 +1964,17 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 			break;
 
 		case OPT_CHMOD:
+		case OPT_CHMOD_DEST: {
+			BOOL dest = opt == OPT_CHMOD_DEST;
 			arg = poptGetOptArg(pc);
-			if (!parse_chmod(arg, &chmod_modes)) {
+			if (!parse_chmod(arg, dest ? &dest_chmod_modes : &chmod_modes)) {
 				snprintf(err_buf, sizeof err_buf,
-					"Invalid argument passed to --chmod (%s)\n",
-					arg);
+					"Invalid argument passed to --chmod%s (%s)\n",
+					dest ? "-dest" : "", arg);
 				goto cleanup;
 			}
 			break;
+		}
 
 		case OPT_INFO:
 			arg = poptGetOptArg(pc);
@@ -2754,6 +2759,21 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 				goto cleanup;
 			}
 			keep_partial = 1;
+		}
+	}
+
+	if (dest_chmod_modes) {
+		if (am_daemon || (am_server && am_sender) || am_root >= 0 || !preserve_perms) {
+			snprintf(err_buf, sizeof err_buf,
+				 "--chmod-dest requires --fake-super and --perms on a non-daemon receiver\n");
+			goto cleanup;
+		}
+		if (inplace || keep_partial || tmpdir || make_backups || basis_dir_cnt
+		 || preserve_hard_links || remove_source_files || read_batch || write_batch) {
+			snprintf(err_buf, sizeof err_buf,
+				 "--chmod-dest requires ordinary temporary-file transfers without backups,"
+				 " alternate destinations, hard links, source removal or batch files\n");
+			goto cleanup;
 		}
 	}
 

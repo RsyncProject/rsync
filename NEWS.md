@@ -8,15 +8,24 @@
   of `--update`.
 - Allow daemon modules to apply PAM account policy after rsync authentication.
   Both build-time support and the module setting are disabled by default.
+- Accept `unix:` in module host rules for named Unix domain sockets.
+  Proxy protocol trust and module authentication are unchanged.
 - Let rrsync administrators require a server-side transfer log outside the
   restricted directory with `-log FILE`. Refuse transfers when the log cannot
   be opened and report later log write failures.
+- Add `--chmod-dest` for fake-super backups. Set physical file and directory
+  permissions independently of the permissions stored for restoration.
 - Reduce directory lookups when linking unchanged regular files with non-daemon
   `--link-dest` transfers. Reuse checked receiver and basis directories.
 - Reuse checked directories for ordinary scans and file reads beneath a
   verified sender root. Avoid a redundant directory probe for sender file
   reads. Set close-on-exec at open time where supported.
 - Avoid redundant stats when creating children of a fresh receiver directory.
+- Without incremental recursion (for example with `--no-inc-recursive`), the
+  `--info=progress2` percentage and time remaining leave out files that
+  needed no transfer once the transfer has passed them. Pushes with `--iconv`
+  retain the previous estimate because filename conversion can change the
+  check order. The file list, the transfer and `--stats` are unchanged.
 - Try an exact `--link-dest` match without a destination stat in new
   incremental directories. Use the normal lookup path if the link fails.
 - Keep the checked root of a single absolute alternate destination open
@@ -40,6 +49,8 @@
   because FFS can corrupt other attributes during that operation.
 - Fixed silent loss of xattrs on Cygwin when the name list did not fit the
   initial buffer.
+- Avoid division by zero in `--progress` when an empty file grows during a
+  transfer.
 - Report buffered diagnostic and logfile write failures instead of returning
   success after dropping output.
 - Preserve directories and their requested attributes in `--backup-dir`
