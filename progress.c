@@ -23,6 +23,7 @@
 #include "rsync.h"
 #include "inums.h"
 
+extern int am_sender;
 extern int am_server;
 extern int flist_eof;
 extern int quiet;
@@ -31,6 +32,7 @@ extern int need_unsorted_flist;
 extern int output_needs_newline;
 extern int stdout_format_has_i;
 extern struct stats stats;
+extern int inc_recurse;
 extern struct file_list *cur_flist;
 
 BOOL want_progress_now = False;
@@ -52,6 +54,7 @@ static struct progress_history ph_start;
 static struct progress_history ph_list[PROGRESS_HISTORY_SECS];
 static int newest_hpos, oldest_hpos;
 static int current_file_index;
+static int checked_count;
 
 static unsigned long msdiff(struct timeval *t1, struct timeval *t2)
 {
@@ -68,7 +71,7 @@ static unsigned long msdiff(struct timeval *t1, struct timeval *t2)
  * necessarily the same as all bytes being received.)
  * @param transfer_done True only for the final whole-transfer summary.
  **/
-static void rprint_progress(OFF_T ofs, OFF_T size, struct timeval *now,
+static void rprint_progress(OFF_T ofs, double size, struct timeval *now,
 			    int is_last, int transfer_done)
 {
 	char rembuf[64], eol[128];
@@ -120,7 +123,15 @@ static void rprint_progress(OFF_T ofs, OFF_T size, struct timeval *now,
 	}
 
 	output_needs_newline = 0;
-	pct = ofs == size ? 100 : (int) (100.0 * ofs / size);
+	/* A file can grow after listing, even from an advertised size of zero. */
+	if (ofs == size)
+		pct = 100;
+	else if (size <= 0 || ofs < 0)
+		pct = 0;
+	else {
+		double percent = 100.0 * ofs / size;
+		pct = percent >= INT_MAX ? INT_MAX : (int)percent;
+	}
 	/* Keep progress rates scaled while byte counts retain the level-1 default. */
 	rate_human_level = human_readable == 1 ? 2 : human_readable;
 	rate_str = rate >= (double)INT64_MAX ? ">MAX "
@@ -144,14 +155,52 @@ void progress_init(void)
 	}
 }
 
+/* The size that an entry has in the transfer, as counted by stats.total_size. */
+static int64 entry_size(const struct file_struct *fp)
+{
+	if (!F_IS_ACTIVE(fp) || !(S_ISREG(fp->mode) || S_ISLNK(fp->mode)))
+		return 0;
+	return F_LENGTH(fp);
+}
+
+/* Count only the unchecked tail plus the work actually requested. Defer
+ * walking the list until there is an overall progress row to print. */
+static double overall_size(void)
+{
+	static int next_unchecked = -1;
+	static int64 unchecked_size;
+	int j;
+
+	/* Filename conversion can change the receiver's sort order. */
+	if (inc_recurse || (am_sender && need_unsorted_flist))
+		return stats.total_size;
+	if (!cur_flist || checked_count >= cur_flist->used)
+		return stats.total_transferred_size;
+
+	if (next_unchecked < 0) {
+		for (j = checked_count; j < cur_flist->used; j++)
+			unchecked_size += entry_size(cur_flist->sorted[j]);
+		next_unchecked = checked_count;
+	}
+	while (next_unchecked < checked_count)
+		unchecked_size -= entry_size(cur_flist->sorted[next_unchecked++]);
+	return (double)stats.total_transferred_size + unchecked_size;
+}
+
 void set_current_file_index(struct file_struct *file, int ndx)
 {
+	int checked;
+
 	if (!file)
 		current_file_index = cur_flist->used + cur_flist->ndx_start - 1;
 	else if (need_unsorted_flist)
 		current_file_index = flist_find(cur_flist, file) + cur_flist->ndx_start;
 	else
 		current_file_index = ndx;
+	/* A redo can revisit an earlier entry without making it unchecked. */
+	checked = current_file_index - cur_flist->ndx_start + 1;
+	if (!inc_recurse && checked > checked_count)
+		checked_count = checked;
 	current_file_index -= cur_flist->flist_num;
 }
 
@@ -171,7 +220,7 @@ void end_progress(OFF_T size)
 		gettimeofday(&now, NULL);
 		if (INFO_GTE(PROGRESS, 2) || want_progress_now) {
 			rprint_progress(stats.total_transferred_size,
-					stats.total_size, &now, True, False);
+					overall_size(), &now, True, False);
 		} else {
 			rprint_progress(size, size, &now, True, False);
 			memset(&ph_start, 0, sizeof ph_start);
@@ -187,12 +236,13 @@ void finish_progress(void)
 		return;
 
 	gettimeofday(&now, NULL);
-	rprint_progress(stats.total_transferred_size, stats.total_size, &now, True, True);
+	rprint_progress(stats.total_transferred_size, overall_size(), &now, True, True);
 }
 
 void show_progress(OFF_T ofs, OFF_T size)
 {
 	struct timeval now;
+	double estimate = size;
 #if defined HAVE_GETPGRP && defined HAVE_TCGETPGRP
 	static pid_t pgrp = -1;
 	pid_t tc_pgrp;
@@ -210,7 +260,7 @@ void show_progress(OFF_T ofs, OFF_T size)
 
 	if (INFO_GTE(PROGRESS, 2)) {
 		ofs = stats.total_transferred_size - size + ofs;
-		size = stats.total_size;
+		estimate = overall_size();
 	}
 
 	if (!ph_start.time.tv_sec) {
@@ -248,5 +298,5 @@ void show_progress(OFF_T ofs, OFF_T size)
 		return;
 #endif
 
-	rprint_progress(ofs, size, &now, False, False);
+	rprint_progress(ofs, estimate, &now, False, False);
 }

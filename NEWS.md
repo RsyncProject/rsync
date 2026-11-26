@@ -21,6 +21,11 @@
   verified sender root. Avoid a redundant directory probe for sender file
   reads. Set close-on-exec at open time where supported.
 - Avoid redundant stats when creating children of a fresh receiver directory.
+- Without incremental recursion (for example with `--no-inc-recursive`), the
+  `--info=progress2` percentage and time remaining leave out files that
+  needed no transfer once the transfer has passed them. Pushes with `--iconv`
+  retain the previous estimate because filename conversion can change the
+  check order. The file list, the transfer and `--stats` are unchanged.
 - Try an exact `--link-dest` match without a destination stat in new
   incremental directories. Use the normal lookup path if the link fails.
 - Keep the checked root of a single absolute alternate destination open
@@ -42,6 +47,8 @@
   because FFS can corrupt other attributes during that operation.
 - Fixed silent loss of xattrs on Cygwin when the name list did not fit the
   initial buffer.
+- Avoid division by zero in `--progress` when an empty file grows during a
+  transfer.
 - Report buffered diagnostic and logfile write failures instead of returning
   success after dropping output.
 - Preserve directories and their requested attributes in `--backup-dir`
