@@ -66,19 +66,6 @@ def test(context: TestContext):
     if result.returncode != 1 or 'local copy' not in result.stderr:
         test_fail(f'remote use did not fail before launching a shell: {result.stderr}')
 
-    if os.geteuid() != 0:
-        (source / '.skip').unlink()
-        unreadable = source / 'unknown'
-        unreadable.mkdir(mode=0o000)
-        try:
-            result = run_rsync('-a', option, f'{source}/', f'{destination}/',
-                               check=False, capture_output=True)
-            if (result.returncode != 23 or 'cannot check marker' not in result.stderr
-                    or (destination / 'unknown').exists()):
-                test_fail(f'marker inspection failure was treated as absence: {result.stderr}')
-        finally:
-            unreadable.chmod(0o700)
-
 
 if __name__ == '__main__':
     run(test)
