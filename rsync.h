@@ -69,7 +69,7 @@
 
 /* The following XMIT flags require an rsync that uses a varint for the flag values */
 
-#define XMIT_SAME_FLAGS (1<<16) 	/* any protocol - restricted by command-line option */
+#define XMIT_RESERVED_16 (1<<16) 	/* reserved for future fileflags use */
 #define XMIT_CRTIME_EQ_MTIME (1<<17)	/* any protocol - restricted by command-line option */
 
 /* These flags are used in the live flist data. */
@@ -93,6 +93,7 @@
 #define FLAG_TIME_FAILED (1<<11)/* generator */
 #define FLAG_MOD_NSEC (1<<12)	/* sender/receiver/generator */
 #define FLAG_GOT_DIR_FLIST (1<<13)/* sender/receiver/generator - dir_flist only */
+#define FLAG_HLINK_WAIT (1<<14) /* generator (w/FLAG_HLINKED): counted in in_progress, pending hard-link processing */
 
 /* These flags are passed to functions but not stored. */
 
@@ -111,7 +112,7 @@
 
 /* Update this if you make incompatible changes and ALSO update the
  * SUBPROTOCOL_VERSION if it is not a final (official) release. */
-#define PROTOCOL_VERSION 32
+#define PROTOCOL_VERSION 33
 
 /* This is used when working on a new protocol version or for any unofficial
  * protocol tweaks.  It should be a non-zero value for each pre-release repo
@@ -192,6 +193,13 @@
 #define IOERR_VANISHED	(1<<1)
 #define IOERR_DEL_LIMIT (1<<2)
 
+/* Mask of all currently defined IOERR_* bits.  Used to sanitize values
+ * received from a peer via MSG_IO_ERROR so a malicious peer cannot set
+ * arbitrary (undefined) bits in the local io_error, which would then be
+ * stored and re-forwarded upstream.  (Undefined bits never reach the exit
+ * code: cleanup.c maps only these defined bits onto RERR_* values.) */
+#define IOERR_VALID_MASK (IOERR_GENERAL | IOERR_VANISHED | IOERR_DEL_LIMIT)
+
 #define MAX_ARGS 1000
 #define MAX_BASIS_DIRS 20
 #define MAX_SERVER_ARGS (MAX_BASIS_DIRS*2 + 100)
@@ -216,8 +224,9 @@
 #define ATTRS_SKIP_MTIME	(1<<1)
 #define ATTRS_ACCURATE_TIME	(1<<2)
 #define ATTRS_SKIP_ATIME	(1<<3)
-#define ATTRS_DELAY_IMMUTABLE	(1<<4)
 #define ATTRS_SKIP_CRTIME	(1<<5)
+#define ATTRS_REQUIRE_SUCCESS	(1<<6)
+#define ATTRS_SET_FILEFLAGS	(1<<7)
 
 #define MSG_FLUSH	2
 #define FULL_FLUSH	1
@@ -245,7 +254,6 @@
 #define ITEM_REPORT_GROUP (1<<6)
 #define ITEM_REPORT_ACL (1<<7)
 #define ITEM_REPORT_XATTR (1<<8)
-#define ITEM_REPORT_FFLAGS (1<<9)
 #define ITEM_REPORT_CRTIME (1<<10)
 #define ITEM_BASIS_TYPE_FOLLOWS (1<<11)
 #define ITEM_XNAME_FOLLOWS (1<<12)
@@ -294,6 +302,7 @@ enum msgcode {
 	MSG_LOG=FLOG, MSG_CLIENT=FCLIENT, /* sibling logging */
 	MSG_REDO=9,	/* reprocess indicated flist index */
 	MSG_STATS=10,	/* message has stats data for generator */
+	MSG_BLOCK_STATS=11,/* message has block-level stats for sender */
 	MSG_IO_ERROR=22,/* the sending side had an I/O error */
 	MSG_IO_TIMEOUT=33,/* tell client about a daemon's timeout value */
 	MSG_NOOP=42,	/* a do-nothing message (legacy protocol-30 only) */
@@ -340,6 +349,14 @@ enum delret {
 #include "errcode.h"
 
 #include "config.h"
+
+#if defined RSYNC_TEST_NO_AT_FDCWD || defined RSYNC_TEST_NO_O_DIRECTORY
+#undef SUPPORT_FILEFLAGS
+#endif
+#ifdef SUPPORT_FILEFLAGS
+#define PROTECTED_FILEFLAGS (UF_IMMUTABLE | SF_IMMUTABLE | UF_APPEND | SF_APPEND \
+			     | UF_NOUNLINK | SF_NOUNLINK | UF_READONLY | SF_SNAPSHOT)
+#endif
 
 /* The default RSYNC_RSH is always set in config.h. */
 
@@ -405,6 +422,21 @@ enum delret {
 #endif
 #endif
 
+/* O_CLOEXEC is absent on some still-supported targets.  Defining it to zero
+ * preserves the open flags there; the test macro exercises that fallback on
+ * build hosts that provide O_CLOEXEC. */
+#ifdef RSYNC_TEST_NO_O_CLOEXEC
+#undef O_CLOEXEC
+#endif
+#ifndef O_CLOEXEC
+#define O_CLOEXEC 0
+#endif
+
+/* Exercise the O_DIRECTORY portability path on build hosts that provide it. */
+#ifdef RSYNC_TEST_NO_O_DIRECTORY
+#undef O_DIRECTORY
+#endif
+
 #ifdef HAVE_SYS_IOCTL_H
 #include <sys/ioctl.h>
 #endif
@@ -424,6 +456,16 @@ enum delret {
 #include <grp.h>
 #endif
 #include <errno.h>
+
+/* O_NOFOLLOW refuses a final-component symlink with ELOOP on Linux, EMLINK on
+ * FreeBSD, and EFTYPE on NetBSD/OpenBSD. Treat all three as "hit a symlink". A
+ * genuine EMLINK (too many hard links) is harmless where this is used: callers
+ * fall through to a readlink/lstat, which restores the real error. */
+#ifdef EFTYPE
+# define NOFOLLOW_HIT_SYMLINK(e) ((e) == ELOOP || (e) == EMLINK || (e) == EFTYPE)
+#else
+# define NOFOLLOW_HIT_SYMLINK(e) ((e) == ELOOP || (e) == EMLINK)
+#endif
 
 #ifdef HAVE_UTIME_H
 #include <utime.h>
@@ -613,74 +655,6 @@ typedef unsigned int size_t;
 #define SUPPORT_CRTIMES 1
 #endif
 
-#define NO_FFLAGS ((uint32)-1)
-
-/* SUPPORT_FILEFLAGS / SUPPORT_FORCE_CHANGE: enabled on BSD-family systems
- * with chflags(2) and on Linux systems with the FS_IOC_{GET,SET}FLAGS
- * ioctls (chattr).  The on-the-wire bit values are the BSD UF_xxx and
- * SF_xxx set; the Linux side (in lib/fileflags.c) translates to/from
- * FS_xxx_FL at the platform boundary. */
-#if defined HAVE_CHFLAGS || defined HAVE_FS_IOC_GETFLAGS
-#define SUPPORT_FILEFLAGS 1
-#define SUPPORT_FORCE_CHANGE 1
-#endif
-
-#if defined SUPPORT_FILEFLAGS || defined SUPPORT_FORCE_CHANGE
-/* BSD bit values that may be missing in some headers (and on Linux,
- * which has none of them in <sys/stat.h>).  These are the canonical
- * wire values regardless of platform. */
-#ifndef UF_NODUMP
-#define UF_NODUMP    0x00000001
-#endif
-#ifndef UF_IMMUTABLE
-#define UF_IMMUTABLE 0x00000002
-#endif
-#ifndef UF_APPEND
-#define UF_APPEND    0x00000004
-#endif
-#ifndef UF_NOUNLINK
-#define UF_NOUNLINK  0
-#endif
-#ifndef UF_HIDDEN
-#define UF_HIDDEN    0
-#endif
-#ifndef SF_IMMUTABLE
-#define SF_IMMUTABLE 0x00020000
-#endif
-#ifndef SF_APPEND
-#define SF_APPEND    0x00040000
-#endif
-#ifndef SF_NOUNLINK
-#define SF_NOUNLINK  0
-#endif
-#define USR_IMMUTABLE (UF_IMMUTABLE|UF_NOUNLINK|UF_APPEND)
-#define SYS_IMMUTABLE (SF_IMMUTABLE|SF_NOUNLINK|SF_APPEND)
-#define ALL_IMMUTABLE (USR_IMMUTABLE|SYS_IMMUTABLE)
-/* SAFE_FILEFLAGS: the bits --fileflags will apply by default from an
- * untrusted source.  Excludes SF_* (root-only, kernel securelevel-locked,
- * can permanently brick a receiver) and UF_NOUNLINK (DoS: locks the
- * receiver out of cleanup even for the file owner).  Use
- * --unsafe-fileflags to apply the full sender value. */
-#define SAFE_FILEFLAGS (UF_NODUMP|UF_IMMUTABLE|UF_APPEND|UF_HIDDEN)
-#else
-#define USR_IMMUTABLE 0
-#define SYS_IMMUTABLE 0
-#define ALL_IMMUTABLE 0
-#define SAFE_FILEFLAGS 0
-#endif
-
-/* ST_FLAGS reads the current fileflags off an already-known stat.  On
- * BSD struct stat has st_flags; on Linux it doesn't, so the access
- * needs an extra ioctl (which the code arranges via stat_x's cached
- * fileflags or via an explicit helper).  ST_FLAGS therefore only
- * applies on BSD-with-chflags builds; elsewhere it returns NO_FFLAGS
- * to force the caller into the explicit-helper path. */
-#ifdef HAVE_CHFLAGS
-#define ST_FLAGS(st) ((st).st_flags)
-#else
-#define ST_FLAGS(st) NO_FFLAGS
-#endif
-
 /* Find a variable that is either exactly 32-bits or longer.
  * If some code depends on 32-bit truncation, it will need to
  * take special action in a "#if SIZEOF_INT32 > 4" section. */
@@ -768,6 +742,8 @@ typedef unsigned int size_t;
 # define SIZEOF_INT64 SIZEOF_OFF_T
 #endif
 
+#define MAX_INT32 ((int32)0x7fffffff)
+
 #define HT_KEY32 0
 #define HT_KEY64 1
 
@@ -788,7 +764,7 @@ struct ht_int64_node {
 	int64 key;
 };
 
-#define HT_NODE(tbl, bkts, i) ((void*)((char*)(bkts) + (i)*(tbl)->node_size))
+#define HT_NODE(tbl, bkts, i) ((void*)((char*)(bkts) + (size_t)(i)*(tbl)->node_size))
 #define HT_KEY(node, k64) ((k64)? ((struct ht_int64_node*)(node))->key \
 			 : (int64)((struct ht_int32_node*)(node))->key)
 
@@ -869,11 +845,13 @@ struct ht_int64_node {
 
 #if defined __STDC_VERSION__ && __STDC_VERSION__ >= 199901L
 #define USE_FLEXIBLE_ARRAY 1
-#define SIZE_T_FMT_MOD "z" /* printf supports %zd */
+#define SIZE_T_FMT_MOD "z" /* printf has a size_t length modifier */
 #define SIZE_T_FMT_CAST size_t
+#define SSIZE_T_FMT_CAST ssize_t
 #else
-#define SIZE_T_FMT_MOD "l" /* printf supports %ld */
-#define SIZE_T_FMT_CAST long
+#define SIZE_T_FMT_MOD "l"
+#define SIZE_T_FMT_CAST unsigned long
+#define SSIZE_T_FMT_CAST long
 #endif
 
 union file_extras {
@@ -912,9 +890,10 @@ extern int pathname_ndx;
 extern int depth_ndx;
 extern int uid_ndx;
 extern int gid_ndx;
-extern int fileflags_ndx;
 extern int acls_ndx;
 extern int xattrs_ndx;
+extern int preserve_fileflags;
+extern int nodump_ndx;
 extern int file_sum_extra_cnt;
 
 #ifdef USE_FLEXIBLE_ARRAY
@@ -968,13 +947,9 @@ extern int file_sum_extra_cnt;
 /* When the associated option is on, all entries will have these present: */
 #define F_OWNER(f) REQ_EXTRA(f, uid_ndx)->unum
 #define F_GROUP(f) REQ_EXTRA(f, gid_ndx)->unum
-#if defined SUPPORT_FILEFLAGS || defined SUPPORT_FORCE_CHANGE
-#define F_FFLAGS(f) REQ_EXTRA(f, fileflags_ndx)->unum
-#else
-#define F_FFLAGS(f) NO_FFLAGS
-#endif
 #define F_ACL(f) REQ_EXTRA(f, acls_ndx)->num
 #define F_XATTR(f) REQ_EXTRA(f, xattrs_ndx)->num
+#define F_NODUMP(f) REQ_EXTRA(f, nodump_ndx)->num
 #define F_NDX(f) REQ_EXTRA(f, unsort_ndx)->num
 #define F_ATIME(f) REQ_EXTRA64(f, atimes_ndx)->num
 #define F_CRTIME(f) REQ_EXTRA64(f, crtimes_ndx)->num
@@ -1109,6 +1084,7 @@ struct map_struct {
 #define FILTRULE_CLEAR_LIST	(1<<18)/* this item is the "!" token */
 #define FILTRULE_PERISHABLE	(1<<19)/* perishable if parent dir goes away */
 #define FILTRULE_XATTR		(1<<20)/* rule only applies to xattr names */
+#define FILTRULE_FROM_FILE	(1<<21)/* pattern text came from a file's contents */
 
 #define FILTRULES_SIDES (FILTRULE_SENDER_SIDE | FILTRULE_RECEIVER_SIDE)
 
@@ -1136,6 +1112,7 @@ struct stats {
 	int64 total_read;
 	int64 literal_data;
 	int64 matched_data;
+	int64 touched_blocks_4k;
 	int64 flist_buildtime;
 	int64 flist_xfertime;
 	int64 flist_size;
@@ -1232,17 +1209,23 @@ typedef struct {
 #define NORETURN __attribute__((__noreturn__))
 #endif
 
+/* Under --enable-coverage, gcov flushes counters via an atexit handler that
+ * _exit() bypasses.  Forked helpers that terminate via _exit() -- the
+ * pre/post-xfer-exec children, the become_daemon original process, the
+ * per-connection accept-loop child on early return -- must dump explicitly
+ * or their counters are lost, which systematically under-reports daemon-side
+ * coverage.  cleanup.c and main.c already inline this for the two main exit
+ * paths; this macro covers the rest.  No-op when not a coverage build. */
+#ifdef GCOV_COVERAGE
+extern void __gcov_dump(void);
+#define gcov_flush() __gcov_dump()
+#else
+#define gcov_flush() ((void)0)
+#endif
+
 typedef struct {
     STRUCT_STAT st;
     time_t crtime;
-#ifdef SUPPORT_FILEFLAGS
-    /* Cached BSD-canonical fileflags for this inode.  On BSD this is
-     * just sxp->st.st_flags (populated when fileflags_cached != 0); on
-     * Linux it requires an open()+ioctl(FS_IOC_GETFLAGS), so we cache
-     * it after the first read for the lifetime of the stat_x. */
-    uint32 fileflags;
-    int    fileflags_cached;
-#endif
 #ifdef SUPPORT_ACLS
     struct rsync_acl *acc_acl; /* access ACL */
     struct rsync_acl *def_acl; /* default ACL */
@@ -1255,15 +1238,6 @@ typedef struct {
 #define ACL_READY(sx) ((sx).acc_acl != NULL)
 #define XATTR_READY(sx) ((sx).xattr != NULL)
 
-/* Portable fileflags helpers (lib/fileflags.c). */
-#ifdef SUPPORT_FILEFLAGS
-int rsync_fchflags(int fd, mode_t mode, uint32 bsd_flags);
-uint32 rsync_fgetflags(int fd, mode_t mode, const STRUCT_STAT *hint);
-uint32 rsync_lgetflags(const char *path, mode_t mode, const STRUCT_STAT *hint);
-uint32 stat_x_get_fileflags(stat_x *sxp, const char *path);
-void   stat_x_invalidate_fileflags(stat_x *sxp);
-#endif
-
 #define CLVL_NOT_SPECIFIED INT_MIN
 
 #define CPRES_AUTO (-1)
@@ -1275,6 +1249,11 @@ void   stat_x_invalidate_fileflags(stat_x *sxp);
 
 #define NSTR_CHECKSUM 0
 #define NSTR_COMPRESS 1
+
+#define NNI_BUILTIN (1<<0)
+#define NNI_EVP (1<<1)
+#define NNI_EVP_OK (1<<2)
+#define NNI_EXPLICIT_ONLY (1<<3)
 
 struct name_num_item {
 	int num, flags;

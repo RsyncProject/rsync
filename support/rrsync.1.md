@@ -5,7 +5,7 @@ rrsync - a script to setup restricted rsync users via ssh logins
 ## SYNOPSIS
 
 ```
-rrsync [-ro|-wo] [-munge] [-no-del] [-no-lock] [-no-overwrite]  DIR
+rrsync [-ro|-wo] [-munge] [-absolute] [-no-del] [-no-lock] [-no-overwrite] [-log FILE] DIR
 ```
 
 The single non-option argument specifies the restricted _DIR_ to use. It can be
@@ -77,6 +77,12 @@ The remainder of this manpage is dedicated to using the rrsync script.
 
     Enable rsync's [`--munge-links`](rsync.1#opt) on the server side.
 
+0. `-absolute`
+
+    Allow file-transfer arguments to name the restricted directory using its
+    absolute server path. For example, with `rrsync -absolute /path/to/root`,
+    the transfer arg `/path/to/root/dir1` is accepted as an alias for `dir1`.
+
 0.  `-no-del`
 
     Disable rsync's `--delete*` and `--remove*` options.
@@ -85,10 +91,37 @@ The remainder of this manpage is dedicated to using the rrsync script.
 
     Avoid the single-run (per-user) lock check.  Useful with [`-munge`](#opt).
 
+0.  `-log FILE`
+
+    Record server-side transfers and deletions in FILE. A relative FILE is
+    resolved from rrsync's initial working directory. The log must be a regular
+    file outside DIR; the path cannot pass through DIR even when it later
+    leaves by `..` or a symlink. An existing log is appended without changing
+    its permissions. A new log is created with mode 0600, subject to the
+    process umask. The client's `--log-file` is refused while `-log` is set.
+
+    The transfer is refused if the log cannot be opened securely. A later log
+    write failure makes rsync exit with an error, but files transferred before
+    that failure are not rolled back. Keep hard-link and bind-mount aliases of
+    the log outside the client's reach; path traversal cannot identify every
+    such alias. This option is unavailable when DIR is `/` or the platform
+    lacks the required no-follow directory operations.
+
 0.  `-no-overwrite`
 
     Enforce `--ignore-existing` on the server. Prevents overwriting existing
     files when the server is the receiver.
+
+    Because `--ignore-existing` protects only the file being transferred, this
+    also refuses the options that can reach a *different* existing file in the
+    restricted dir: `--log-file`, `--partial-dir`, `--delay-updates`,
+    `--delay-symlinks` (which creates its symlinks at the end of the transfer,
+    replacing whatever has appeared at that name since the check), and backup
+    mode (`-b`, `--backup-dir`, whose published backup replaces whatever
+    already occupies the backup name). Resumable uploads with an explicit
+    `--partial-dir`, `--delay-updates` and `--delay-symlinks` are therefore
+    unavailable under this option. Administrator-controlled `-log` remains
+    available because its log stays outside the restricted dir.
 
 0.  `-help`, `-h`
 
@@ -112,6 +145,21 @@ The rrsync script accepts just a subset of rsync's options that the real rsync
 uses when running the server command.  A few extra convenience options are also
 included to help it to interact with BackupPC and accept some convenient user
 overrides.
+
+The [`--nice`](rsync.1#opt--nice) option is limited to local CPU nice 19, idle
+I/O priority or both.  Other values could raise the server process priority and
+are rejected.
+
+The rrsync script accepts rsync's
+[`--ignore-missing-args`](rsync.1#opt--ignore-missing-args) as a sending server.
+It skips an operand found missing before opening or pinning it;
+a later open or pin failure remains an error. With `--relative`, a missing
+directory operand ending in `/` or `/.` is skipped when its source anchor
+exists. Without `--relative`, those operands remain directory errors. A missing
+source anchor also causes rrsync to reject the whole transfer, while stock
+rsync would transfer other operands and exit with status 23. If all source
+operands are missing, rrsync refuses the transfer rather than letting rsync
+send `.`; stock rsync would succeed with an empty transfer.
 
 The script (or a copy of it) can be manually edited if you want it to customize
 the option handling.

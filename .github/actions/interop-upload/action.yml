@@ -1,0 +1,45 @@
+name: Verified interoperability record
+description: Publish one phase record and verify an ambiguous upload before retrying
+inputs:
+  name:
+    required: true
+    description: Attempt-bound artifact name
+  path:
+    required: true
+    description: Local JSON record
+runs:
+  using: composite
+  steps:
+    - id: upload
+      continue-on-error: true
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+      with:
+        name: ${{ inputs.name }}
+        path: ${{ inputs.path }}
+        if-no-files-found: error
+        retention-days: 7
+    - id: probe
+      if: steps.upload.outcome == 'failure'
+      shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+        ARTIFACT_NAME: ${{ inputs.name }}
+        ARTIFACT_PATH: ${{ inputs.path }}
+      run: python3 -B -S .github/scripts/interop_upload.py probe "$ARTIFACT_NAME" "$ARTIFACT_PATH"
+    - id: retry
+      if: steps.probe.outputs.present == 'false'
+      continue-on-error: true
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+      with:
+        name: ${{ inputs.name }}
+        path: ${{ inputs.path }}
+        if-no-files-found: error
+        retention-days: 7
+    - name: Require the exact published record
+      if: steps.probe.outputs.present == 'false'
+      shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+        ARTIFACT_NAME: ${{ inputs.name }}
+        ARTIFACT_PATH: ${{ inputs.path }}
+      run: python3 -B -S .github/scripts/interop_upload.py require "$ARTIFACT_NAME" "$ARTIFACT_PATH"

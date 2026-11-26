@@ -50,7 +50,7 @@ The first two lines are important for rsync to work on Windows NT however.
 Don't do this unless you are comfortable with the changes! Run regedit32 and
 add the following keys and values (quotation marks ARE IMPORTANT):
   HKEY_LOCAL_MACHINE->SYSTEM->CurrentControlSet->Services->Rsync
-    Edit->Add Key->  Key Name: Paramaters
+    Edit->Add Key->  Key Name: Parameters
     Edit->Add Value->  Value Name: AppDirectory  Value: "C:\programfiles\rsync"
     Edit->Add Value->  Value Name: Application  Value: "C:\programfiles\rsync\rsync.exe"
     Edit->Add Value->  Value Name: AppParamters  Value: --config="C:\programfiles\rsync\rsyncd.conf" --daemon

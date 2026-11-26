@@ -30,16 +30,15 @@
 extern int dry_run;
 extern int preserve_acls;
 extern int preserve_xattrs;
+extern char backup_dir_buf[MAXPATHLEN];
 extern int preserve_perms;
-extern int preserve_fileflags;
-extern int preserve_unsafe_fileflags;
-extern int force_change;
 extern int preserve_executability;
 extern int preserve_mtimes;
 extern int omit_dir_times;
 extern int omit_link_times;
 extern int am_root;
 extern int am_server;
+extern int operator_path_resolve;
 extern int am_daemon;
 extern int am_sender;
 extern int am_receiver;
@@ -58,7 +57,6 @@ extern int make_backups;
 extern int sanitize_paths;
 extern struct file_list *cur_flist, *first_flist, *dir_flist;
 extern struct chmod_mode_struct *daemon_chmod_modes;
-extern char curr_dir[MAXPATHLEN];
 #ifdef ICONV_OPTION
 extern char *iconv_opt;
 #endif
@@ -70,6 +68,18 @@ extern char *iconv_opt;
 #define UPDATED_ACLS  (1<<4)
 #define UPDATED_MODE  (1<<5)
 #define UPDATED_CRTIME (1<<6)
+#define UPDATED_FILEFLAGS (1<<7)
+
+const char *get_locale_charset(void)
+{
+#if defined HAVE_LIBCHARSET_H && defined HAVE_LOCALE_CHARSET
+	return locale_charset();
+#elif defined HAVE_LANGINFO_H && defined HAVE_NL_LANGINFO
+	return nl_langinfo(CODESET);
+#else
+	return ""; /* Works with (at the very least) gnu iconv... */
+#endif
+}
 
 #ifdef ICONV_CONST
 iconv_t ic_chck = (iconv_t)-1;
@@ -77,20 +87,9 @@ iconv_t ic_chck = (iconv_t)-1;
 iconv_t ic_send = (iconv_t)-1, ic_recv = (iconv_t)-1;
 # endif
 
-static const char *default_charset(void)
-{
-# if defined HAVE_LIBCHARSET_H && defined HAVE_LOCALE_CHARSET
-	return locale_charset();
-# elif defined HAVE_LANGINFO_H && defined HAVE_NL_LANGINFO
-	return nl_langinfo(CODESET);
-# else
-	return ""; /* Works with (at the very least) gnu iconv... */
-# endif
-}
-
 void setup_iconv(void)
 {
-	const char *defset = default_charset();
+	const char *defset = get_locale_charset();
 # ifdef ICONV_OPTION
 	const char *charset;
 	char *cp;
@@ -412,7 +411,21 @@ int read_ndx_and_attrs(int f_in, int f_out, int *iflag_ptr, uchar *type_ptr, cha
 		if ((len = read_vstring(f_in, buf, MAXPATHLEN)) < 0)
 			exit_cleanup(RERR_PROTOCOL);
 
-		if (sanitize_paths) {
+		/* For a basis type (FNAMECMP_FUZZY and the alt-dest FNAMECMP_FUZZY+N)
+		 * the xname is a peer-supplied leaf name that the receiver joins to
+		 * an operator-chosen basedir (--link-dest / --compare-dest /
+		 * --copy-dest, or the fuzzy dir) and opens as the delta basis.  It
+		 * must never contain a ".." (or leading "/") that escapes that dir:
+		 * a malicious sender could otherwise walk the receiver's filesystem
+		 * -- e.g. --link-dest=/backup with an xname of "../../etc/shadow" --
+		 * and read an out-of-tree file as the basis (client-side
+		 * arbitrary-read / FIFO-hang).  Sanitize it always, not only in the
+		 * daemon (sanitize_paths) case: the operator basedir may legitimately
+		 * be relative (#915), but the wire-supplied leaf never needs "..".
+		 * Only the basis types use xname as a path; other ITEM_XNAME_FOLLOWS
+		 * uses (the hard-link "=> target" display name, which is often empty)
+		 * are not paths and must be left byte-for-byte. */
+		if (fnamecmp_type >= FNAMECMP_FUZZY) {
 			sanitize_path(buf, buf, "", 0, SP_DEFAULT);
 			len = strlen(buf);
 		}
@@ -475,182 +488,6 @@ mode_t dest_mode(mode_t flist_mode, mode_t stat_mode, int dflt_perms,
 	return new_mode;
 }
 
-#if defined SUPPORT_FILEFLAGS || defined SUPPORT_FORCE_CHANGE
-/* Project the sender-supplied fileflags onto the bits this receiver is
- * willing to apply, preserving the bits the receiver already has outside
- * that mask.  By default the safe-to-apply set is SAFE_FILEFLAGS; the
- * --unsafe-fileflags option widens it to all bits.  See rsync.h comment
- * on SAFE_FILEFLAGS for the threat model. */
-uint32 filter_recv_fileflags(uint32 received, uint32 current_on_dest)
-{
-	uint32 mask = preserve_unsafe_fileflags ? (uint32)-1 : SAFE_FILEFLAGS;
-	return (received & mask) | (current_on_dest & ~mask);
-}
-
-/* Try to open fname O_RDONLY|O_NOFOLLOW via secure_relative_open
- * (relative) or plain open() (absolute).  If the per-component-walk
- * fallback returns EISDIR (the resolved target is a directory and we
- * didn't ask for O_DIRECTORY), retry with O_DIRECTORY -- set_fileflags
- * is happy with either type and the fallback enforces O_DIRECTORY
- * stricter than the kernel RESOLVE_BENEATH path does.  Returns fd on
- * success, -1 with errno preserved on failure. */
-static int open_for_fileflags(const char *fname)
-{
-	int oflags = O_RDONLY | O_NOFOLLOW;
-	int fd;
-
-	if (fname[0] != '/')
-		fd = secure_relative_open(NULL, fname, oflags, 0);
-	else
-		fd = open(fname, oflags);
-#ifdef O_DIRECTORY
-	if (fd < 0 && errno == EISDIR) {
-		oflags |= O_DIRECTORY;
-		if (fname[0] != '/')
-			fd = secure_relative_open(NULL, fname, oflags, 0);
-		else
-			fd = open(fname, oflags);
-	}
-#endif
-	return fd;
-}
-
-/* Set a file's BSD-canonical fileflags, via the portable wrapper that
- * handles both BSD fchflags(fd, ...) and Linux ioctl(FS_IOC_SETFLAGS).
- *
- * SECURITY: relative paths are opened via secure_relative_open(NULL,
- * fname, ...) so the full path chain is bounded -- on Linux 5.6+,
- * FreeBSD 13+ and macOS 15+ this uses openat2/openat with
- * RESOLVE_BENEATH (or O_RESOLVE_BENEATH), and elsewhere falls back to
- * a per-component O_NOFOLLOW walk.  This closes the same daemon
- * (use chroot = no) symlink-race attack class as CVE-2026-29518.
- *
- * basedir = NULL means "anchor at AT_FDCWD" -- the cwd the receiver
- * already set via change_dir() before the file-ops phase, kernel-level
- * confined and not re-traversed component-by-component on each call.
- * The earlier basedir=curr_dir variant re-opened curr_dir-as-a-path-
- * string each call, which made the basedir itself re-resolvable through
- * any swapped components above the module root.
- *
- * Absolute paths still fall back to a plain open(O_NOFOLLOW): we have
- * no basedir context for them and they don't occur on the normal
- * receiver path (only via --partial-dir=/abs and similar). */
-int set_fileflags(const char *fname, uint32 fileflags)
-{
-	int fd, rc, save_errno;
-	int restore_mode = -1;	/* mode_t to restore after, -1 = no restore */
-	STRUCT_STAT lst;
-	STRUCT_STAT st;
-
-	/* Do NOT add O_NONBLOCK: NetBSD's open() rejects directories
-	 * when O_NONBLOCK is set in the flags, returning EISDIR even
-	 * though POSIX allows opening directories O_RDONLY.  We don't
-	 * need O_NONBLOCK here -- rsync_fchflags() rejects everything
-	 * except S_IFREG and S_IFDIR, and callers already short-circuit
-	 * on S_ISLNK, so the open target is always a regular file or
-	 * directory.  Neither blocks on plain O_RDONLY. */
-	fd = open_for_fileflags(fname);
-	if (fd < 0 && errno == EACCES) {
-		/* set_file_attrs chmods before set_fileflags, so if the
-		 * caller's target mode lacks owner-read (e.g. 000 backup of
-		 * a chattr+i secret file), the O_RDONLY open above fails
-		 * for non-root users.  Recover by lstat-ing the path,
-		 * temporarily widening the mode to add owner-read, retrying
-		 * the open, then restoring via fchmod through the fd we
-		 * just acquired (which closes the path-based TOCTOU window
-		 * on the restore step).  Refuse anything that isn't a
-		 * regular file or directory, both to keep within the same
-		 * set_fileflags target types and to avoid chmod-ing through
-		 * a setuid program file we don't own. */
-		if (do_lstat(fname, &lst) == 0
-		 && (S_ISREG(lst.st_mode) || S_ISDIR(lst.st_mode))
-		 && !(lst.st_mode & S_IRUSR)
-		 && do_chmod_at(fname, lst.st_mode | S_IRUSR) == 0) {
-			restore_mode = lst.st_mode & CHMOD_BITS;
-			fd = open_for_fileflags(fname);
-			if (fd < 0) {
-				save_errno = errno;
-				do_chmod_at(fname, restore_mode);
-				errno = save_errno;
-			}
-		}
-	}
-	if (fd < 0)
-		goto fail;
-	if (fstat(fd, &st) != 0) {
-		save_errno = errno;
-		if (restore_mode != -1)
-			(void)fchmod(fd, restore_mode);
-		close(fd);
-		errno = save_errno;
-		goto fail;
-	}
-	if (restore_mode != -1) {
-		/* Restore via fd, BEFORE the fchflags below -- if the
-		 * fchflags sets immutable, a later fchmod would be
-		 * rejected by the kernel even through the existing fd.
-		 * fchmod here works because the inode is still mutable and
-		 * we own it; the already-open fd retains its read access
-		 * across the mode drop (POSIX checks read perm at open(),
-		 * not at use). */
-		(void)fchmod(fd, restore_mode);
-	}
-	rc = rsync_fchflags(fd, st.st_mode, fileflags);
-	save_errno = errno;
-	close(fd);
-	errno = save_errno;
-	if (rc != 0)
-		goto fail;
-	return 1;
-fail:
-	rsyserr(FERROR_XFER, errno,
-		"failed to set file flags on %s",
-		full_fname(fname));
-	return 0;
-}
-
-/* Remove immutable flags from an object, so it can be altered/removed. */
-int make_mutable(const char *fname, mode_t mode, uint32 fileflags, uint32 iflags)
-{
-	if (S_ISLNK(mode) || !(fileflags & iflags))
-		return 0;
-	if (!set_fileflags(fname, fileflags & ~iflags))
-		return -1;
-	return 1;
-}
-
-/* Undo a prior make_mutable() call that returned a 1. */
-int undo_make_mutable(const char *fname, uint32 fileflags)
-{
-	if (!set_fileflags(fname, fileflags))
-		return -1;
-	return 1;
-}
-
-/* fd-based variants for use from the syscall.c force_change recovery
- * paths, where we hold an fd we just openat()'d.  No path is touched
- * after open, eliminating the TOCTOU window between an lstat and the
- * chflags. */
-int make_mutable_fd(int fd, mode_t mode, uint32 fileflags, uint32 iflags)
-{
-	if (S_ISLNK(mode) || !(fileflags & iflags))
-		return 0;
-	if (rsync_fchflags(fd, mode, fileflags & ~iflags) != 0)
-		return -1;
-	return 1;
-}
-
-int undo_make_mutable_fd(int fd, uint32 fileflags)
-{
-	/* mode unknown here; pass S_IFREG so the Linux rsync_fchflags
-	 * doesn't refuse based on file type (we've already validated in
-	 * make_mutable_fd that the fd is regular/dir). */
-	if (rsync_fchflags(fd, S_IFREG, fileflags) != 0)
-		return -1;
-	return 1;
-}
-#endif
-
 static int same_mtime(struct file_struct *file, STRUCT_STAT *st, int extra_accuracy)
 {
 #ifdef ST_MTIME_NSEC
@@ -670,24 +507,149 @@ int set_file_attrs(const char *fname, struct file_struct *file, stat_x *sxp,
 		   const char *fnamecmp, int flags)
 {
 	int updated = 0;
+	int attr_error = 0;
+	int mtime_stale = 0;
 	stat_x sx2;
 	int change_uid, change_gid;
 	mode_t new_mode = file->mode;
 	int inherit;
+	int dfd = -1;            /* held dir fd for the entry's own dir, or -1 */
+	const char *leaf = NULL; /* leaf of fname relative to dfd */
+	int op_leaf_fd = -1;     /* O_NOFOLLOW fd pinning a cross-tree operator leaf */
+	int op_pin = 0;          /* drive chmod/chown off op_leaf_fd for a cross-tree leaf */
+	int op_refuse = 0;       /* pin open hit the symlink-race signal: refuse, don't redirect */
+#if defined SUPPORT_XATTRS || defined SUPPORT_ACLS
+	int held_fd = -1; /* held O_NOFOLLOW fd for fd-based xattr/ACL ops, or -1 */
+	int xattr_refuse = 0; /* no confined fd for a slashed path: skip path-based xattr/ACL */
+#endif
 
 	if (!sxp) {
+		int sret, sdfd;
 		if (dry_run)
 			return 1;
-		if (link_stat(fname, &sx2.st, 0) < 0) {
+		/* Stat through the entry's held dir fd (like gen_entry_stat) so we
+		 * don't re-walk the full path here; link_stat_at folds in no
+		 * fake-super xattr, so only when am_root >= 0. */
+		if (am_root >= 0 && (sdfd = held_dfd_for(fname, file)) >= 0) {
+			const char *sl = strrchr(fname, '/');
+			sret = link_stat_at(sdfd, sl ? sl + 1 : fname, &sx2.st, 0);
+		} else
+			sret = link_stat(fname, &sx2.st, 0);
+		if (sret < 0) {
 			rsyserr(FERROR_XFER, errno, "stat %s failed",
 				full_fname(fname));
-			return 0;
+			return flags & ATTRS_REQUIRE_SUCCESS ? -1 : 0;
 		}
 		init_stat_x(&sx2);
 		sxp = &sx2;
 		inherit = !preserve_perms;
 	} else
 		inherit = !preserve_perms && file->flags & FLAG_DIR_CREATED;
+
+	/* Resolve the entry's directory once; the chown/chmod/times ops below
+	 * issue single-component *at() calls against it instead of re-resolving
+	 * the full path each time.  -1 => fall back to the full-path wrappers
+	 * (cross-tree path such as --temp-dir/--backup-dir, or gated off). */
+	dfd = held_dfd_for(fname, file);
+	if (dfd >= 0) {
+		const char *slash = strrchr(fname, '/');
+		leaf = slash ? slash + 1 : fname;
+	}
+
+#if defined SUPPORT_XATTRS || defined SUPPORT_ACLS
+	/* Pin a regular-file/dir/fifo entry via the held dir fd with O_NOFOLLOW so
+	 * the xattr/ACL ops below act on the held inode (sys_f*xattr/fsetxattr),
+	 * not a re-resolved path a parent-symlink race could redirect.  O_NONBLOCK
+	 * stops a raced FIFO blocking the open; O_NOFOLLOW refuses a raced symlink
+	 * leaf.  A symlink/socket/device leaf or no held dfd leaves held_fd == -1,
+	 * and the ACL code then uses setxattrat(AT_SYMLINK_NOFOLLOW) or falls back.
+	 * Under --fake-super the ACL store stays an l-variant xattr and ignores it. */
+	if (dfd >= 0
+	 && (S_ISREG(sxp->st.st_mode) || S_ISDIR(sxp->st.st_mode) || S_ISFIFO(sxp->st.st_mode))
+	 && (preserve_xattrs || am_root < 0
+# ifdef SUPPORT_ACLS
+	     || (preserve_acls && am_root >= 0)
+# endif
+	    ))
+		held_fd = openat(dfd, leaf, O_RDONLY | O_NOFOLLOW | O_NONBLOCK | O_NOCTTY | O_CLOEXEC);
+
+	/* If the held-fd pin above missed (no cached dir fd -- a path deeper than the
+	 * dirfd cache, or a raced leaf) but we are a confined receiver on a
+	 * non-operator path, re-pin the leaf through the secure resolver so the
+	 * xattr/ACL ops below drive fsetxattr off a confined fd -- NOT a raw path-based
+	 * lsetxattr, which re-resolves the parent and lets a flipped dest/sub symlink
+	 * land the xattr OUTSIDE the tree (copy-xattrs-symlink-race).  If the secure
+	 * re-pin also fails (a genuinely raced parent/leaf symlink), held_fd stays -1
+	 * and xattr_refuse skips the path-based ops rather than redirecting them.
+	 * (chmod/chown/times stay safe via their secure path wrappers; operator paths
+	 * use op_pin/op_refuse below.) */
+	if (held_fd < 0 && !operator_path_resolve && secure_relpath_active()
+	 && (S_ISREG(sxp->st.st_mode) || S_ISDIR(sxp->st.st_mode) || S_ISFIFO(sxp->st.st_mode))
+	 && (preserve_xattrs || am_root < 0
+# ifdef SUPPORT_ACLS
+	     || (preserve_acls && am_root >= 0)
+# endif
+	    )) {
+		int odir = 0;
+# ifdef O_DIRECTORY
+		if (S_ISDIR(sxp->st.st_mode))
+			odir = O_DIRECTORY;
+# endif
+		held_fd = secure_relative_open(NULL, fname,
+			O_RDONLY | O_NOFOLLOW | O_NONBLOCK | O_NOCTTY | O_CLOEXEC | odir, 0);
+		if (held_fd < 0 && strchr(fname, '/'))
+			xattr_refuse = 1;
+	}
+#endif
+
+	/* A cross-tree operator path (an absolute --backup-dir/--temp-dir/--*-dest
+	 * leaf) has no held parent dfd, so the chmod/chown below would re-resolve the
+	 * full path and could follow a parent component an attacker flips to a
+	 * symlink mid-operation -- and an lchown through such a component even retags
+	 * the planted symlink as ours (trust laundering that then defeats the
+	 * owner-walk).  Pin the leaf inode itself with an O_NOFOLLOW open via the
+	 * operator owner-walk resolver and drive fchmod/fchown off that fd.  A raced
+	 * symlink leaf makes the open fail, leaving op_leaf_fd == -1: the metadata op
+	 * is then refused, never redirected.  --insecure-links opts back out (the
+	 * resolver in do_open_at honours it), and a genuine symlink leaf (a symlink
+	 * backup) keeps the existing l-variant path. */
+	/* Gate on the INTENDED type (new_mode), not the on-disk type (sxp->st): the
+	 * attacker controls the latter via the flip, and a dir component that has
+	 * just been flipped to a symlink must still take the pinned path so the
+	 * O_NOFOLLOW open refuses it -- otherwise the lchown would launder it. */
+	op_pin = operator_path_resolve && dfd < 0 && !symlink_optout_allowed()
+	      && (S_ISREG(new_mode) || S_ISDIR(new_mode) || S_ISFIFO(new_mode));
+	if (op_pin) {
+		op_leaf_fd = do_open_at(fname, O_RDONLY | O_NONBLOCK | O_NOCTTY | O_CLOEXEC, 0);
+		/* When running as root (the uid-0 trust-laundering case) an O_RDONLY open
+		 * of a real owned reg/dir/fifo leaf never fails for permission reasons, so
+		 * ANY failure here means the leaf is being raced (a symlink refused by
+		 * O_NOFOLLOW / owner-walk -> ELOOP, or vanished mid-flip -> ENOENT):
+		 * refuse, never redirect via a re-resolvable path.  --fake-super
+		 * (am_root < 0) is the same: the daemon owns the freshly-staged leaf it is
+		 * about to set %stat/ACL/xattr metadata on, so any open failure is a race
+		 * -- refuse rather than fall through to a path-based sys_lsetxattr that a
+		 * flipped parent could redirect outside the module.  A plain non-root
+		 * operator (am_root == 0) can still hit a legitimate EACCES on an
+		 * owned-but-unreadable leaf; there we only treat the explicit symlink-race
+		 * signal (ELOOP) as a refusal and otherwise fall back to the legacy path
+		 * op rather than spuriously failing a real file. */
+		if (op_leaf_fd < 0 && (am_root != 0 || errno == ELOOP))
+			op_refuse = 1;
+#if defined SUPPORT_XATTRS || defined SUPPORT_ACLS
+		if (op_leaf_fd >= 0)
+			held_fd = op_leaf_fd;	/* xattr/ACL ops below pin to this leaf fd too */
+#endif
+	}
+
+	if ((flags & ATTRS_REQUIRE_SUCCESS) && (op_refuse
+#if defined SUPPORT_XATTRS || defined SUPPORT_ACLS
+	    || xattr_refuse
+#endif
+	    )) {
+		errno = ELOOP;
+		goto failed;
+	}
 
 	if (inherit && S_ISDIR(new_mode) && sxp->st.st_mode & S_ISGID) {
 		/* We just created this directory and its setgid
@@ -699,8 +661,8 @@ int set_file_attrs(const char *fname, struct file_struct *file, stat_x *sxp,
 		new_mode = tweak_mode(new_mode, daemon_chmod_modes);
 
 #ifdef SUPPORT_ACLS
-	if (preserve_acls && !S_ISLNK(file->mode) && !ACL_READY(*sxp))
-		get_acl(fname, sxp);
+	if (preserve_acls && !S_ISLNK(file->mode) && !ACL_READY(*sxp) && !op_refuse && !xattr_refuse)
+		get_acl_fdat(held_fd, dfd, leaf, fname, sxp);
 #endif
 
 	change_uid = am_root && uid_ndx && sxp->st.st_uid != (uid_t)F_OWNER(file);
@@ -727,13 +689,16 @@ int set_file_attrs(const char *fname, struct file_struct *file, stat_x *sxp,
 		if (am_root >= 0) {
 			uid_t uid = change_uid ? (uid_t)F_OWNER(file) : sxp->st.st_uid;
 			gid_t gid = change_gid ? (gid_t)F_GROUP(file) : sxp->st.st_gid;
-			if (do_lchown_at(fname, uid, gid) != 0) {
+			if ((op_leaf_fd >= 0 ? do_fchown(op_leaf_fd, uid, gid)
+			     : op_refuse ? (errno = ELOOP, -1)
+			     : dfd >= 0 ? do_lchown_atfd(dfd, leaf, uid, gid)
+					: do_lchown_at(fname, uid, gid)) != 0) {
 				/* We shouldn't have attempted to change uid
 				 * or gid unless have the privilege. */
 				rsyserr(FERROR_XFER, errno, "%s %s failed",
 					change_uid ? "chown" : "chgrp",
 					full_fname(fname));
-				goto cleanup;
+				goto failed;
 			}
 			if (uid == (uid_t)-1 && sxp->st.st_uid != (uid_t)-1)
 				rprintf(FERROR_XFER, "uid 4294967295 (-1) is impossible to set on %s\n", full_fname(fname));
@@ -743,8 +708,12 @@ int set_file_attrs(const char *fname, struct file_struct *file, stat_x *sxp,
 			 * the destination had the setuid or setgid bits set
 			 * (due to the side effect of the chown call). */
 			if (sxp->st.st_mode & (S_ISUID | S_ISGID)) {
-				link_stat(fname, &sxp->st,
-					  keep_dirlinks && S_ISDIR(sxp->st.st_mode));
+				if (dfd >= 0)
+					link_stat_at(dfd, leaf, &sxp->st,
+						     keep_dirlinks && S_ISDIR(sxp->st.st_mode));
+				else
+					link_stat(fname, &sxp->st,
+						  keep_dirlinks && S_ISDIR(sxp->st.st_mode));
 			}
 		}
 		if (change_uid)
@@ -754,10 +723,15 @@ int set_file_attrs(const char *fname, struct file_struct *file, stat_x *sxp,
 	}
 
 #ifdef SUPPORT_XATTRS
-	if (am_root < 0)
-		set_stat_xattr(fname, file, new_mode);
-	if (preserve_xattrs && fnamecmp)
-		set_xattr(fname, file, fnamecmp, sxp);
+	if (am_root < 0 && !op_refuse && !xattr_refuse) {
+		/* Changing the fake stat xattr can change mtime on disk. */
+		int ret = set_stat_xattr(fname, file, new_mode, held_fd);
+		if (ret < 0 && (flags & ATTRS_REQUIRE_SUCCESS))
+			goto failed;
+		mtime_stale = ret > 0;
+	}
+	if (preserve_xattrs && fnamecmp && !op_refuse && !xattr_refuse)
+		set_xattr(fname, file, fnamecmp, sxp, held_fd);
 #endif
 
 	if ((omit_dir_times && S_ISDIR(sxp->st.st_mode))
@@ -774,7 +748,8 @@ int set_file_attrs(const char *fname, struct file_struct *file, stat_x *sxp,
 	}
 	if (sxp != &sx2)
 		memcpy(&sx2.st, &sxp->st, sizeof sx2.st);
-	if (!(flags & ATTRS_SKIP_MTIME) && !same_mtime(file, &sxp->st, flags & ATTRS_ACCURATE_TIME)) {
+	if (!(flags & ATTRS_SKIP_MTIME)
+	 && (mtime_stale || !same_mtime(file, &sxp->st, flags & ATTRS_ACCURATE_TIME))) {
 		sx2.st.st_mtime = file->modtime;
 #ifdef ST_MTIME_NSEC
 		sx2.st.ST_MTIME_NSEC = F_MOD_NSEC_or_0(file);
@@ -797,24 +772,37 @@ int set_file_attrs(const char *fname, struct file_struct *file, stat_x *sxp,
 		if (sxp->crtime == 0)
 			sxp->crtime = get_create_time(fname, &sxp->st);
 		if (!same_time(sxp->crtime, 0L, file_crtime, 0L)) {
-			if (
 #ifdef HAVE_GETATTRLIST
-			     do_setattrlist_crtime(fname, file_crtime) == 0
+			int ret = do_setattrlist_crtime(fname, file_crtime);
 #elif defined __CYGWIN__
-			     do_SetFileTime(fname, file_crtime) == 0
+			int ret = do_SetFileTime(fname, file_crtime);
 #else
 #error Unknown crtimes implementation
 #endif
-			)
+			if (ret == 0)
 				updated |= UPDATED_CRTIME;
+			else if (flags & ATTRS_REQUIRE_SUCCESS)
+				goto failed;
 		}
 	}
 #endif
 	if (updated & (UPDATED_MTIME|UPDATED_ATIME)) {
-		int ret = set_times(fname, &sx2.st);
+		int ret;
+#ifdef HAVE_FUTIMENS
+		if (op_leaf_fd >= 0)
+			ret = do_futimens(op_leaf_fd, &sx2.st);
+		else
+#endif
+		if (op_refuse)
+			ret = (errno = ELOOP, -1);
+		else {
+			ret = dfd >= 0 ? set_times_at(dfd, leaf, &sx2.st) : -2;
+			if (ret == -2)
+				ret = set_times(fname, &sx2.st);
+		}
 		if (ret < 0) {
 			rsyserr(FERROR_XFER, errno, "failed to set times on %s", full_fname(fname));
-			goto cleanup;
+			goto failed;
 		}
 		if (ret > 0) { /* ret == 1 if symlink could not be set */
 			updated &= ~(UPDATED_MTIME|UPDATED_ATIME);
@@ -829,42 +817,43 @@ int set_file_attrs(const char *fname, struct file_struct *file, stat_x *sxp,
 	 * If set_acl() changes permission bits in the process of setting
 	 * an access ACL, it changes sxp->st.st_mode so we know whether we
 	 * need to chmod(). */
-	if (preserve_acls && !S_ISLNK(new_mode)) {
-		if (set_acl(fname, file, sxp, new_mode) > 0)
+	if (preserve_acls && !S_ISLNK(new_mode) && !op_refuse && !xattr_refuse) {
+		int ret = set_acl_fdat(held_fd, dfd, leaf, fname, file, sxp, new_mode);
+		if (ret < 0 && (flags & ATTRS_REQUIRE_SUCCESS))
+			goto failed;
+		if (ret > 0)
 			updated |= UPDATED_ACLS;
 	}
 #endif
 
 #ifdef HAVE_CHMOD
 	if (!BITS_EQUAL(sxp->st.st_mode, new_mode, CHMOD_BITS)) {
-		int ret = am_root < 0 ? 0 : do_chmod_at(fname, new_mode);
+		BOOL best_effort = !preserve_perms && !preserve_executability
+			       && !preserve_acls && !daemon_chmod_modes;
+		int ret = am_root < 0 ? 0
+			: op_refuse ? (errno = ELOOP, -1)
+			: do_chmod_attrs(fname, new_mode, op_leaf_fd, dfd, leaf, best_effort);
 		if (ret < 0) {
 			rsyserr(FERROR_XFER, errno,
 				"failed to set permissions on %s",
 				full_fname(fname));
-			goto cleanup;
+			goto failed;
 		}
-		if (ret == 0) /* ret == 1 if symlink could not be set */
+		if (ret == 0)
 			updated |= UPDATED_MODE;
 	}
 #endif
 
 #ifdef SUPPORT_FILEFLAGS
-	if (preserve_fileflags && !S_ISLNK(sxp->st.st_mode)) {
-		uint32 current = stat_x_get_fileflags(sxp, fname);
-		uint32 wanted = filter_recv_fileflags(F_FFLAGS(file), current);
-		if (flags & ATTRS_DELAY_IMMUTABLE)
-			wanted &= ~ALL_IMMUTABLE;
-		if (current != wanted) {
-			if (!set_fileflags(fname, wanted))
-				goto cleanup;
-			/* Deliberately do NOT invalidate the cache here: the
-			 * itemize() call that follows compares pre-change
-			 * (cached) against wanted to decide whether to emit
-			 * the 'f' column.  Invalidating would refresh to the
-			 * post-change value and itemize would see no diff. */
-			updated = 1;
+	if (flags & ATTRS_SET_FILEFLAGS && !dry_run
+	 && F_NODUMP(file) != ((sxp->st.st_flags & UF_NODUMP) != 0)) {
+		int ret = do_set_fileflags(fname, dfd, leaf, &sxp->st, F_NODUMP(file));
+		if (ret < 0) {
+			rsyserr(FERROR_XFER, errno, "failed to set file flags on %s", full_fname(fname));
+			goto failed;
 		}
+		if (ret > 0)
+			updated |= UPDATED_FILEFLAGS;
 	}
 #endif
 
@@ -874,9 +863,24 @@ int set_file_attrs(const char *fname, struct file_struct *file, stat_x *sxp,
 		else
 			rprintf(FCLIENT, "%s is uptodate\n", fname);
 	}
+	goto cleanup;
+
+  failed:
+	if (flags & ATTRS_REQUIRE_SUCCESS) {
+		attr_error = errno ? errno : EIO;
+		updated = -1;
+	}
   cleanup:
+#if defined SUPPORT_XATTRS || defined SUPPORT_ACLS
+	if (held_fd >= 0 && held_fd != op_leaf_fd)	/* may alias op_leaf_fd (cross-tree) */
+		close(held_fd);
+#endif
+	if (op_leaf_fd >= 0)
+		close(op_leaf_fd);
 	if (sxp == &sx2)
 		free_stat_x(&sx2);
+	if (attr_error)
+		errno = attr_error;
 	return updated;
 }
 
@@ -926,28 +930,8 @@ int finish_transfer(const char *fname, const char *fnametmp,
 		    int overwriting_basis)
 {
 	int ret;
+	BOOL backup_basis = False;
 	const char *temp_copy_name = partialptr && *partialptr != '/' ? partialptr : NULL;
-#ifdef SUPPORT_FORCE_CHANGE
-	/* For force_change without preserve_fileflags, the generator's
-	 * F_FFLAGS stash isn't visible to us (the receiver runs in a
-	 * separate process from the generator and we never decoded the
-	 * dest's flags off the wire -- they're a local-only fact).  Stat
-	 * the dest ourselves before any rename so we can re-apply the
-	 * force_change-affected bits afterwards.  Without this, the
-	 * manpage's "original flags are restored" promise silently fails
-	 * for single-link rename-replaced destinations. */
-	uint32 fc_pre_flags = 0;
-	if (force_change && !preserve_fileflags && !inplace) {
-		stat_x sx_dst;
-		init_stat_x(&sx_dst);
-		if (do_lstat(fname, &sx_dst.st) == 0
-		 && (S_ISREG(sx_dst.st.st_mode) || S_ISDIR(sx_dst.st.st_mode)))
-			fc_pre_flags = stat_x_get_fileflags(&sx_dst, fname);
-		if (fc_pre_flags == NO_FFLAGS)
-			fc_pre_flags = 0;
-		free_stat_x(&sx_dst);
-	}
-#endif
 
 	if (inplace) {
 		if (DEBUG_GTE(RECV, 1))
@@ -960,53 +944,41 @@ int finish_transfer(const char *fname, const char *fnametmp,
 		int ok = make_backup(fname, False);
 		if (!ok)
 			exit_cleanup(RERR_FILEIO);
-		if (ok == 1 && fnamecmp == fname)
+		if (ok == 1 && fnamecmp == fname) {
 			fnamecmp = get_backup_name(fname);
+		}
 	}
 
-	/* Change permissions before putting the file into place. */
+	/* Change permissions before putting the file into place.  An absolute
+	 * --temp-dir/--partial-dir leaves fnametmp on an operator path with no held
+	 * dirfd, so resolve its metadata through the ownership walk (op_pin); a
+	 * flipped temp-dir parent then can't redirect the chmod/chown/times/etc.
+	 * (in-tree temps keep their held dirfd, so op_pin stays off there). */
+	backup_basis = preserve_xattrs && fnamecmp == backup_dir_buf;
+	if (backup_basis && !begin_backup_read())
+		return 0;
+	operator_path_resolve = 1;
 	set_file_attrs(fnametmp, file, NULL, fnamecmp,
-		       ATTRS_DELAY_IMMUTABLE
-		       | (ok_to_set_time ? ATTRS_ACCURATE_TIME : ATTRS_SKIP_MTIME | ATTRS_SKIP_ATIME | ATTRS_SKIP_CRTIME));
+		       ok_to_set_time ? ATTRS_ACCURATE_TIME : ATTRS_SKIP_MTIME | ATTRS_SKIP_ATIME | ATTRS_SKIP_CRTIME);
+	operator_path_resolve = 0;
+	if (backup_basis && !end_backup_access())
+		return 0;
 
 	/* move tmp file over real file */
 	if (DEBUG_GTE(RECV, 1))
 		rprintf(FINFO, "renaming %s to %s\n", fnametmp, fname);
-	ret = robust_rename(fnametmp, fname, temp_copy_name, file->mode);
+	ret = robust_rename(fnametmp, fname, temp_copy_name, file->mode, file);
 	if (ret < 0) {
 		rsyserr(FERROR_XFER, errno, "%s %s -> \"%s\"",
 			ret == -2 ? "copy" : "rename",
 			full_fname(fnametmp), fname);
 		if (!partialptr || (ret == -2 && temp_copy_name)
-		 || robust_rename(fnametmp, partialptr, NULL, file->mode) < 0)
+		 || robust_rename(fnametmp, partialptr, NULL, file->mode, file) < 0)
 			do_unlink_at(fnametmp);
 		return 0;
 	}
 	if (ret == 0) {
 		/* The file was moved into place (not copied), so it's done. */
-#ifdef SUPPORT_FILEFLAGS
-		if (preserve_fileflags) {
-			/* We delayed applying the immutable bits until after
-			 * the rename; do so now -- but only the bits the
-			 * receiver's policy lets through (see
-			 * filter_recv_fileflags). */
-			uint32 wanted = filter_recv_fileflags(F_FFLAGS(file), 0);
-			if (wanted & ALL_IMMUTABLE)
-				set_fileflags(fname, wanted);
-		}
-#endif
-#ifdef SUPPORT_FORCE_CHANGE
-		/* Restore the dest's pre-rename force_change-affected bits.
-		 * The temp inode now sits at fname with no flags, so
-		 * without this the manpage's promise that the "original
-		 * flags are restored" silently fails for the common
-		 * single-link case.  fc_pre_flags was captured at function
-		 * entry via lstat (preserve_fileflags already took the
-		 * separate restoration path above). */
-		if (force_change && !preserve_fileflags
-		 && (fc_pre_flags & force_change))
-			set_fileflags(fname, fc_pre_flags & force_change);
-#endif
 		return 1;
 	}
 	/* The file was copied, so tweak the perms of the copied file.  If it
@@ -1014,8 +986,13 @@ int finish_transfer(const char *fname, const char *fnametmp,
 	fnametmp = temp_copy_name ? temp_copy_name : fname;
 
   do_set_file_attrs:
+	backup_basis = preserve_xattrs && fnamecmp == backup_dir_buf;
+	if (backup_basis && !begin_backup_read())
+		return 0;
 	set_file_attrs(fnametmp, file, NULL, fnamecmp,
 		       ok_to_set_time ? ATTRS_ACCURATE_TIME : ATTRS_SKIP_MTIME | ATTRS_SKIP_ATIME | ATTRS_SKIP_CRTIME);
+	if (backup_basis && !end_backup_access())
+		return 0;
 
 	if (temp_copy_name) {
 		if (do_rename_at(fnametmp, fname) < 0) {
@@ -1024,15 +1001,6 @@ int finish_transfer(const char *fname, const char *fnametmp,
 			return 0;
 		}
 		handle_partial_dir(temp_copy_name, PDIR_DELETE);
-#ifdef SUPPORT_FORCE_CHANGE
-		/* Same rename-replaced-the-inode hazard as the move path
-		 * above: the temp inode now sits at fname with no flags,
-		 * so restore the force_change-affected bits captured at
-		 * function entry. */
-		if (force_change && !preserve_fileflags
-		 && (fc_pre_flags & force_change))
-			set_fileflags(fname, fc_pre_flags & force_change);
-#endif
 	}
 	return 1;
 }

@@ -1,0 +1,195 @@
+name: Directed transfers
+description: Native SSH and daemon transfers between seven endpoints
+inputs:
+  platform:
+    required: true
+    description: Native endpoint
+  guest:
+    default: 'false'
+    description: Use the existing local VM SSH connection
+outputs:
+  blocked:
+    description: A shared phase could not run
+    value: ${{ steps.outcome.outputs.blocked }}
+runs:
+  using: composite
+  steps:
+    - name: Install Tailscale
+      shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+        INTEROP_PLATFORM: ${{ inputs.platform }}
+        INTEROP_GUEST: ${{ inputs.guest }}
+      run: python3 -B -S .github/scripts/interop-host.py install "$INTEROP_PLATFORM" --root "$RUNNER_TEMP/interoperability"
+    - name: Generate enrolment recipient
+      shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+        INTEROP_PLATFORM: ${{ inputs.platform }}
+        INTEROP_GUEST: ${{ inputs.guest }}
+      run: python3 -B -S .github/scripts/interop-host.py recipient "$INTEROP_PLATFORM" --root "$RUNNER_TEMP/interoperability"
+    - name: Upload recipient
+      uses: ./.github/actions/interop-upload
+      with:
+        name: interoperability-public-${{ inputs.platform }}-attempt-${{ github.run_attempt }}
+        path: ${{ runner.temp }}/interoperability/public-key.json
+    - name: Join quarantine
+      shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+        INTEROP_PLATFORM: ${{ inputs.platform }}
+        INTEROP_GUEST: ${{ inputs.guest }}
+      run: python3 -B -S .github/scripts/interop-host.py connect "$INTEROP_PLATFORM" --root "$RUNNER_TEMP/interoperability"
+    - name: Start native fixture services
+      if: env.INTEROP_BLOCKED != 'true'
+      shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+        INTEROP_PLATFORM: ${{ inputs.platform }}
+        INTEROP_GUEST: ${{ inputs.guest }}
+      run: python3 -B -S .github/scripts/interop-host.py prepare "$INTEROP_PLATFORM" --root "$RUNNER_TEMP/interoperability"
+    - name: Upload endpoint identity
+      if: env.INTEROP_BLOCKED != 'true'
+      uses: ./.github/actions/interop-upload
+      with:
+        name: interoperability-ready-${{ inputs.platform }}-attempt-${{ github.run_attempt }}
+        path: ${{ runner.temp }}/interoperability/ready.json
+    - name: Check quarantine
+      if: env.INTEROP_BLOCKED != 'true'
+      shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+        INTEROP_PLATFORM: ${{ inputs.platform }}
+        INTEROP_GUEST: ${{ inputs.guest }}
+      run: python3 -B -S .github/scripts/interop-host.py quarantine "$INTEROP_PLATFORM" --root "$RUNNER_TEMP/interoperability"
+    - name: Upload quarantine result
+      if: env.INTEROP_BLOCKED != 'true'
+      uses: ./.github/actions/interop-upload
+      with:
+        name: interoperability-quarantine-${{ inputs.platform }}-attempt-${{ github.run_attempt }}
+        path: ${{ runner.temp }}/interoperability/quarantine.json
+    - name: Check admission
+      if: env.INTEROP_BLOCKED != 'true'
+      shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+        INTEROP_PLATFORM: ${{ inputs.platform }}
+        INTEROP_GUEST: ${{ inputs.guest }}
+      run: python3 -B -S .github/scripts/interop-host.py admit "$INTEROP_PLATFORM" --root "$RUNNER_TEMP/interoperability"
+    - name: Upload endpoint admission
+      if: env.INTEROP_BLOCKED != 'true'
+      uses: ./.github/actions/interop-upload
+      with:
+        name: interoperability-admitted-${{ inputs.platform }}-attempt-${{ github.run_attempt }}
+        path: ${{ runner.temp }}/interoperability/admitted.json
+    - name: Initial transfers
+      id: transfer1
+      if: env.INTEROP_BLOCKED != 'true'
+      shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+        INTEROP_PLATFORM: ${{ inputs.platform }}
+        INTEROP_GUEST: ${{ inputs.guest }}
+      run: python3 -B -S .github/scripts/interop-host.py transfer1 "$INTEROP_PLATFORM" --root "$RUNNER_TEMP/interoperability"
+    - name: Upload initial transfer completion
+      id: transfer1_upload
+      if: ${{ always() && !cancelled() && env.INTEROP_BLOCKED != 'true' && (steps.transfer1.outcome == 'success' || steps.transfer1.outcome == 'failure') }}
+      uses: ./.github/actions/interop-upload
+      with:
+        name: interoperability-transfer1-${{ inputs.platform }}-attempt-${{ github.run_attempt }}
+        path: ${{ runner.temp }}/interoperability/transfer1.json
+    - name: Complete initial transfer phase
+      id: wait1
+      if: ${{ always() && !cancelled() && steps.transfer1_upload.outcome == 'success' }}
+      shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+        INTEROP_PLATFORM: ${{ inputs.platform }}
+      run: python3 -B -S .github/scripts/interop-host.py wait1 "$INTEROP_PLATFORM" --root "$RUNNER_TEMP/interoperability"
+    - name: Verify initial data and update sources
+      if: env.INTEROP_BLOCKED != 'true' && steps.wait1.outcome == 'success'
+      shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+        INTEROP_PLATFORM: ${{ inputs.platform }}
+        INTEROP_GUEST: ${{ inputs.guest }}
+      run: python3 -B -S .github/scripts/interop-host.py next "$INTEROP_PLATFORM" --root "$RUNNER_TEMP/interoperability"
+    - name: Upload update readiness
+      if: env.INTEROP_BLOCKED != 'true'
+      uses: ./.github/actions/interop-upload
+      with:
+        name: interoperability-next-${{ inputs.platform }}-attempt-${{ github.run_attempt }}
+        path: ${{ runner.temp }}/interoperability/next.json
+    - name: Checksum updates and deletion
+      id: transfer2
+      if: env.INTEROP_BLOCKED != 'true'
+      shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+        INTEROP_PLATFORM: ${{ inputs.platform }}
+        INTEROP_GUEST: ${{ inputs.guest }}
+      run: python3 -B -S .github/scripts/interop-host.py transfer2 "$INTEROP_PLATFORM" --root "$RUNNER_TEMP/interoperability"
+    - name: Upload update completion
+      id: transfer2_upload
+      if: ${{ always() && !cancelled() && env.INTEROP_BLOCKED != 'true' && (steps.transfer2.outcome == 'success' || steps.transfer2.outcome == 'failure') }}
+      uses: ./.github/actions/interop-upload
+      with:
+        name: interoperability-transfer2-${{ inputs.platform }}-attempt-${{ github.run_attempt }}
+        path: ${{ runner.temp }}/interoperability/transfer2.json
+    - name: Complete updated transfer phase
+      id: wait2
+      if: ${{ always() && !cancelled() && steps.transfer2_upload.outcome == 'success' }}
+      shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+        INTEROP_PLATFORM: ${{ inputs.platform }}
+      run: python3 -B -S .github/scripts/interop-host.py wait2 "$INTEROP_PLATFORM" --root "$RUNNER_TEMP/interoperability"
+    - name: Verify updated native data
+      if: env.INTEROP_BLOCKED != 'true' && steps.wait2.outcome == 'success'
+      shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+        INTEROP_PLATFORM: ${{ inputs.platform }}
+        INTEROP_GUEST: ${{ inputs.guest }}
+      run: python3 -B -S .github/scripts/interop-host.py verify "$INTEROP_PLATFORM" --root "$RUNNER_TEMP/interoperability"
+    - name: Upload transfer result
+      if: env.INTEROP_BLOCKED != 'true'
+      uses: ./.github/actions/interop-upload
+      with:
+        name: interoperability-result-${{ inputs.platform }}-attempt-${{ github.run_attempt }}
+        path: ${{ runner.temp }}/interoperability/result.json
+    - name: Check revocation
+      if: env.INTEROP_BLOCKED != 'true'
+      shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+        INTEROP_PLATFORM: ${{ inputs.platform }}
+        INTEROP_GUEST: ${{ inputs.guest }}
+      run: python3 -B -S .github/scripts/interop-host.py revoked "$INTEROP_PLATFORM" --root "$RUNNER_TEMP/interoperability"
+    - name: Upload revocation result
+      if: env.INTEROP_BLOCKED != 'true'
+      uses: ./.github/actions/interop-upload
+      with:
+        name: interoperability-revoked-${{ inputs.platform }}-attempt-${{ github.run_attempt }}
+        path: ${{ runner.temp }}/interoperability/revoked.json
+    - name: Upload blocked phase
+      if: ${{ always() && env.INTEROP_BLOCKED == 'true' }}
+      uses: ./.github/actions/interop-upload
+      with:
+        name: interoperability-blocked-${{ inputs.platform }}-attempt-${{ github.run_attempt }}
+        path: ${{ runner.temp }}/interoperability/blocked.json
+    - name: Stop fixture services and leave the network
+      if: always()
+      shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+        INTEROP_PLATFORM: ${{ inputs.platform }}
+        INTEROP_GUEST: ${{ inputs.guest }}
+      run: python3 -B -S .github/scripts/interop-host.py stop "$INTEROP_PLATFORM" --root "$RUNNER_TEMP/interoperability"
+    - name: Record endpoint outcome
+      id: outcome
+      if: always()
+      shell: bash
+      env:
+        INTEROP_PLATFORM: ${{ inputs.platform }}
+      run: python3 -B -S .github/scripts/interop-host.py outcome "$INTEROP_PLATFORM" --root "$RUNNER_TEMP/interoperability"

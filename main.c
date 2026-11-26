@@ -31,12 +31,8 @@
 #ifdef __TANDEM
 #include <floss.h(floss_execlp)>
 #endif
-#if defined SUPPORT_FORCE_CHANGE && defined HAVE_CHFLAGS
-/* The securelevel check below uses BSD sysctl(KERN_SECURELVL) -- only
- * relevant on systems with the BSD chflags(2) family.  Linux has no
- * equivalent of securelevel for the immutable bits, so this whole
- * block is BSD-only. */
-#include <sys/sysctl.h>
+#ifdef HAVE_SYS_RESOURCE_H
+#include <sys/resource.h>
 #endif
 
 extern int dry_run;
@@ -49,14 +45,15 @@ extern int am_daemon;
 extern int inc_recurse;
 extern int blocking_io;
 extern int always_checksum;
+extern int time_only;
 extern int remove_source_files;
 extern int output_needs_newline;
 extern int called_from_signal_handler;
 extern int need_messages_from_generator;
 extern int kluge_around_eof;
 extern int got_xfer_error;
+extern volatile sig_atomic_t got_sigusr2;
 extern int old_style_args;
-extern int force_change;
 extern int msgs2stderr;
 extern int module_id;
 extern int read_only;
@@ -257,6 +254,7 @@ void read_del_stats(int f)
 static void become_copy_as_user()
 {
 	char *gname;
+	const struct passwd *pw = NULL;
 	uid_t uid;
 	gid_t gid;
 
@@ -280,7 +278,6 @@ static void become_copy_as_user()
 			exit_cleanup(RERR_SYNTAX);
 		}
 	} else {
-		struct passwd *pw;
 		if ((pw = getpwuid(uid)) == NULL) {
 			rsyserr(FERROR, errno, "getpwuid failed");
 			exit_cleanup(RERR_SYNTAX);
@@ -299,7 +296,7 @@ static void become_copy_as_user()
 	}
 #endif
 #ifdef HAVE_INITGROUPS
-	if (!gname && initgroups(copy_as, gid) < 0) {
+	if (!gname && initgroups(pw->pw_name, gid) < 0) {
 		rsyserr(FERROR, errno, "initgroups failed");
 		exit_cleanup(RERR_SYNTAX);
 	}
@@ -447,6 +444,9 @@ static void output_summary(void)
 			human_num(stats.total_transferred_size));
 		rprintf(FINFO,"Literal data: %s bytes\n",
 			human_num(stats.literal_data));
+		if (protocol_version >= 33)
+			rprintf(FINFO,"Number of 4 KiB logical blocks touched: %s\n",
+				comma_num(stats.touched_blocks_4k));
 		rprintf(FINFO,"Matched data: %s bytes\n",
 			human_num(stats.matched_data));
 		rprintf(FINFO,"File list size: %s\n",
@@ -497,7 +497,7 @@ static void show_malloc_stats(void)
 
 #define PRINT_ALLOC_NUM(title, descr, num) \
 	rprintf(FINFO, "  %-11s%10" SIZE_T_FMT_MOD "d   (" descr ")\n", \
-		title ":", (SIZE_T_FMT_CAST)(num));
+		title ":", (SSIZE_T_FMT_CAST)(num));
 
 	PRINT_ALLOC_NUM("arena", "bytes from sbrk", mi.arena);
 	PRINT_ALLOC_NUM("ordblks", "chunks not in use", mi.ordblks);
@@ -525,6 +525,16 @@ static pid_t do_cmd(char *cmd, char *machine, char *user, char **remote_argv, in
 	char *args[MAX_ARGS], *need_to_free = NULL;
 	pid_t pid;
 	int dash_l_set = 0;
+#ifdef SUPPORT_IDN
+	char idn_machine[1024];
+
+	/* A daemon-over-remote-shell host is ours to resolve, so give the helper
+	 * the A-label form.  A "host:path" transfer is left alone because that
+	 * name belongs to the user's ssh, which may be matching it against an
+	 * ssh_config Host pattern. */
+	if (machine && daemon_connection > 0 && idn_to_ascii(machine, 1, idn_machine, sizeof idn_machine))
+		machine = idn_machine;
+#endif
 
 	if (!read_batch && !local_server) {
 		char *t, *f, in_quote = '\0';
@@ -720,20 +730,24 @@ static char *get_local_name(struct file_list *flist, char *dest_path)
 		dest_path = dot_dir_or_error();
 
 	if (daemon_filter_list.head) {
-		char *slash = strrchr(dest_path, '/');
+		/* Collapse ".." for the NAME-based daemon filter check so a "../excluded"
+		 * destination is matched by name, as stock rsync does on its sanitized
+		 * arg.  Done on a copy: the daemon exclude/filter is name-based (a symlink
+		 * whose own name is not excluded is still followed -- see rsyncd.conf(5)
+		 * "munge symlinks"), and the real dest_path is left for the resolver. */
+		char cleaned[MAXPATHLEN], *slash;
+		if (!sanitize_path(cleaned, dest_path, NULL, 0, SP_KEEP_DOT_DIRS))
+			strlcpy(cleaned, dest_path, sizeof cleaned);
+		slash = strrchr(cleaned, '/');
 		if (slash && (slash[1] == '\0' || (slash[1] == '.' && slash[2] == '\0')))
 			*slash = '\0';
-		else
-			slash = NULL;
-		if ((*dest_path != '.' || dest_path[1] != '\0')
-		 && (check_filter(&daemon_filter_list, FLOG, dest_path, 0) < 0
-		  || check_filter(&daemon_filter_list, FLOG, dest_path, 1) < 0)) {
+		if ((*cleaned != '.' || cleaned[1] != '\0')
+		 && (check_filter(&daemon_filter_list, FLOG, cleaned, 0) < 0
+		  || check_filter(&daemon_filter_list, FLOG, cleaned, 1) < 0)) {
 			rprintf(FERROR, "ERROR: daemon has excluded destination \"%s\"\n",
 				dest_path);
 			exit_cleanup(RERR_FILESELECT);
 		}
-		if (slash)
-			*slash = '/';
 	}
 
 	/* See what currently exists at the destination. */
@@ -747,10 +761,10 @@ static char *get_local_name(struct file_list *flist, char *dest_path)
 		if (ret < 0)
 			goto mkdir_error;
 		if (ret && (INFO_GTE(NAME, 1) || stdout_format_has_i)) {
-			if (file_total == 1 || trailing_slash)
+			if (cp && (file_total == 1 || trailing_slash))
 				*cp = '\0';
-			rprintf(FINFO, "created %d director%s for %s\n", ret, ret == 1 ? "y" : "ies", dest_path);
-			if (file_total == 1 || trailing_slash)
+			rprintf(FINFO, "created %s director%s for %s\n", comma_num(ret), ret == 1 ? "y" : "ies", dest_path);
+			if (cp && (file_total == 1 || trailing_slash))
 				*cp = '/';
 		}
 		if (ret)
@@ -840,7 +854,16 @@ static char *get_local_name(struct file_list *flist, char *dest_path)
 		dest_path = "/";
 
 	*cp = '\0';
-	if (!change_dir(dest_path, CD_NORMAL)) {
+	if (dry_run && mkpath_dest_arg && do_stat(dest_path, &st) < 0) {
+		/* --mkpath would have created this parent dir, but a dry run did
+		 * not, so don't chdir into it; flag the destination as not yet
+		 * present (as the dir-creation path above does) so the generator
+		 * doesn't try to compare against the missing tree (#880).  Only
+		 * the missing-parent case is touched, so an ordinary file-to-file
+		 * dry run still itemizes against an existing destination. */
+		dry_run++;
+		change_dir(dest_path, CD_SKIP_CHDIR);
+	} else if (!change_dir(dest_path, CD_NORMAL)) {
 		rsyserr(FERROR, errno, "change_dir#3 %s failed",
 			full_fname(dest_path));
 		exit_cleanup(RERR_FILESELECT);
@@ -863,13 +886,20 @@ static void check_alt_basis_dirs(void)
 
 	for (j = 0; j < basis_dir_cnt; j++) {
 		char *bdir = basis_dir[j];
+		assert(bdir != NULL); /* option-supplied root; never NULL */
 		int bd_len = strlen(bdir);
 		if (bd_len > 1 && bdir[bd_len-1] == '/')
 			bdir[--bd_len] = '\0';
-		if (dry_run > 1 && *bdir != '/') {
+		/* Make a relative --link-dest/--copy-dest/--compare-dest absolute
+		 * (vs the destination curr_dir).  These are operator-trusted roots, so
+		 * an absolute path makes the do_*_at() wrappers use plain resolution
+		 * rather than reject an operator '..' outside the dest tree (e.g.
+		 * --copy-dest=../to).  Skipped when sanitize_paths already confined
+		 * them; the dry_run>1 case keeps its leading-"../"-strip. */
+		if (*bdir != '/' && (dry_run > 1 || !sanitize_paths)) {
 			int len = curr_dir_len + 1 + bd_len + 1;
 			char *new = new_array(char, len);
-			if (slash && strncmp(bdir, "../", 3) == 0) {
+			if (dry_run > 1 && slash && strncmp(bdir, "../", 3) == 0) {
 				/* We want to remove only one leading "../" prefix for
 				 * the directory we couldn't create in dry-run mode:
 				 * this ensures that any other ".." references get
@@ -924,7 +954,7 @@ static void read_final_goodbye(int f_in, int f_out)
 
 static void do_server_sender(int f_in, int f_out, int argc, char *argv[])
 {
-	struct file_list *flist;
+	const struct file_list *flist;
 	char *dir;
 
 	if (DEBUG_GTE(SEND, 1))
@@ -994,26 +1024,6 @@ static int do_recv(int f_in, int f_out, char *local_name)
 	 * points to an identical file won't be replaced by the referent. */
 	copy_links = copy_dirlinks = copy_unsafe_links = 0;
 
-#if defined SUPPORT_FORCE_CHANGE && defined HAVE_CHFLAGS
-	if (force_change & SYS_IMMUTABLE) {
-		/* BSD-only: determine whether we'll be able to unlock a system
-		 * immutable item.  Linux has no equivalent of securelevel for
-		 * its chattr +i (it requires CAP_LINUX_IMMUTABLE rather than
-		 * a kernel-wide securelevel knob), and CAP_LINUX_IMMUTABLE
-		 * either is or is not set on this process. */
-		int mib[2];
-		int securityLevel = 0;
-		size_t len = sizeof securityLevel;
-
-		mib[0] = CTL_KERN;
-		mib[1] = KERN_SECURELVL;
-		if (sysctl(mib, 2, &securityLevel, &len, NULL, 0) == 0 && securityLevel > 0) {
-			rprintf(FERROR, "System security level is too high to force mutability on system immutable files and directories.\n");
-			exit_cleanup(RERR_UNSUPPORTED);
-		}
-	}
-#endif
-
 #ifdef SUPPORT_HARD_LINKS
 	if (preserve_hard_links && !inc_recurse)
 		match_hard_links(first_flist);
@@ -1046,6 +1056,7 @@ static int do_recv(int f_in, int f_out, char *local_name)
 		if (backup_dir_len > 1)
 			backup_dir_buf[backup_dir_len-1] = '/';
 	}
+	init_backup_access(False);
 
 	if (tmpdir) {
 		STRUCT_STAT st;
@@ -1101,6 +1112,11 @@ static int do_recv(int f_in, int f_out, char *local_name)
 
 		write_int(f_out, NDX_DONE);
 		send_msg(MSG_STATS, (char*)&stats.total_read, sizeof stats.total_read, 0);
+		if (protocol_version >= 33) {
+			char b[8];
+			SIVAL64(b, 0, stats.touched_blocks_4k);
+			send_msg(MSG_BLOCK_STATS, b, sizeof b, 0);
+		}
 		io_flush(FULL_FLUSH);
 
 		/* Handle any keep-alive packets from the post-processing work
@@ -1116,11 +1132,13 @@ static int do_recv(int f_in, int f_out, char *local_name)
 			exit_cleanup(RERR_PROTOCOL);
 		}
 
-		/* Finally, we go to sleep until our parent kills us with a
-		 * USR2 signal.  We sleep for a short time, as on some OSes
-		 * a signal won't interrupt a sleep! */
-		while (1)
+		/* Finally, we go to sleep until our parent tells us to wrap up
+		 * with a USR2 signal.  We sleep for a short time, as on some OSes
+		 * a signal won't interrupt a sleep, then act on the flag the
+		 * (async-signal-safe) handler set. */
+		while (!got_sigusr2)
 			msleep(20);
+		receive_sigusr2();
 	}
 
 	am_generator = 1;
@@ -1246,15 +1264,25 @@ static void do_server_recv(int f_in, int f_out, int argc, char *argv[])
 		char **dir_p;
 		filter_rule_list *elp = &daemon_filter_list;
 
+		/* Collapse ".." and strip the module-dir prefix to get the module-relative
+		 * name, but keep a leading "/" for a "path = /" module (module_dirlen <= 1)
+		 * so an absolute (module-rooted) filter rule still matches. */
+		char clean[MAXPATHLEN], *dir;
 		for (dir_p = basis_dir; *dir_p; dir_p++) {
-			char *dir = *dir_p;
-			if (*dir == '/')
-				dir += module_dirlen;
+			if (!sanitize_path(clean, *dir_p, "/", 0, SP_DEFAULT))
+				strlcpy(clean, *dir_p, sizeof clean);
+			dir = clean + (*clean == '/' && module_dirlen > 1 ? module_dirlen : 0);
 			if (check_filter(elp, FLOG, dir, 1) < 0)
 				goto options_rejected;
 		}
-		if (partial_dir && *partial_dir == '/'
-		 && check_filter(elp, FLOG, partial_dir + module_dirlen, 1) < 0) {
+		if (partial_dir && *partial_dir == '/') {
+			if (!sanitize_path(clean, partial_dir, "/", 0, SP_DEFAULT))
+				strlcpy(clean, partial_dir, sizeof clean);
+			dir = clean + (*clean == '/' && module_dirlen > 1 ? module_dirlen : 0);
+			if (check_filter(elp, FLOG, dir, 1) < 0)
+				goto options_rejected;
+		}
+		if (0) {
 		    options_rejected:
 			rprintf(FERROR, "Your options have been rejected by the server.\n");
 			exit_cleanup(RERR_SYNTAX);
@@ -1283,11 +1311,25 @@ void start_server(int f_in, int f_out, int argc, char *argv[])
 
 	if (protocol_version >= 23)
 		io_start_multiplex_out(f_out);
+	/* Priority diagnostics need the negotiated message channel.
+	 * File-list work starts below. */
+	niceness_apply();
 	if (am_daemon && io_timeout && protocol_version >= 31)
 		send_msg_int(MSG_IO_TIMEOUT, io_timeout);
 
 	if (am_sender) {
 		keep_dirlinks = 0; /* Must be disabled on the sender. */
+
+		/* Mirror client_run()'s sender_keeps_checksum check: a daemon-
+		 * as-sender with -c and a `log format` containing %C will read
+		 * F_SUM(file) in log_formatted(), so make_file() must allocate
+		 * SUM_EXTRA_CNT.  Without this, F_SUM() reads past the pool slot
+		 * and hex-encodes adjacent heap into the transfer log. */
+		if (always_checksum
+		 && (log_format_has(stdout_format, 'C')
+		  || log_format_has(logfile_format, 'C')))
+			sender_keeps_checksum = 1;
+
 		if (need_messages_from_generator)
 			io_start_multiplex_in(f_in);
 		else
@@ -1303,10 +1345,11 @@ void start_server(int f_in, int f_out, int argc, char *argv[])
  * for rsyncd, remote-shell, and local connections. */
 int client_run(int f_in, int f_out, pid_t pid, int argc, char *argv[])
 {
-	struct file_list *flist = NULL;
+	struct file_list *flist;
 	int exit_code = 0, exit_code2 = 0;
 	char *local_name = NULL;
 
+	niceness_apply();
 	cleanup_child_pid = pid;
 	if (!read_batch) {
 		set_nonblocking(f_in);
@@ -1351,7 +1394,7 @@ int client_run(int f_in, int f_out, pid_t pid, int argc, char *argv[])
 
 		become_copy_as_user();
 
-		flist = send_file_list(f_out, argc, argv);
+		send_file_list(f_out, argc, argv);
 		if (DEBUG_GTE(FLIST, 3))
 			rprintf(FINFO,"file list sent\n");
 
@@ -1509,10 +1552,19 @@ static int start_client(int argc, char *argv[])
 		rsync_port = 0;
 	}
 
+	if (preserve_fileflags && (!local_server || list_only)) {
+		rprintf(FERROR, "--fileflags is only supported for local transfers\n");
+		exit_cleanup(RERR_SYNTAX);
+	}
+
 	/* A local transfer doesn't unbackslash anything, so leave the args alone. */
 	if (local_server) {
 		old_style_args = 2;
 		trust_sender_args = trust_sender_filter = 1;
+	}
+	if (time_only && am_sender && !local_server) {
+		rprintf(FERROR, "--time-only requires a local receiver or a remote source\n");
+		exit_cleanup(RERR_SYNTAX);
 	}
 
 	if (!rsync_port && remote_argc && !**remote_argv) /* Turn an empty arg into a dot dir. */
@@ -1583,7 +1635,7 @@ static int start_client(int argc, char *argv[])
 		exit_cleanup(RERR_SYNTAX);
 	}
 
-	if (connect_timeout) {
+	if (connect_timeout && !daemon_connection) {
 		rprintf(FERROR, "The --contimeout option may only be "
 				"used when connecting to an rsync daemon.\n");
 		exit_cleanup(RERR_SYNTAX);
@@ -1615,6 +1667,14 @@ static int start_client(int argc, char *argv[])
 	(void)env_port;
 #endif
 
+	/* For a daemon reached through a remote shell, the "connection" rsync
+	 * waits on is: the helper is spawned, it establishes its own link (e.g.
+	 * rsync-ssl's openssl connect + TLS handshake), and the daemon greeting is
+	 * exchanged.  Bound that whole phase with --contimeout so the option
+	 * behaves for daemon-via-rsh the way it does for a socket connection. */
+	if (daemon_connection && connect_timeout > 0)
+		set_client_connect_timeout(connect_timeout);
+
 	pid = do_cmd(shell_cmd, shell_machine, shell_user, remote_argv, remote_argc, &f_in, &f_out);
 
 	/* if we're running an rsync server on the remote host over a
@@ -1622,6 +1682,7 @@ static int start_client(int argc, char *argv[])
 	if (daemon_connection) {
 		int tmpret;
 		tmpret = start_inband_exchange(f_in, f_out, shell_user, remote_argc, remote_argv);
+		set_client_connect_timeout(0);
 		if (tmpret < 0)
 			return tmpret;
 	}
@@ -1641,11 +1702,26 @@ static void sigusr1_handler(UNUSED(int val))
 	exit_cleanup(RERR_SIGNAL1);
 }
 
+/* SIGUSR2 tells the receiver child to wrap up.  A signal handler must be
+ * async-signal-safe, so it only sets a flag here; receive_sigusr2() does the
+ * actual summary + shutdown (which use stdio/malloc/close) at a safe point in
+ * the receiver's post-transfer wait loops (read_final_goodbye via perform_io,
+ * and the trailing sleep). */
 static void sigusr2_handler(UNUSED(int val))
+{
+	got_sigusr2 = 1;
+}
+
+void receive_sigusr2(void)
 {
 	if (!am_server)
 		output_summary();
 	close_all();
+#ifdef GCOV_COVERAGE
+	/* The receiver child exits with _exit() here, bypassing the gcov atexit
+	 * flush; without this it writes no .gcda. */
+	{ extern void __gcov_dump(void); __gcov_dump(); }
+#endif
 	if (got_xfer_error)
 		_exit(RERR_PARTIAL);
 	_exit(0);
@@ -1659,8 +1735,10 @@ static void siginfo_handler(UNUSED(int val))
 }
 #endif
 
-void remember_children(UNUSED(int val))
+static void remember_children(UNUSED(int val))
 {
+	int saved_errno = errno;
+
 #ifdef WNOHANG
 	int cnt, status;
 	pid_t pid;
@@ -1681,6 +1759,26 @@ void remember_children(UNUSED(int val))
 	}
 #endif
 #ifndef HAVE_SIGACTION
+	signal(SIGCHLD, remember_children);
+#endif
+	errno = saved_errno;
+}
+
+void install_child_exit_handler(void)
+{
+#ifdef HAVE_SIGACTION
+	struct sigaction action = {0};
+
+	action.sa_handler = remember_children;
+	action.sa_flags = SA_NOCLDSTOP;
+	sigemptyset(&action.sa_mask);
+#ifdef SA_RESTART
+	/* Child exit is not cancellation. Stdio may discard buffered output
+	 * when a flush fails, so restart the underlying syscall instead. */
+	action.sa_flags |= SA_RESTART;
+#endif
+	sigaction(SIGCHLD, &action, NULL);
+#else
 	signal(SIGCHLD, remember_children);
 #endif
 }
@@ -1748,6 +1846,31 @@ static void unset_env_var(const char *var)
 }
 
 
+/* The symlink-race-safe path resolver (secure_relative_open) holds one open
+ * dirfd per path component while it walks a path, plus an ancestor-dirfd cache
+ * -- far more descriptors than legacy rsync's single open().  On a host with a
+ * low default soft limit (e.g. OpenBSD's 128) a deep tree can hit EMFILE.
+ * Raise the soft RLIMIT_NOFILE toward the hard limit (unprivileged, per
+ * process; inherited by the sender/generator/receiver forks and daemon
+ * children), but cap it: some systems set an enormous hard limit (2^20+) that
+ * we don't want to adopt wholesale. */
+static void raise_fd_limit(void)
+{
+#if defined HAVE_GETRLIMIT && defined HAVE_SETRLIMIT && defined RLIMIT_NOFILE
+	struct rlimit rl;
+	rlim_t want = 4096; /* covers a MAXPATHLEN-deep walk + cache + headroom */
+
+	if (getrlimit(RLIMIT_NOFILE, &rl) < 0)
+		return;
+	if (want > rl.rlim_max)
+		want = rl.rlim_max; /* never exceed the (admin-set) hard limit */
+	if (rl.rlim_cur < want) { /* only ever raise, never lower an inherited limit */
+		rl.rlim_cur = want;
+		(void)setrlimit(RLIMIT_NOFILE, &rl); /* best-effort */
+	}
+#endif
+}
+
 int main(int argc,char *argv[])
 {
 	int ret;
@@ -1755,17 +1878,20 @@ int main(int argc,char *argv[])
 	raw_argc = argc;
 	raw_argv = argv;
 
+	raise_fd_limit();
+
 #ifdef HAVE_SIGACTION
 # ifdef HAVE_SIGPROCMASK
 	sigset_t sigmask;
 
 	sigemptyset(&sigmask);
+	sigaddset(&sigmask, SIGCHLD);
 # endif
 	sigact.sa_flags = SA_NOCLDSTOP;
 #endif
 	SIGACTMASK(SIGUSR1, sigusr1_handler);
 	SIGACTMASK(SIGUSR2, sigusr2_handler);
-	SIGACTMASK(SIGCHLD, remember_children);
+	install_child_exit_handler();
 #ifdef MAINTAINER_MODE
 	SIGACTMASK(SIGSEGV, rsync_panic_handler);
 	SIGACTMASK(SIGFPE, rsync_panic_handler);
@@ -1868,7 +1994,7 @@ int main(int argc,char *argv[])
 	if (am_server && protect_args) {
 		char buf[MAXPATHLEN];
 		protect_args = 2;
-		read_args(STDIN_FILENO, NULL, buf, sizeof buf, 1, &argv, &argc, NULL);
+		read_args(STDIN_FILENO, NULL, buf, sizeof buf, 1, 0, &argv, &argc, NULL);
 		if (!parse_arguments(&argc, (const char ***) &argv)) {
 			option_error();
 			exit_cleanup(RERR_SYNTAX);

@@ -25,6 +25,9 @@ options.  To get a complete list of supported options type:
 
 See the [manpage][0] for more detailed information.
 
+FreeBSD builds with descriptor-based file flag support can preserve the
+`nodump` flag in local transfers with `--fileflags`.
+
 [0]: https://download.samba.org/pub/rsync/rsync.1
 
 BUILDING AND INSTALLING
@@ -35,6 +38,11 @@ information on what libraries and packages you can use to get the maximum
 features in your build.
 
 [1]: https://github.com/RsyncProject/rsync/blob/master/INSTALL.md
+
+TESTING
+-------
+
+Run `make check` from a configured build directory. See the [testsuite README](testsuite/README.md) for test selection, profiles and CI.
 
 SETUP
 -----
@@ -105,6 +113,10 @@ and its development.
 BUG REPORTS
 -----------
 
+Report suspected security vulnerabilities through
+[GitHub's private reporting form](https://github.com/RsyncProject/rsync/security/advisories/new).
+See the [security policy](SECURITY.md) for details and an email contact.
+
 The [bug-tracking web page][4] has full details on bug reporting.
 
 [4]: https://rsync.samba.org/bug-tracking.html
@@ -120,8 +132,6 @@ To send a bug report, follow the instructions on the bug-tracking
 page of the web site.
 
 Alternately, email your bug report to <rsync@lists.samba.org>.
-
-For security issues please email details of the issue to <rsync.project@gmail.com>.
 
 GIT REPOSITORY
 --------------
@@ -144,6 +154,8 @@ COPYRIGHT
 
 Rsync was originally written by Andrew Tridgell and Paul Mackerras.  Many
 people from around the world have helped to maintain and improve it.
+
+Special thanks go to Wayne Davison, who maintained rsync from 2004 to 2024.
 
 Rsync may be used, modified and redistributed only under the terms of
 the GNU General Public License, found in the file [COPYING][9] in this
