@@ -117,6 +117,13 @@ static time_t last_io_out;
  * transfer timeout and may be supplied by the module or client. */
 static time_t daemon_handshake_deadline;
 
+/* Wall-clock bound the client puts on establishing a daemon connection made
+ * through a remote shell (daemon_connection == 1): spawning the helper, its
+ * connect()/TLS handshake, and the exchange of the daemon greeting all happen
+ * before any buffered I/O begins, so --contimeout can time the whole phase the
+ * same way the socket path times its connect(). */
+static time_t client_connect_deadline;
+
 static int write_batch_monitor_in = -1;
 static int write_batch_monitor_out = -1;
 
@@ -146,17 +153,28 @@ static int handshake_poll_timeout_ms(void)
 	time_t now, left;
 	int timeout = poll_timeout_ms();
 
-	if (!daemon_handshake_deadline)
+	if (!daemon_handshake_deadline && !client_connect_deadline)
 		return timeout;
 
 	now = time(NULL);
-	left = daemon_handshake_deadline - now;
-	if (left <= 0) {
-		rprintf(FERROR, "[%s] daemon handshake timeout -- exiting\n", who_am_i());
-		exit_cleanup(RERR_TIMEOUT);
+	if (daemon_handshake_deadline) {
+		left = daemon_handshake_deadline - now;
+		if (left <= 0) {
+			rprintf(FERROR, "[%s] daemon handshake timeout -- exiting\n", who_am_i());
+			exit_cleanup(RERR_TIMEOUT);
+		}
+		if (left <= INT_MAX / 1000 && left * 1000 < timeout)
+			timeout = (int)left * 1000;
 	}
-	if (left <= INT_MAX / 1000 && left * 1000 < timeout)
-		timeout = (int)left * 1000;
+	if (client_connect_deadline) {
+		left = client_connect_deadline - now;
+		if (left <= 0) {
+			rprintf(FERROR, "[%s] connection timed out -- exiting\n", who_am_i());
+			exit_cleanup(RERR_CONTIMEOUT);
+		}
+		if (left <= INT_MAX / 1000 && left * 1000 < timeout)
+			timeout = (int)left * 1000;
+	}
 	return timeout;
 }
 
@@ -328,14 +346,14 @@ static size_t safe_read(int fd, char *buf, size_t len)
 			ssize_t n = read(fd, buf + got, len - got);
 			if (DEBUG_GTE(IO, 2)) {
 				rprintf(FINFO, "[%s] safe_read(%d)=%" SIZE_T_FMT_MOD "d\n",
-					who_am_i(), fd, (SIZE_T_FMT_CAST)n);
+					who_am_i(), fd, (SSIZE_T_FMT_CAST)n);
 			}
 			if (n == 0)
 				break;
 			if (n < 0) {
 				if (errno == EINTR)
 					continue;
-				rsyserr(FERROR, errno, "safe_read failed to read %" SIZE_T_FMT_MOD "d bytes",
+				rsyserr(FERROR, errno, "safe_read failed to read %" SIZE_T_FMT_MOD "u bytes",
 					(SIZE_T_FMT_CAST)len);
 				exit_cleanup(RERR_STREAMIO);
 			}
@@ -382,7 +400,7 @@ static void safe_write(int fd, const char *buf, size_t len)
 		if (errno != EINTR && errno != EWOULDBLOCK && errno != EAGAIN) {
 		  write_failed:
 			rsyserr(FERROR, errno,
-				"safe_write failed to write %" SIZE_T_FMT_MOD "d bytes to %s",
+				"safe_write failed to write %" SIZE_T_FMT_MOD "u bytes to %s",
 				(SIZE_T_FMT_CAST)len, what_fd_is(fd));
 			exit_cleanup(RERR_STREAMIO);
 		}
@@ -454,7 +472,7 @@ static void forward_filesfrom_data(void)
 
 	if (DEBUG_GTE(IO, 2)) {
 		rprintf(FINFO, "[%s] files-from read=%" SIZE_T_FMT_MOD "d\n",
-			who_am_i(), (SIZE_T_FMT_CAST)len);
+			who_am_i(), (SSIZE_T_FMT_CAST)len);
 	}
 
 #ifdef ICONV_OPTION
@@ -644,14 +662,14 @@ static char *perform_io(size_t needed, int flags)
 	case PIO_NEED_INPUT:
 		/* We never resize the circular input buffer. */
 		if (iobuf.in.size < needed) {
-			rprintf(FERROR, "need to read %" SIZE_T_FMT_MOD "d bytes,"
-					" iobuf.in.buf is only %" SIZE_T_FMT_MOD "d bytes.\n",
+			rprintf(FERROR, "need to read %" SIZE_T_FMT_MOD "u bytes,"
+					" iobuf.in.buf is only %" SIZE_T_FMT_MOD "u bytes.\n",
 				(SIZE_T_FMT_CAST)needed, (SIZE_T_FMT_CAST)iobuf.in.size);
 			exit_cleanup(RERR_PROTOCOL);
 		}
 
 		if (msgs2stderr == 1 && DEBUG_GTE(IO, 3)) {
-			rprintf(FINFO, "[%s] perform_io(%" SIZE_T_FMT_MOD "d, %sinput)\n",
+			rprintf(FINFO, "[%s] perform_io(%" SIZE_T_FMT_MOD "u, %sinput)\n",
 				who_am_i(), (SIZE_T_FMT_CAST)needed, flags & PIO_CONSUME_INPUT ? "consume&" : "");
 		}
 		break;
@@ -659,15 +677,15 @@ static char *perform_io(size_t needed, int flags)
 	case PIO_NEED_OUTROOM:
 		/* We never resize the circular output buffer. */
 		if (iobuf.out.size - iobuf.out_empty_len < needed) {
-			fprintf(stderr, "need to write %" SIZE_T_FMT_MOD "d bytes,"
-					" iobuf.out.buf is only %" SIZE_T_FMT_MOD "d bytes.\n",
+			fprintf(stderr, "need to write %" SIZE_T_FMT_MOD "u bytes,"
+					" iobuf.out.buf is only %" SIZE_T_FMT_MOD "u bytes.\n",
 				(SIZE_T_FMT_CAST)needed, (SIZE_T_FMT_CAST)(iobuf.out.size - iobuf.out_empty_len));
 			exit_cleanup(RERR_PROTOCOL);
 		}
 
 		if (msgs2stderr == 1 && DEBUG_GTE(IO, 3)) {
-			rprintf(FINFO, "[%s] perform_io(%" SIZE_T_FMT_MOD "d,"
-				       " outroom) needs to flush %" SIZE_T_FMT_MOD "d\n",
+			rprintf(FINFO, "[%s] perform_io(%" SIZE_T_FMT_MOD "u,"
+				       " outroom) needs to flush %" SIZE_T_FMT_MOD "u\n",
 				who_am_i(), (SIZE_T_FMT_CAST)needed,
 				iobuf.out.len + needed > iobuf.out.size
 				? (SIZE_T_FMT_CAST)(iobuf.out.len + needed - iobuf.out.size) : (SIZE_T_FMT_CAST)0);
@@ -677,15 +695,15 @@ static char *perform_io(size_t needed, int flags)
 	case PIO_NEED_MSGROOM:
 		/* We never resize the circular message buffer. */
 		if (iobuf.msg.size < needed) {
-			fprintf(stderr, "need to write %" SIZE_T_FMT_MOD "d bytes,"
-					" iobuf.msg.buf is only %" SIZE_T_FMT_MOD "d bytes.\n",
+			fprintf(stderr, "need to write %" SIZE_T_FMT_MOD "u bytes,"
+					" iobuf.msg.buf is only %" SIZE_T_FMT_MOD "u bytes.\n",
 				(SIZE_T_FMT_CAST)needed, (SIZE_T_FMT_CAST)iobuf.msg.size);
 			exit_cleanup(RERR_PROTOCOL);
 		}
 
 		if (msgs2stderr == 1 && DEBUG_GTE(IO, 3)) {
-			rprintf(FINFO, "[%s] perform_io(%" SIZE_T_FMT_MOD "d,"
-				       " msgroom) needs to flush %" SIZE_T_FMT_MOD "d\n",
+			rprintf(FINFO, "[%s] perform_io(%" SIZE_T_FMT_MOD "u,"
+				       " msgroom) needs to flush %" SIZE_T_FMT_MOD "u\n",
 				who_am_i(), (SIZE_T_FMT_CAST)needed,
 				iobuf.msg.len + needed > iobuf.msg.size
 				? (SIZE_T_FMT_CAST)(iobuf.msg.len + needed - iobuf.msg.size) : (SIZE_T_FMT_CAST)0);
@@ -694,7 +712,7 @@ static char *perform_io(size_t needed, int flags)
 
 	case 0:
 		if (msgs2stderr == 1 && DEBUG_GTE(IO, 3)) {
-			rprintf(FINFO, "[%s] perform_io(%" SIZE_T_FMT_MOD "d, %d)\n",
+			rprintf(FINFO, "[%s] perform_io(%" SIZE_T_FMT_MOD "u, %d)\n",
 				who_am_i(), (SIZE_T_FMT_CAST)needed, flags);
 		}
 		break;
@@ -758,7 +776,7 @@ static char *perform_io(size_t needed, int flags)
 					      ((MPLEX_BASE + (int)MSG_DATA)<<24) + iobuf.out.len - 4);
 
 					if (msgs2stderr == 1 && DEBUG_GTE(IO, 1)) {
-						rprintf(FINFO, "[%s] send_msg(%d, %" SIZE_T_FMT_MOD "d)\n",
+						rprintf(FINFO, "[%s] send_msg(%d, %" SIZE_T_FMT_MOD "u)\n",
 							who_am_i(), (int)MSG_DATA, (SIZE_T_FMT_CAST)iobuf.out.len - 4);
 					}
 
@@ -909,7 +927,7 @@ static char *perform_io(size_t needed, int flags)
 			}
 			if (msgs2stderr == 1 && DEBUG_GTE(IO, 2)) {
 				rprintf(FINFO, "[%s] recv=%" SIZE_T_FMT_MOD "d\n",
-					who_am_i(), (SIZE_T_FMT_CAST)n);
+					who_am_i(), (SSIZE_T_FMT_CAST)n);
 			}
 
 			if (io_timeout) {
@@ -951,7 +969,7 @@ static char *perform_io(size_t needed, int flags)
 			}
 			if (msgs2stderr == 1 && DEBUG_GTE(IO, 2)) {
 				rprintf(FINFO, "[%s] %s sent=%" SIZE_T_FMT_MOD "d\n",
-					who_am_i(), out == &iobuf.out ? "out" : "msg", (SIZE_T_FMT_CAST)n);
+					who_am_i(), out == &iobuf.out ? "out" : "msg", (SSIZE_T_FMT_CAST)n);
 			}
 
 			if (io_timeout)
@@ -1069,15 +1087,20 @@ void noop_io_until_death(void)
 /* Buffer a message for the multiplexed output stream.  Is not used for (normal) MSG_DATA. */
 int send_msg(enum msgcode code, const char *buf, size_t len, int convert)
 {
+	static int growing_msg_buffer;
 	char *hdr;
 	size_t needed, pos;
 	BOOL want_debug = DEBUG_GTE(IO, 1) && convert >= 0 && (msgs2stderr == 1 || code != MSG_INFO);
 
 	if (!OUT_MULTIPLEXED)
 		return 0;
+	/* A fatal realloc_xbuf() failure is reported via rprintf(), which would
+	 * otherwise call send_msg() again and try to grow the same full buffer. */
+	if (growing_msg_buffer)
+		return 0;
 
 	if (want_debug) {
-		rprintf(FINFO, "[%s] send_msg(%d, %" SIZE_T_FMT_MOD "d)\n",
+		rprintf(FINFO, "[%s] send_msg(%d, %" SIZE_T_FMT_MOD "u)\n",
 			who_am_i(), (int)code, (SIZE_T_FMT_CAST)len);
 	}
 
@@ -1100,7 +1123,9 @@ int send_msg(enum msgcode code, const char *buf, size_t len, int convert)
 		else { /* We sometimes allow the iobuf.msg size to increase to avoid a deadlock. */
 			size_t old_size = iobuf.msg.size;
 			restore_iobuf_size(&iobuf.msg);
+			growing_msg_buffer = 1;
 			realloc_xbuf(&iobuf.msg, iobuf.msg.size * 2);
+			growing_msg_buffer = 0;
 			if (iobuf.msg.pos + iobuf.msg.len > old_size)
 				memcpy(iobuf.msg.buf + old_size, iobuf.msg.buf, iobuf.msg.pos + iobuf.msg.len - old_size);
 		}
@@ -1155,7 +1180,7 @@ int send_msg(enum msgcode code, const char *buf, size_t len, int convert)
 	SIVAL(hdr, 0, ((MPLEX_BASE + (int)code)<<24) + len);
 
 	if (want_debug && convert > 0) {
-		rprintf(FINFO, "[%s] converted msg len=%" SIZE_T_FMT_MOD "d\n",
+		rprintf(FINFO, "[%s] converted msg len=%" SIZE_T_FMT_MOD "u\n",
 			who_am_i(), (SIZE_T_FMT_CAST)len);
 	}
 
@@ -1301,6 +1326,14 @@ void set_daemon_handshake_timeout(int secs)
 		daemon_handshake_deadline = time(NULL) + secs;
 	else
 		daemon_handshake_deadline = 0;
+}
+
+void set_client_connect_timeout(int secs)
+{
+	if (secs > 0)
+		client_connect_deadline = time(NULL) + secs;
+	else
+		client_connect_deadline = 0;
 }
 
 static void check_for_d_option_error(const char *msg)
@@ -1670,7 +1703,7 @@ static void read_a_msg(void)
 	tag = (tag >> 24) - MPLEX_BASE;
 
 	if (msgs2stderr == 1 && DEBUG_GTE(IO, 1)) {
-		rprintf(FINFO, "[%s] got msg=%d, len=%" SIZE_T_FMT_MOD "d\n",
+		rprintf(FINFO, "[%s] got msg=%d, len=%" SIZE_T_FMT_MOD "u\n",
 			who_am_i(), (int)tag, (SIZE_T_FMT_CAST)msg_bytes);
 	}
 
@@ -1692,6 +1725,18 @@ static void read_a_msg(void)
 		raw_read_buf((char*)&stats.total_read, sizeof stats.total_read);
 		iobuf.in_multiplexed = 1;
 		break;
+	case MSG_BLOCK_STATS: {
+		char b[8];
+
+		if (msg_bytes != 8 || protocol_version < 33 || (!am_generator && !am_sender))
+			goto invalid_msg;
+		raw_read_buf(b, 8);
+		stats.touched_blocks_4k = IVAL64(b, 0);
+		iobuf.in_multiplexed = 1;
+		if (am_server && am_generator)
+			send_msg(MSG_BLOCK_STATS, b, sizeof b, 0);
+		break;
+	}
 	case MSG_REDO:
 		if (msg_bytes != 4 || !am_generator)
 			goto invalid_msg;
@@ -1860,7 +1905,7 @@ static void read_a_msg(void)
 			goto invalid_msg;
 		iobuf.in_multiplexed = 1;
 		if (DEBUG_GTE(EXIT, 3)) {
-			rprintf(FINFO, "[%s] got MSG_ERROR_EXIT with %" SIZE_T_FMT_MOD "d bytes\n",
+			rprintf(FINFO, "[%s] got MSG_ERROR_EXIT with %" SIZE_T_FMT_MOD "u bytes\n",
 					who_am_i(), (SIZE_T_FMT_CAST)msg_bytes);
 		}
 		if (msg_bytes == 0) {
@@ -1985,75 +2030,61 @@ uint32 read_uint(int f)
 
 int32 read_varint(int f)
 {
-	union {
-		char b[5];
-		int32 x;
-	} u;
+	char b[5] = {0};
+	int32 val;
 	uchar ch;
 	int extra;
 
-	u.x = 0;
 	ch = read_byte(f);
 	extra = int_byte_extra[ch / 4];
 	if (extra) {
 		uchar bit = ((uchar)1<<(8-extra));
-		if (extra >= (int)sizeof u.b) {
+		if (extra >= (int)sizeof b) {
 			rprintf(FERROR, "Overflow in read_varint()\n");
 			exit_cleanup(RERR_STREAMIO);
 		}
-		read_buf(f, u.b, extra);
-		u.b[extra] = ch & (bit-1);
+		read_buf(f, b, extra);
+		b[extra] = ch & (bit-1);
 	} else
-		u.b[0] = ch;
-#if CAREFUL_ALIGNMENT
-	u.x = IVAL(u.b,0);
-#endif
+		b[0] = ch;
+	val = IVAL(b, 0);
 #if SIZEOF_INT32 > 4
-	if (u.x & (int32)0x80000000)
-		u.x |= ~(int32)0xffffffff;
+	if (val & (int32)0x80000000)
+		val |= ~(int32)0xffffffff;
 #endif
-	return u.x;
+	return val;
 }
 
 int64 read_varlong(int f, uchar min_bytes)
 {
-	union {
-		char b[9];
-		int64 x;
-	} u;
+	char b[9] = {0};
 	char b2[8];
 	int extra;
 
-#if SIZEOF_INT64 < 8
-	memset(u.b, 0, 8);
-#else
-	u.x = 0;
-#endif
 	read_buf(f, b2, min_bytes);
-	memcpy(u.b, b2+1, min_bytes-1);
+	memcpy(b, b2+1, min_bytes-1);
 	extra = int_byte_extra[CVAL(b2, 0) / 4];
 	if (extra) {
 		uchar bit = ((uchar)1<<(8-extra));
-		if (min_bytes + extra > (int)sizeof u.b) {
+		if (min_bytes + extra > (int)sizeof b) {
 			rprintf(FERROR, "Overflow in read_varlong()\n");
 			exit_cleanup(RERR_STREAMIO);
 		}
-		read_buf(f, u.b + min_bytes - 1, extra);
-		u.b[min_bytes + extra - 1] = CVAL(b2, 0) & (bit-1);
+		read_buf(f, b + min_bytes - 1, extra);
+		b[min_bytes + extra - 1] = CVAL(b2, 0) & (bit-1);
 #if SIZEOF_INT64 < 8
-		if (min_bytes + extra > 5 || u.b[4] || CVAL(u.b,3) & 0x80) {
+		if (min_bytes + extra > 5 || b[4] || CVAL(b,3) & 0x80) {
 			rprintf(FERROR, "Integer overflow: attempted 64-bit offset\n");
 			exit_cleanup(RERR_UNSUPPORTED);
 		}
 #endif
 	} else
-		u.b[min_bytes + extra - 1] = CVAL(b2, 0);
+		b[min_bytes - 1] = CVAL(b2, 0);
 #if SIZEOF_INT64 < 8
-	u.x = IVAL(u.b,0);
-#elif CAREFUL_ALIGNMENT
-	u.x = IVAL64(u.b,0);
+	return IVAL(b, 0);
+#else
+	return IVAL64(b, 0);
 #endif
-	return u.x;
 }
 
 /* Read an int32 and verify lo <= v <= hi. On out-of-range, abort with a
@@ -2408,8 +2439,8 @@ void write_longint(int f, int64 x)
 {
 	char b[12], * const s = b+4;
 
-	SIVAL(s, 0, x);
 	if (x <= 0x7FFFFFFF && x >= 0) {
+		SIVAL(s, 0, x);
 		write_buf(f, s, 4);
 		return;
 	}
@@ -2419,7 +2450,7 @@ void write_longint(int f, int64 x)
 	exit_cleanup(RERR_UNSUPPORTED);
 #else
 	memset(b, 0xFF, 4);
-	SIVAL(s, 4, x >> 32);
+	SIVAL64(s, 0, x);
 	write_buf(f, b, 12);
 #endif
 }

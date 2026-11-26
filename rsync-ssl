@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# This script uses openssl, gnutls, or stunnel to secure an rsync daemon connection.
+# This script uses openssl, gnutls, socat or stunnel to secure an rsync daemon connection.
 
 # By default this script takes rsync args and hands them off to the actual
 # rsync command with an --rsh option that makes it open an SSL connection to an
@@ -31,13 +31,16 @@ function rsync_ssl_run {
 
 function rsync_ssl_helper {
     if [[ -z "$RSYNC_SSL_TYPE" ]]; then
-	found=`path_search openssl stunnel4 stunnel` || exit 1
+	found=$(path_search openssl socat stunnel4 stunnel) || exit 1
 	if [[ "$found" == */openssl ]]; then
 	    RSYNC_SSL_TYPE=openssl
 	    RSYNC_SSL_OPENSSL="$found"
 	elif [[ "$found" == */gnutls-cli ]]; then
 	    RSYNC_SSL_TYPE=gnutls
 	    RSYNC_SSL_GNUTLS="$found"
+	elif [[ "$found" == */socat ]]; then
+	    RSYNC_SSL_TYPE=socat
+	    RSYNC_SSL_SOCAT="$found"
 	else
 	    RSYNC_SSL_TYPE=stunnel
 	    RSYNC_SSL_STUNNEL="$found"
@@ -47,19 +50,25 @@ function rsync_ssl_helper {
     case "$RSYNC_SSL_TYPE" in
 	openssl)
 	    if [[ -z "$RSYNC_SSL_OPENSSL" ]]; then
-		RSYNC_SSL_OPENSSL=`path_search openssl` || exit 1
+		RSYNC_SSL_OPENSSL=$(path_search openssl) || exit 1
 	    fi
 	    optsep=' '
 	    ;;
 	gnutls)
 	    if [[ -z "$RSYNC_SSL_GNUTLS" ]]; then
-		RSYNC_SSL_GNUTLS=`path_search gnutls-cli` || exit 1
+		RSYNC_SSL_GNUTLS=$(path_search gnutls-cli) || exit 1
+	    fi
+	    optsep=' '
+	    ;;
+	socat)
+	    if [[ -z "$RSYNC_SSL_SOCAT" ]]; then
+		RSYNC_SSL_SOCAT=$(path_search socat) || exit 1
 	    fi
 	    optsep=' '
 	    ;;
 	stunnel)
 	    if [[ -z "$RSYNC_SSL_STUNNEL" ]]; then
-		RSYNC_SSL_STUNNEL=`path_search stunnel4 stunnel` || exit 1
+		RSYNC_SSL_STUNNEL=$(path_search stunnel4 stunnel) || exit 1
 	    fi
 	    optsep=' = '
 	    ;;
@@ -69,31 +78,34 @@ function rsync_ssl_helper {
 	    ;;
     esac
 
+    local -a gnutls_opts=(--logfile=/dev/null)
     if [[ -z "$RSYNC_SSL_CERT" ]]; then
 	certopt=""
-	gnutls_cert_opt=""
+	socat_cert_opt=""
     else
 	certopt="-cert$optsep$RSYNC_SSL_CERT"
-	gnutls_cert_opt="--x509certfile=$RSYNC_SSL_CERT"
+	gnutls_opts+=("--x509certfile=$RSYNC_SSL_CERT")
+	socat_cert_opt=",cert=$RSYNC_SSL_CERT"
     fi
 
     if [[ -z "$RSYNC_SSL_KEY" ]]; then
-	keyopt=""
-	gnutls_key_opt=""
+	socat_key_opt=""
     else
-	keyopt="-key$optsep$RSYNC_SSL_KEY"
-	gnutls_key_opt="--x509keyfile=$RSYNC_SSL_KEY"
+	gnutls_opts+=("--x509keyfile=$RSYNC_SSL_KEY")
+	socat_key_opt=",key=$RSYNC_SSL_KEY"
     fi
 
+    local -a openssl_ca_opts
     if [[ -z ${RSYNC_SSL_CA_CERT+x} ]]; then
 	# RSYNC_SSL_CA_CERT unset - default CA set AND verify:
 	# openssl:
-	caopt="-verify_return_error -verify 4"
+	openssl_ca_opts=(-verify_return_error -verify 4)
 	# gnutls:
 	# gnutls-cli has no reliable "use the system trust store AND make
 	# verification fatal" switch across versions, so the gnutls path
 	# refuses below unless RSYNC_SSL_ALLOW_INSECURE_GNUTLS is set.
-	gnutls_opts=""
+	# socat:
+	socat_opts="verify=1"
 	# stunnel:
 	# Since there is no way of using the default CA certificate collection,
 	# we cannot do any verification. Thus, stunnel should really only be
@@ -103,18 +115,22 @@ function rsync_ssl_helper {
     elif [[ "$RSYNC_SSL_CA_CERT" == "" ]]; then
 	# RSYNC_SSL_CA_CERT set but empty -do NO verifications:
 	# openssl:
-	caopt="-verify 1"
+	openssl_ca_opts=(-verify 1)
 	# gnutls:
-	gnutls_opts="--insecure"
+	gnutls_opts+=(--insecure)
+	# socat:
+	socat_opts="verify=0"
 	# stunnel:
 	cafile=""
 	verify="verifyChain = no"
     else
 	# RSYNC_SSL_CA_CERT set - use CA AND verify:
 	# openssl:
-	caopt="-CAfile $RSYNC_SSL_CA_CERT -verify_return_error -verify 4"
+	openssl_ca_opts=(-CAfile "$RSYNC_SSL_CA_CERT" -verify_return_error -verify 4)
 	# gnutls:
-	gnutls_opts="--x509cafile=$RSYNC_SSL_CA_CERT"
+	gnutls_opts+=("--x509cafile=$RSYNC_SSL_CA_CERT")
+	# socat:
+	socat_opts="cafile=$RSYNC_SSL_CA_CERT,verify=1"
 	# stunnel:
 	cafile="CAfile = $RSYNC_SSL_CA_CERT"
 	verify="verifyChain = yes"
@@ -145,17 +161,9 @@ function rsync_ssl_helper {
 	exit 1
     fi
 
-    # Bind the server certificate to the requested host (openssl -verify_hostname,
-    # stunnel checkHost) so a cert that is CA-valid for a *different* name can't be
-    # used to MITM. Set RSYNC_SSL_SKIP_HOSTNAME_CHECK=1 to keep CA chain
-    # verification but skip the identity check (e.g. bare-IP or internal-CA setups).
-    # checkHost only applies while the chain is being verified.
-    openssl_host_opt="-verify_hostname $hostname"
     stunnel_host_opt=""
-    [[ "$verify" == "verifyChain = yes" ]] && stunnel_host_opt="checkHost = $hostname"
-    if [[ "$RSYNC_SSL_SKIP_HOSTNAME_CHECK" == 1 ]]; then
-	openssl_host_opt=""
-	stunnel_host_opt=""
+    if [[ "$verify" == "verifyChain = yes" && "$RSYNC_SSL_SKIP_HOSTNAME_CHECK" != 1 ]]; then
+	stunnel_host_opt="checkHost = $hostname"
     fi
 
     if [[ $RSYNC_SSL_TYPE == gnutls && -z ${RSYNC_SSL_CA_CERT+x} && "$RSYNC_SSL_ALLOW_INSECURE_GNUTLS" != 1 ]]; then
@@ -163,10 +171,18 @@ function rsync_ssl_helper {
 	exit 1
     fi
 
+    if [[ "$hostname" =~ ^[0-9.]+$ || "$hostname" == *:* ]]; then
+	socat_sni_opt=",no-sni=1"
+    else
+	socat_sni_opt=",snihost=$hostname"
+    fi
+
     if [[ $RSYNC_SSL_TYPE == openssl ]]; then
-	exec "$RSYNC_SSL_OPENSSL" s_client $caopt $certopt $keyopt -quiet -verify_quiet -servername $hostname $openssl_host_opt -connect $hostname:$port
+	run_openssl "$hostname" "$port" "${openssl_ca_opts[@]}"
     elif [[ $RSYNC_SSL_TYPE == gnutls ]]; then
-	exec "$RSYNC_SSL_GNUTLS" --logfile=/dev/null $gnutls_cert_opt $gnutls_key_opt $gnutls_opts $hostname:$port
+	exec "$RSYNC_SSL_GNUTLS" "${gnutls_opts[@]}" "--port=$port" "$hostname"
+    elif [[ $RSYNC_SSL_TYPE == socat ]]; then
+	exec "$RSYNC_SSL_SOCAT" - "OPENSSL:$hostname:$port,commonname=$hostname$socat_sni_opt,$socat_opts$socat_cert_opt$socat_key_opt"
     else
 	# devzero@web.de came up with this no-tmpfile calling syntax:
 	exec "$RSYNC_SSL_STUNNEL" -fd 10 11<&0 <<EOF 10<&0 0<&11 11<&-
@@ -183,12 +199,60 @@ EOF
     fi
 }
 
+function run_openssl {
+    local host="$1" port="$2" identity="$1" endpoint="$1:$2"
+    local verify_flag=-verify_hostname
+    shift 2
+    local -a options=("$@")
+
+    if [[ "$host" == *:* ]]; then
+	verify_flag=-verify_ip
+	identity="${host%%%*}"
+	endpoint="[$host]:$port"
+    elif [[ "$host" == *.* && "$host" =~ ^[0-9.]+$ ]]; then
+	validate_ipv4_literal "$host"
+	verify_flag=-verify_ip
+    else
+	options+=(-servername "$host")
+    fi
+
+    if [[ "$RSYNC_SSL_SKIP_HOSTNAME_CHECK" != 1 ]]; then
+	options+=("$verify_flag" "$identity")
+    fi
+    [[ -n "$RSYNC_SSL_CERT" ]] && options+=(-cert "$RSYNC_SSL_CERT")
+    [[ -n "$RSYNC_SSL_KEY" ]] && options+=(-key "$RSYNC_SSL_KEY")
+
+    exec "$RSYNC_SSL_OPENSSL" s_client "${options[@]}" -quiet -verify_quiet -connect "$endpoint"
+}
+
+function validate_ipv4_literal {
+    local octet='(0|[1-9][0-9]{0,2})'
+    local address="^$octet\\.$octet\\.$octet\\.$octet$"
+    local value
+
+    [[ "$1" =~ $address ]] || invalid_ssl_hostname "$1"
+    for value in "${BASH_REMATCH[@]:1}"; do
+	((10#$value <= 255)) || invalid_ssl_hostname "$1"
+    done
+}
+
 function validate_ssl_hostname {
     local host="$1"
-    if [[ -z "$host" || "$host" == -* || "$host" =~ [^A-Za-z0-9._:-] ]]; then
-	echo "invalid rsync-ssl hostname: $host" 1>&2
-	exit 1
+    if [[ "$RSYNC_SSL_TYPE" == openssl && "$host" == *%* ]]; then
+	local scope="${host#*%}"
+	host="${host%%%*}"
+	if [[ "$host" != *:* || ! "$scope" =~ ^[A-Za-z0-9._-]+$ ]]; then
+	    invalid_ssl_hostname "$1"
+	fi
     fi
+    if [[ -z "$host" || "$host" == -* || "$host" =~ [^A-Za-z0-9._:-] ]]; then
+	invalid_ssl_hostname "$1"
+    fi
+}
+
+function invalid_ssl_hostname {
+    printf 'invalid rsync-ssl hostname: %s\n' "$1" >&2
+    exit 1
 }
 
 function path_search {
@@ -213,7 +277,7 @@ function path_search {
 
 if [[ "$#" == 0 ]]; then
     echo "Usage: rsync-ssl [--type=SSL_TYPE] RSYNC_ARG [...]" 1>&2
-    echo "The SSL_TYPE can be openssl or stunnel"
+    echo "The SSL_TYPE can be openssl, socat or stunnel"
     exit 1
 fi
 

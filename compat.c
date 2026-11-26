@@ -33,9 +33,13 @@ extern int allow_inc_recurse;
 extern int preallocate_files;
 extern int append_mode;
 extern int fuzzy_basis;
+extern int relative_paths;
+extern int implied_dirs;
+extern int ignore_non_existing_dirs;
 extern int read_batch;
 extern int write_batch;
 extern int delay_updates;
+extern int delay_symlinks;
 extern int checksum_seed;
 extern int basis_dir_cnt;
 extern int prune_empty_dirs;
@@ -75,6 +79,7 @@ extern struct name_num_item *xfer_sum_nni;
 
 int remote_protocol = 0;
 int file_extra_cnt = 0; /* count of file-list extras that everyone gets */
+int ltfs_ndx;
 int inc_recurse = 0;
 int compat_flags = 0;
 int use_safe_inc_flist = 0;
@@ -88,7 +93,7 @@ struct name_num_item *xattr_sum_nni;
 int xattr_sum_len = 0;
 
 /* These index values are for the file-list's extra-attribute array. */
-int pathname_ndx, depth_ndx, atimes_ndx, crtimes_ndx, startblock_ndx, uid_ndx, gid_ndx, acls_ndx, xattrs_ndx, unsort_ndx;
+int pathname_ndx, depth_ndx, atimes_ndx, crtimes_ndx, uid_ndx, gid_ndx, acls_ndx, xattrs_ndx, unsort_ndx;
 
 int receiver_symlink_times = 0; /* receiver can set the time on a symlink */
 int sender_symlink_iconv = 0;	/* sender should convert symlink content */
@@ -174,7 +179,7 @@ void set_allow_inc_recurse(void)
 		allow_inc_recurse = 0;
 	else if (!am_sender
 	 && (delete_before || delete_after
-	  || delay_updates || prune_empty_dirs))
+	  || delay_updates || delay_symlinks || prune_empty_dirs))
 		allow_inc_recurse = 0;
 	else if (am_server && strchr(client_info, 'i') == NULL)
 		allow_inc_recurse = 0;
@@ -185,7 +190,7 @@ void parse_compress_choice(int final_call)
 	if (valid_compressions.negotiated_nni)
 		do_compression = valid_compressions.negotiated_nni->num;
 	else if (compress_choice) {
-		struct name_num_item *nni = get_nni_by_name(&valid_compressions, compress_choice, -1);
+		struct name_num_item const * const nni = get_nni_by_name(&valid_compressions, compress_choice, -1);
 		if (!nni) {
 			rprintf(FERROR, "unknown compress name: %s\n", compress_choice);
 			exit_cleanup(RERR_UNSUPPORTED);
@@ -231,7 +236,7 @@ struct name_num_item *get_nni_by_name(struct name_num_obj *nno, const char *name
 	for (nni = nno->list; nni->name; nni++) {
 		if (nni->num == CSUM_gone)
 			continue;
-		if (strncasecmp(name, nni->name, len) == 0 && nni->name[len] == '\0')
+		if (ascii_strncasecmp(name, nni->name, len) == 0 && nni->name[len] == '\0')
 			return nni;
 	}
 
@@ -293,7 +298,7 @@ static int parse_nni_str(struct name_num_obj *nno, const char *from, char *tobuf
 			ch = '\0';
 		if (!ch || at_space) {
 			if (tok) {
-				struct name_num_item *nni = get_nni_by_name(nno, tok, to - tok);
+				struct name_num_item const * const nni = get_nni_by_name(nno, tok, to - tok);
 				if (nni && !nno->saw[nni->num]) {
 					nno->saw[nni->num] = ++cnt;
 					if (nni->main_nni) {
@@ -459,7 +464,8 @@ void validate_choice_vs_env(int ntype, int num1, int num2)
  * for the order of the args in the array.  If dup_markup == '\0', duplicates
  * are removed otherwise the char is prefixed to the duplicate term and, if it
  * is an opening paren/bracket/brace, the matching closing char is suffixed.
- * "none" is removed on the client side unless dup_markup != '\0'. */
+ * "none" is removed on the client side unless dup_markup != '\0'.
+ * Negotiation lists omit explicit-only choices. Display lists keep them. */
 int get_default_nno_list(struct name_num_obj *nno, char *to_buf, int to_buf_len, char dup_markup)
 {
 	struct name_num_item *nni;
@@ -476,7 +482,7 @@ int get_default_nno_list(struct name_num_obj *nno, char *to_buf, int to_buf_len,
 	init_nno_saw(nno, 0);
 
 	for (nni = nno->list, len = 0; nni->name; nni++) {
-		if (nni->num == CSUM_gone)
+		if (nni->num == CSUM_gone || (!dup_markup && (nni->flags & NNI_EXPLICIT_ONLY)))
 			continue;
 		if (nni->main_nni) {
 			if (!dup_markup || nni->main_nni->num == CSUM_gone)
@@ -585,8 +591,8 @@ void setup_protocol(int f_out,int f_in)
 		atimes_ndx = (file_extra_cnt += EXTRA64_CNT);
 	if (preserve_crtimes)
 		crtimes_ndx = (file_extra_cnt += EXTRA64_CNT);
-	if (ltfs_mode)
-		startblock_ndx = (file_extra_cnt += EXTRA64_CNT);
+	if (ltfs_mode && local_server)
+		ltfs_ndx = (file_extra_cnt += EXTRA64_CNT);
 	if (am_sender) /* This is most likely in the file_extras64 union as well. */
 		pathname_ndx = (file_extra_cnt += PTR_EXTRA_CNT);
 	else
@@ -665,6 +671,14 @@ void setup_protocol(int f_out,int f_in)
 #endif
 
 	if (protocol_version < 30) {
+		/* Older senders omit implied parents instead of marking them. */
+		if (ignore_non_existing_dirs && relative_paths && !implied_dirs) {
+			rprintf(FERROR,
+				"--ignore-non-existing-directory with --relative --no-implied-dirs"
+				" requires protocol 30 or higher (negotiated %d).\n",
+				protocol_version);
+			exit_cleanup(RERR_PROTOCOL);
+		}
 		if (append_mode == 1)
 			append_mode = 2;
 		if (preserve_acls && !local_server) {
@@ -722,6 +736,14 @@ void setup_protocol(int f_out,int f_in)
 				protocol_version);
 			exit_cleanup(RERR_PROTOCOL);
 		}
+
+		if (delay_symlinks) {
+			rprintf(FERROR,
+				"--delay-symlinks requires protocol 29 or higher"
+				" (negotiated %d).\n",
+				protocol_version);
+			exit_cleanup(RERR_PROTOCOL);
+		}
 	} else if (protocol_version >= 30) {
 		if (am_server) {
 			compat_flags = allow_inc_recurse ? CF_INC_RECURSE : 0;
@@ -757,11 +779,11 @@ void setup_protocol(int f_out,int f_in)
 				do_negotiated_strings = 1;
 		}
 		/* The inc_recurse var MUST be set to 0 or 1. */
-		inc_recurse = compat_flags & CF_INC_RECURSE ? 1 : 0;
+		inc_recurse = (compat_flags & CF_INC_RECURSE) ? 1 : 0;
 		want_xattr_optim = protocol_version >= 31 && !(compat_flags & CF_AVOID_XATTR_OPTIM);
-		proper_seed_order = compat_flags & CF_CHKSUM_SEED_FIX ? 1 : 0;
-		xfer_flags_as_varint = compat_flags & CF_VARINT_FLIST_FLAGS ? 1 : 0;
-		xmit_id0_names = compat_flags & CF_ID0_NAMES ? 1 : 0;
+		proper_seed_order = (compat_flags & CF_CHKSUM_SEED_FIX) ? 1 : 0;
+		xfer_flags_as_varint = (compat_flags & CF_VARINT_FLIST_FLAGS) ? 1 : 0;
+		xmit_id0_names = (compat_flags & CF_ID0_NAMES) ? 1 : 0;
 		if (!xfer_flags_as_varint && preserve_crtimes) {
 			fprintf(stderr, "Both rsync versions must be at least 3.2.0 for --crtimes.\n");
 			exit_cleanup(RERR_PROTOCOL);

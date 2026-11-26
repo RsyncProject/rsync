@@ -40,8 +40,10 @@ extern int protocol_version;
 extern int relative_paths;
 extern int preserve_hard_links;
 extern int preserve_perms;
+extern int preserve_acls;
 extern int write_devices;
 extern int preserve_xattrs;
+extern int crtimes_ndx;
 extern int do_fsync;
 extern int basis_dir_cnt;
 extern int make_backups;
@@ -73,6 +75,7 @@ extern struct name_num_item *xfer_sum_nni;
 extern int xfer_sum_len;
 extern int use_secure_symlinks;
 extern int operator_path_resolve;
+extern char *backup_dir;
 
 static struct bitbag *delayed_bits = NULL;
 static int phase = 0, redoing = 0;
@@ -124,10 +127,16 @@ static int secure_basis_open(const char *basedir, const char *relpath, int flags
 	 * and traverse a symlink the secure_relative_open path can't confine: resolve
 	 * it with the ownership walk, which follows a uid0/euid-owned symlink but
 	 * refuses a foreign one AND (via abspath_excluded_by_module) refuses a target
-	 * the module's exclude hides -- closing the partial-dir exclude bypass. */
+	 * the module's exclude hides -- closing the partial-dir exclude bypass.  The
+	 * final component is opened with O_NOFOLLOW so an operator-path leaf symlink
+	 * cannot be selected as an alternate basis. */
+#if defined AT_FDCWD && defined O_NOFOLLOW && defined O_DIRECTORY
 	if (operator_path_resolve) {
 		char fullpath[MAXPATHLEN];
 		const char *p = relpath;
+		const char *leaf;
+		int dfd, fd, saved_errno;
+		int owned = 1;
 		if (basedir) {
 			if (pathjoin(fullpath, sizeof fullpath, basedir, relpath) >= sizeof fullpath) {
 				errno = ENAMETOOLONG;
@@ -135,8 +144,26 @@ static int secure_basis_open(const char *basedir, const char *relpath, int flags
 			}
 			p = fullpath;
 		}
-		return open_no_attacker_symlinks(p, flags, mode);
+#ifndef __CYGWIN__
+		/* A single absolute alt-dest uses the ordinary ownership walk.
+		 * Partial, writable and daemon paths keep an uncached walk. */
+		if (basedir && basedir == basis_dir[0] && *basedir == '/'
+		 && basis_dir_cnt == 1 && !am_daemon && am_root >= 0
+		 && flags == O_RDONLY && !preserve_acls && !preserve_xattrs && !crtimes_ndx)
+			dfd = cached_basis_parent_fd(basedir, p, &leaf, &owned);
+		else
+#endif
+			dfd = owner_walk_parent(p, &leaf);
+		if (dfd < 0)
+			return -1;
+		fd = do_open_atfd(dfd, leaf, flags, mode);
+		saved_errno = fd < 0 ? errno : 0;
+		if (owned)
+			close(dfd);
+		errno = saved_errno;
+		return fd;
 	}
+#endif
 
 	/* The confined resolver is needed for the sanitizing daemon
 	 * (am_daemon && !am_chrooted) and for a /./ inner-module chroot
@@ -381,7 +408,7 @@ int get_tmpname(char *fnametmp, const char *fname, BOOL make_unique)
 		 * link, or symlink to fail to be created.  Also: avoid
 		 * using mktemp() due to gcc's annoying warning. */
 		while (1) {
-			snprintf(suf, TMPNAME_SUFFIX_LEN+1, ".%d", counter);
+			snprintf(suf, TMPNAME_SUFFIX_LEN+1, ".%u", counter);
 			if (access(fnametmp, 0) < 0)
 				break;
 			if (++counter >= counter_limit)
@@ -406,7 +433,7 @@ int open_tmpfile(char *fnametmp, const char *fname, struct file_struct *file)
 		return -1;
 
 	if (am_root < 0) {
-		/* For --fake-super, the file must be useable by the copying
+		/* For --fake-super, the file must be usable by the copying
 		 * user, just like it would be for root. */
 		added_perms = S_IRUSR|S_IWUSR;
 	} else {
@@ -471,6 +498,9 @@ static int receive_data(int f_in, char *fname_r, int fd_r, OFF_T size_r,
 	char *data;
 	int32 i;
 	char *map = NULL;
+
+	/* Reset the block tracker's per-file state in case the OS reuses an fd. */
+	reset_block_tracker();
 
 #ifdef SUPPORT_PREALLOCATION
 	if (preallocate_files && fd != -1 && total_size > 0 && (!inplace_sizing || total_size > size_r)) {
@@ -814,6 +844,8 @@ int recv_files(int f_in, int f_out, char *local_name)
 	int ndx, recv_ok, one_inplace, write_to_device;
 	mode_t write_devices_saved_mode = 0;
 
+	reset_basis_parent_cache();
+
 	if (DEBUG_GTE(RECV, 1))
 		rprintf(FINFO, "recv_files(%d) starting\n", cur_flist->used);
 
@@ -1064,7 +1096,13 @@ int recv_files(int f_in, int f_out, char *local_name)
 		 * trusted absolute fnamecmp (e.g. an absolute --partial-dir basis). */
 		{
 			int bdfd;
-			if (fnamecmp_type == FNAMECMP_PARTIAL_DIR
+			BOOL backup_basis = fnamecmp_type == FNAMECMP_BACKUP && inplace && make_backups > 0;
+
+			if (backup_basis && !begin_backup_read())
+				fd1 = -1;
+			else if (backup_basis && backup_dir)
+				fd1 = open_backup_basis(fnamecmp);
+			else if (fnamecmp_type == FNAMECMP_PARTIAL_DIR
 			 && fnamecmp && *fnamecmp != '/') {
 				/* The relative partial path contains peer-derived directory
 				 * components.  It is not an operator-trusted path as a whole. */
@@ -1088,6 +1126,10 @@ int recv_files(int f_in, int f_out, char *local_name)
 					operator_path_resolve = 1;
 				fd1 = secure_basis_open(basedir, fnamecmp, O_RDONLY, 0);
 				operator_path_resolve = 0;
+			}
+			if (backup_basis && !end_backup_access() && fd1 >= 0) {
+				close(fd1);
+				fd1 = -1;
 			}
 		}
 		if (fnamecmp_type == FNAMECMP_PARTIAL_DIR && fd1 == -1) {
@@ -1134,7 +1176,8 @@ int recv_files(int f_in, int f_out, char *local_name)
 
 		/* A peer's basis selector cannot enable direct output through a path
 		 * that the confined basis open did not validate. */
-		one_inplace = inplace_partial && fnamecmp_type == FNAMECMP_PARTIAL_DIR
+		one_inplace = inplace_partial && partial_dir
+			   && fnamecmp_type == FNAMECMP_PARTIAL_DIR
 			   && fd1 != -1;
 		updating_basis_or_equiv = one_inplace
 		    || (inplace && (fnamecmp == fname || fnamecmp_type == FNAMECMP_BACKUP));
@@ -1373,8 +1416,11 @@ int recv_files(int f_in, int f_out, char *local_name)
 	if (phase == 2 && delay_updates) /* for protocol_version < 29 */
 		handle_delayed_updates(local_name);
 
+	finish_progress();
+
 	if (DEBUG_GTE(RECV, 1))
 		rprintf(FINFO,"recv_files finished\n");
 
+	reset_basis_parent_cache();
 	return 0;
 }

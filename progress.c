@@ -24,8 +24,10 @@
 #include "inums.h"
 
 extern int am_server;
+extern int ltfs_ndx;
 extern int flist_eof;
 extern int quiet;
+extern int human_readable;
 extern int need_unsorted_flist;
 extern int output_needs_newline;
 extern int stdout_format_has_i;
@@ -65,22 +67,25 @@ static unsigned long msdiff(struct timeval *t1, struct timeval *t2)
  * @param is_last True if this is the last time progress will be
  * printed for this file, so we should output a newline.  (Not
  * necessarily the same as all bytes being received.)
+ * @param transfer_done True only for the final whole-transfer summary.
  **/
-static void rprint_progress(OFF_T ofs, OFF_T size, struct timeval *now, int is_last)
+static void rprint_progress(OFF_T ofs, OFF_T size, struct timeval *now,
+			    int is_last, int transfer_done)
 {
 	char rembuf[64], eol[128];
-	const char *units;
+	const char *rate_str;
 	unsigned long diff;
 	double rate, remain;
-	int pct;
+	int pct, rate_human_level;
+	BOOL overall = INFO_GTE(PROGRESS, 2);
 
 	if (is_last) {
 		int len = snprintf(eol, sizeof eol,
 			" (xfr#%d, %s-chk=%d/%d)\n",
-			stats.xferred_files, flist_eof ? "to" : "ir",
-			stats.num_files - current_file_index - 1,
+			stats.xferred_files, transfer_done || flist_eof ? "to" : "ir",
+			transfer_done ? 0 : stats.num_files - current_file_index - 1,
 			stats.num_files);
-		if (INFO_GTE(PROGRESS, 2)) {
+		if (overall) {
 			static int last_len = 0;
 			/* Drop \n and pad with spaces if line got shorter. */
 			if (last_len < --len)
@@ -88,32 +93,23 @@ static void rprint_progress(OFF_T ofs, OFF_T size, struct timeval *now, int is_l
 			eol[last_len] = '\0';
 			while (last_len > len)
 				eol[--last_len] = ' ';
-			is_last = 0;
 		}
 		/* Compute stats based on the starting info. */
 		if (!ph_start.time.tv_sec || !(diff = msdiff(&ph_start.time, now)))
 			diff = 1;
-		rate = (double) (ofs - ph_start.ofs) * 1000.0 / diff / 1024.0;
-		/* Switch to total time taken for our last update. */
-		remain = (double) diff / 1000.0;
+		rate = (double) (ofs - ph_start.ofs) * 1000.0 / diff;
 	} else {
 		strlcpy(eol, "  ", sizeof eol);
 		/* Compute stats based on recent progress. */
 		if (!(diff = msdiff(&ph_list[oldest_hpos].time, now)))
 			diff = 1;
-		rate = (double) (ofs - ph_list[oldest_hpos].ofs) * 1000.0 / diff / 1024.0;
-		remain = rate ? (double) (size - ofs) / rate / 1000.0 : 0.0;
+		rate = (double) (ofs - ph_list[oldest_hpos].ofs) * 1000.0 / diff;
 	}
 
-	if (rate > 1024*1024) {
-		rate /= 1024.0 * 1024.0;
-		units = "GB/s";
-	} else if (rate > 1024) {
-		rate /= 1024.0;
-		units = "MB/s";
-	} else {
-		units = "kB/s";
-	}
+	if (transfer_done || (is_last && !overall))
+		remain = (double) diff / 1000.0;
+	else
+		remain = rate ? (double) (size - ofs) / rate : 0.0;
 
 	if (remain < 0 || remain > 9999.0 * 3600.0)
 		strlcpy(rembuf, "  ??:??:??", sizeof rembuf);
@@ -126,9 +122,14 @@ static void rprint_progress(OFF_T ofs, OFF_T size, struct timeval *now, int is_l
 
 	output_needs_newline = 0;
 	pct = ofs == size ? 100 : (int) (100.0 * ofs / size);
-	rprintf(FCLIENT, "\r%15s %3d%% %7.2f%s %s%s",
-		human_num(ofs), pct, rate, units, rembuf, eol);
-	if (!is_last && !quiet) {
+	/* Keep progress rates scaled while byte counts retain the level-1 default. */
+	rate_human_level = human_readable == 1 ? 2 : human_readable;
+	rate_str = rate >= (double)INT64_MAX ? ">MAX "
+		: do_big_num((int64)rate, rate_human_level, NULL);
+	rput_progress();
+	rprintf(FCLIENT, "%15sB %3d%% %7sB/s %s%s", human_num(ofs), pct,
+		rate_str, rembuf, eol);
+	if ((!is_last || overall) && !quiet) {
 		output_needs_newline = 1;
 		rflush(FCLIENT);
 	}
@@ -158,6 +159,10 @@ void set_current_file_index(struct file_struct *file, int ndx)
 void instant_progress(const char *fname)
 {
 	/* We only get here if want_progress_now is True */
+	if (ltfs_ndx) {
+		want_progress_now = False;
+		return;
+	}
 	if (!stdout_format_has_i && !INFO_GTE(NAME, 1))
 		rprintf(FINFO, "%s\n", fname);
 	end_progress(0);
@@ -171,12 +176,23 @@ void end_progress(OFF_T size)
 		gettimeofday(&now, NULL);
 		if (INFO_GTE(PROGRESS, 2) || want_progress_now) {
 			rprint_progress(stats.total_transferred_size,
-					stats.total_size, &now, True);
+					stats.total_size, &now, True, False);
 		} else {
-			rprint_progress(size, size, &now, True);
+			rprint_progress(size, size, &now, True, False);
 			memset(&ph_start, 0, sizeof ph_start);
 		}
 	}
+}
+
+void finish_progress(void)
+{
+	struct timeval now;
+
+	if (am_server || !INFO_GTE(PROGRESS, 2))
+		return;
+
+	gettimeofday(&now, NULL);
+	rprint_progress(stats.total_transferred_size, stats.total_size, &now, True, True);
 }
 
 void show_progress(OFF_T ofs, OFF_T size)
@@ -237,5 +253,5 @@ void show_progress(OFF_T ofs, OFF_T size)
 		return;
 #endif
 
-	rprint_progress(ofs, size, &now, False);
+	rprint_progress(ofs, size, &now, False, False);
 }

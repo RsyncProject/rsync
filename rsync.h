@@ -93,6 +93,7 @@
 #define FLAG_TIME_FAILED (1<<11)/* generator */
 #define FLAG_MOD_NSEC (1<<12)	/* sender/receiver/generator */
 #define FLAG_GOT_DIR_FLIST (1<<13)/* sender/receiver/generator - dir_flist only */
+#define FLAG_HLINK_WAIT (1<<14) /* generator (w/FLAG_HLINKED): counted in in_progress, pending hard-link processing */
 
 /* These flags are passed to functions but not stored. */
 
@@ -111,7 +112,7 @@
 
 /* Update this if you make incompatible changes and ALSO update the
  * SUBPROTOCOL_VERSION if it is not a final (official) release. */
-#define PROTOCOL_VERSION 32
+#define PROTOCOL_VERSION 33
 
 /* This is used when working on a new protocol version or for any unofficial
  * protocol tweaks.  It should be a non-zero value for each pre-release repo
@@ -224,6 +225,7 @@
 #define ATTRS_ACCURATE_TIME	(1<<2)
 #define ATTRS_SKIP_ATIME	(1<<3)
 #define ATTRS_SKIP_CRTIME	(1<<5)
+#define ATTRS_REQUIRE_SUCCESS	(1<<6)
 
 #define MSG_FLUSH	2
 #define FULL_FLUSH	1
@@ -299,6 +301,7 @@ enum msgcode {
 	MSG_LOG=FLOG, MSG_CLIENT=FCLIENT, /* sibling logging */
 	MSG_REDO=9,	/* reprocess indicated flist index */
 	MSG_STATS=10,	/* message has stats data for generator */
+	MSG_BLOCK_STATS=11,/* message has block-level stats for sender */
 	MSG_IO_ERROR=22,/* the sending side had an I/O error */
 	MSG_IO_TIMEOUT=33,/* tell client about a daemon's timeout value */
 	MSG_NOOP=42,	/* a do-nothing message (legacy protocol-30 only) */
@@ -408,6 +411,21 @@ enum delret {
 #ifdef HAVE_SYS_FCNTL_H
 #include <sys/fcntl.h>
 #endif
+#endif
+
+/* O_CLOEXEC is absent on some still-supported targets.  Defining it to zero
+ * preserves the open flags there; the test macro exercises that fallback on
+ * build hosts that provide O_CLOEXEC. */
+#ifdef RSYNC_TEST_NO_O_CLOEXEC
+#undef O_CLOEXEC
+#endif
+#ifndef O_CLOEXEC
+#define O_CLOEXEC 0
+#endif
+
+/* Exercise the O_DIRECTORY portability path on build hosts that provide it. */
+#ifdef RSYNC_TEST_NO_O_DIRECTORY
+#undef O_DIRECTORY
 #endif
 
 #ifdef HAVE_SYS_IOCTL_H
@@ -628,8 +646,6 @@ typedef unsigned int size_t;
 #define SUPPORT_CRTIMES 1
 #endif
 
-/* SUPPORT_LTFS is defined by configure (requires SUPPORT_XATTRS). */
-
 /* Find a variable that is either exactly 32-bits or longer.
  * If some code depends on 32-bit truncation, it will need to
  * take special action in a "#if SIZEOF_INT32 > 4" section. */
@@ -820,11 +836,13 @@ struct ht_int64_node {
 
 #if defined __STDC_VERSION__ && __STDC_VERSION__ >= 199901L
 #define USE_FLEXIBLE_ARRAY 1
-#define SIZE_T_FMT_MOD "z" /* printf supports %zd */
+#define SIZE_T_FMT_MOD "z" /* printf has a size_t length modifier */
 #define SIZE_T_FMT_CAST size_t
+#define SSIZE_T_FMT_CAST ssize_t
 #else
-#define SIZE_T_FMT_MOD "l" /* printf supports %ld */
-#define SIZE_T_FMT_CAST long
+#define SIZE_T_FMT_MOD "l"
+#define SIZE_T_FMT_CAST unsigned long
+#define SSIZE_T_FMT_CAST long
 #endif
 
 union file_extras {
@@ -859,7 +877,6 @@ extern int file_extra_cnt;
 extern int inc_recurse;
 extern int atimes_ndx;
 extern int crtimes_ndx;
-extern int startblock_ndx;
 extern int pathname_ndx;
 extern int depth_ndx;
 extern int uid_ndx;
@@ -924,7 +941,13 @@ extern int file_sum_extra_cnt;
 #define F_NDX(f) REQ_EXTRA(f, unsort_ndx)->num
 #define F_ATIME(f) REQ_EXTRA64(f, atimes_ndx)->num
 #define F_CRTIME(f) REQ_EXTRA64(f, crtimes_ndx)->num
-#define F_STARTBLOCK(f) REQ_EXTRA64(f, startblock_ndx)->num
+#define F_LTFS_KEY(f) REQ_EXTRA64(f, ltfs_ndx)->num
+
+#if defined __linux__ && defined HAVE_LINUX_XATTRS && defined SUPPORT_XATTRS \
+ && defined HAVE_FDOPENDIR && defined HAVE_DIRFD && defined AT_FDCWD \
+ && defined O_NOFOLLOW && defined O_DIRECTORY && SIZEOF_INT64 >= 8
+#define SUPPORT_LTFS_ORDER 1
+#endif
 
 /* These items are per-entry optional: */
 #define F_HL_GNUM(f) OPT_EXTRA(f, START_BUMP(f))->num /* non-dirs */
@@ -1084,6 +1107,7 @@ struct stats {
 	int64 total_read;
 	int64 literal_data;
 	int64 matched_data;
+	int64 touched_blocks_4k;
 	int64 flist_buildtime;
 	int64 flist_xfertime;
 	int64 flist_size;
@@ -1220,6 +1244,11 @@ typedef struct {
 
 #define NSTR_CHECKSUM 0
 #define NSTR_COMPRESS 1
+
+#define NNI_BUILTIN (1<<0)
+#define NNI_EVP (1<<1)
+#define NNI_EVP_OK (1<<2)
+#define NNI_EXPLICIT_ONLY (1<<3)
 
 struct name_num_item {
 	int num, flags;

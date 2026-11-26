@@ -1,6 +1,6 @@
 #!/bin/sh
 
-srcdir=`dirname $0`
+srcdir=$(dirname "$0")
 
 if [ ! -f git-version.h ]; then
     touch git-version.h
@@ -15,18 +15,18 @@ if test -d "$srcdir/.git" || test -f "$srcdir/.git"; then
     # clone.  A release tarball has no .git, so git-version.h stays empty and
     # rsync prints the plain RSYNC_VERSION.
     # cd into the subshell rather than "git -C" (avoids needing a newer git).
-    gitsha=`(cd "$srcdir" && git rev-parse --short=8 HEAD) 2>/dev/null`
+    gitsha=$(cd "$srcdir" && git rev-parse --short=8 HEAD 2>/dev/null)
     # Tolerate any preprocessor spacing and a trailing comment; capture only the
     # quoted value.  Empty (define missing/unmatched) -> leave RSYNC_GITVER unset.
-    rsyncver=`sed -n 's/^[[:space:]]*#[[:space:]]*define[[:space:]][[:space:]]*RSYNC_VERSION[[:space:]][[:space:]]*"\([^"]*\)".*/\1/p' "$srcdir/version.h"`
+    rsyncver=$(sed -n 's/^[[:space:]]*#[[:space:]]*define[[:space:]][[:space:]]*RSYNC_VERSION[[:space:]][[:space:]]*"\([^"]*\)".*/\1/p' "$srcdir/version.h")
     if [ -n "$gitsha" ] && [ -n "$rsyncver" ]; then
-	gitver="$rsyncver-g$gitsha"
-	echo "#define RSYNC_GITVER \"$gitver\"" >git-version.h.new
-	if ! diff git-version.h.new git-version.h >/dev/null; then
-	    echo "Updating git-version.h"
-	    mv git-version.h.new git-version.h
-	else
-	    rm git-version.h.new
-	fi
+        gitver="$rsyncver-g$gitsha"
+        echo "#define RSYNC_GITVER \"$gitver\"" >git-version.h.new
+        if ! diff git-version.h.new git-version.h >/dev/null; then
+            echo "Updating git-version.h"
+            mv git-version.h.new git-version.h
+        else
+            rm git-version.h.new
+        fi
     fi
 fi

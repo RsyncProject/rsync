@@ -877,7 +877,7 @@ void *push_local_filters(const char *dir, unsigned int dirlen)
 
 	push->mergelist_cnt = mergelist_cnt;
 	for (i = 0; i < mergelist_cnt; i++) {
-		filter_rule *ex = mergelist_parents[i];
+		const filter_rule *ex = mergelist_parents[i];
 		if (!ex)
 			continue;
 		memcpy(&push->mergelists[i], ex->u.mergelist, sizeof (filter_rule_list));
@@ -1002,15 +1002,15 @@ void change_local_filter_dir(const char *dname, int dlen, int dir_depth)
 static int rule_matches(const char *fname, filter_rule *ex, int name_flags)
 {
 	int slash_handling, str_cnt = 0, anchored_match = 0;
-	int ret_match = ex->rflags & FILTRULE_NEGATE ? 0 : 1;
+	int ret_match = (ex->rflags & FILTRULE_NEGATE) ? 0 : 1;
 	const char *p, *pattern = ex->pattern;
 	const char *strings[16]; /* more than enough */
 	const char *name = fname + (*fname == '/');
 
-	if (!*name || ex->elide == cur_elide_value)
+	if (!*name || (ex->elide == cur_elide_value))
 		return 0;
 
-	if (!(name_flags & NAME_IS_XATTR) ^ !(ex->rflags & FILTRULE_XATTR))
+	if (!(name_flags & NAME_IS_XATTR) != !(ex->rflags & FILTRULE_XATTR))
 		return 0;
 
 	if (!ex->u.slash_cnt && !(ex->rflags & FILTRULE_WILD2)) {
@@ -1206,7 +1206,7 @@ int check_filter(filter_rule_list *listp, enum logcode code,
 		}
 		if (rule_matches(name, ent, name_flags)) {
 			report_filter_result(code, name, ent, name_flags, listp->debug_type);
-			return ent->rflags & FILTRULE_INCLUDE ? 1 : -1;
+			return (ent->rflags & FILTRULE_INCLUDE) ? 1 : -1;
 		}
 	}
 
@@ -1598,11 +1598,26 @@ void parse_filter_str(filter_rule_list *listp, const char *rulestr,
 	}
 }
 
+static int get_filter_char(FILE *file)
+{
+	int c = getc(file);
+	while (c == EOF && ferror(file) && errno == EINTR) {
+		clearerr(file);
+		/* EINTR leaves the unread byte in place, including on pipes.
+		 * Clang 21's stream model does not recognise this recovery. */
+#ifdef __clang_analyzer__
+		__attribute__((suppress))
+#endif
+		c = getc(file);
+	}
+	return c;
+}
+
 void parse_filter_file(filter_rule_list *listp, const char *fname, const filter_rule *template, int xflags)
 {
 	FILE *fp;
 	char line[BIGPATHBUFLEN];
-	char *eob = line + sizeof line - 1;
+	const char *eob = line + sizeof line - 1;
 	BOOL word_split = (template->rflags & FILTRULE_WORD_SPLIT) != 0;
 	const char *save_src_file, *save_src_named_at;
 	int save_src_line, save_src_in_file;
@@ -1685,8 +1700,11 @@ void parse_filter_file(filter_rule_list *listp, const char *fname, const filter_
 
 		if (fd < 0)
 			fp = NULL;
-		else if (!(fp = fdopen(fd, "rb")))
+		else if (!(fp = fdopen(fd, "rb"))) {
+			int fdopen_errno = errno;
 			close(fd);
+			errno = fdopen_errno;
+		}
 	} else
 		fp = stdin;
 
@@ -1762,11 +1780,7 @@ void parse_filter_file(filter_rule_list *listp, const char *fname, const filter_
 			if (pending != EOF) {   /* a CR lookahead we could not push back */
 				ch = pending;
 				pending = EOF;
-			} else if ((ch = getc(fp)) == EOF) {
-				if (ferror(fp) && errno == EINTR) {
-					clearerr(fp);
-					continue;
-				}
+			} else if ((ch = get_filter_char(fp)) == EOF) {
 				break;
 			}
 			if (word_split && isspace(ch))
@@ -1774,9 +1788,7 @@ void parse_filter_file(filter_rule_list *listp, const char *fname, const filter_
 			if (eol_nulls? !ch : (ch == '\n' || ch == '\r')) {
 				if (ch == '\r') {   /* CRLF is one line, not two */
 					int nxt;
-					while ((nxt = getc(fp)) == EOF
-					    && ferror(fp) && errno == EINTR)
-						clearerr(fp);
+					nxt = get_filter_char(fp);
 					if (nxt == EOF) {
 						if (!ferror(fp))
 							ch = EOF;   /* real end of file */
@@ -1795,6 +1807,14 @@ void parse_filter_file(filter_rule_list *listp, const char *fname, const filter_
 				*s++ = ch;
 			else
 				overflow = 1;
+		}
+		if (ferror(fp)) {
+			if (named_by_file)
+				rprintf(FERROR, "failed to read filter file %s\n", rule_text(template, src_name));
+			else
+				rsyserr(FERROR, errno, "failed to read filter file %s", src_name);
+			fclose(fp);
+			exit_cleanup(RERR_FILEIO);
 		}
 		if (overflow) {
 			rprintf(FERROR, "discarding over-long filter: %s\n",
@@ -1928,7 +1948,7 @@ static void send_rules(int f_out, filter_rule_list *flp)
 		if (f_out < 0)
 			continue;
 		len = strlen(ent->pattern);
-		dlen = ent->rflags & FILTRULE_DIRECTORY ? 1 : 0;
+		dlen = (ent->rflags & FILTRULE_DIRECTORY) ? 1 : 0;
 		if (!(plen + len + dlen))
 			continue;
 		write_int(f_out, plen + len + dlen);

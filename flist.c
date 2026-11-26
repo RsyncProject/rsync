@@ -25,6 +25,9 @@
 #include "rounding.h"
 #include "inums.h"
 #include "io.h"
+#ifdef SUPPORT_LTFS_ORDER
+#include "lib/sysxattrs.h"
+#endif
 
 extern int am_root;
 extern int am_server;
@@ -38,6 +41,7 @@ extern int am_sender;
 extern int am_generator;
 extern int inc_recurse;
 extern int always_checksum;
+extern int remove_source_files;
 extern int module_id;
 extern int ignore_errors;
 extern int numeric_ids;
@@ -46,6 +50,7 @@ extern int recurse;
 extern int use_qsort;
 extern int xfer_dirs;
 extern int filesfrom_fd;
+extern char *files_from;
 extern int one_file_system;
 extern int copy_devices;
 extern int copy_dirlinks;
@@ -62,7 +67,7 @@ extern int missing_args;
 extern int eol_nulls;
 extern int atimes_ndx;
 extern int crtimes_ndx;
-extern int startblock_ndx;
+extern int ltfs_ndx;
 extern int relative_paths;
 extern int implied_dirs;
 extern int ignore_perishable;
@@ -71,6 +76,7 @@ extern int prune_empty_dirs;
 extern int copy_links;
 extern int copy_unsafe_links;
 extern int insecure_links;
+extern int filesfrom_owner_walk_override;
 extern int protocol_version;
 extern int sanitize_paths;
 extern int munge_symlinks;
@@ -186,7 +192,8 @@ static void emit_filelist_progress(int count)
 		return;
 	if (output_needs_newline == 2) /* avoid a newline in the middle of this filelist-progress output */
 		output_needs_newline = 0;
-	rprintf(FCLIENT, " %d files...\r", count);
+	rprintf(FCLIENT, " %s files...", comma_num(count));
+	rput_progress();
 	output_needs_newline = 2;
 }
 
@@ -201,8 +208,8 @@ static void finish_filelist_progress(const struct file_list *flist)
 	output_needs_newline = 0;
 	if (INFO_GTE(FLIST, 2)) {
 		/* This overwrites the progress line */
-		rprintf(FINFO, "%d file%sto consider\n",
-			flist->used, flist->used == 1 ? " " : "s ");
+		rprintf(FINFO, "%s file%sto consider\n",
+			comma_num(flist->used), flist->used == 1 ? " " : "s ");
 	} else {
 		rprintf(FINFO, "done\n");
 	}
@@ -231,27 +238,263 @@ static int scan_dirfd = -1;
 static const char *scan_dir_prefix;
 static int scan_dir_prefix_len;
 
+struct sender_source_root {
+	struct sender_source_root *next;
+	dev_t dev;
+	ino_t ino;
+	char path[1];
+};
+
+static struct sender_source_root *sender_source_roots;
+static struct sender_source_root *sender_source_root_fd_owner;
+static int sender_source_root_fd = -1;
+
+static int sender_source_full_path(const char *path, char *full, size_t full_size)
+{
+	size_t len;
+
+	if (*path == '/')
+		len = strlcpy(full, path, full_size);
+	else
+		len = pathjoin(full, full_size, curr_dir, path);
+	if (len >= full_size) {
+		errno = ENAMETOOLONG;
+		return -1;
+	}
+	clean_fname(full, CFN_COLLAPSE_DOT_DOT_DIRS | CFN_DROP_TRAILING_DOT_DIR);
+	return 0;
+}
+
+static void remember_sender_source_root(const char *path, const STRUCT_STAT *st)
+{
+	struct sender_source_root *root;
+	char full[MAXPATHLEN];
+	size_t len;
+
+	if (sender_source_full_path(path, full, sizeof full) < 0)
+		overflow_exit("remember_sender_source_root");
+	len = strlen(full);
+
+	for (root = sender_source_roots; root; root = root->next) {
+		if (strcmp(root->path, full) == 0)
+			return;
+	}
+	root = (struct sender_source_root *)new_array(char, sizeof *root + len);
+	root->next = sender_source_roots;
+	root->dev = st->st_dev;
+	root->ino = st->st_ino;
+	memcpy(root->path, full, len + 1);
+	sender_source_roots = root;
+}
+
+static void remember_sender_source_arg(const char *path, const STRUCT_STAT *st)
+{
+	STRUCT_STAT parent_st;
+	char full[MAXPATHLEN], *slash;
+
+	if (S_ISDIR(st->st_mode)) {
+		remember_sender_source_root(path, st);
+		return;
+	}
+	if (sender_source_full_path(path, full, sizeof full) < 0)
+		overflow_exit("remember_sender_source_arg");
+	slash = strrchr(full, '/');
+	if (!slash)
+		return;
+	if (slash == full)
+		slash[1] = '\0';
+	else
+		*slash = '\0';
+	/* The operator selected this parent as part of the source argument. Pin
+	 * its resolved identity while the file leaf remains O_NOFOLLOW later. */
+	if (do_stat(full, &parent_st) == 0 && S_ISDIR(parent_st.st_mode))
+		remember_sender_source_root(full, &parent_st);
+}
+
+#if defined AT_FDCWD && defined O_NOFOLLOW && defined O_DIRECTORY
+/* Keep one validated source root open at a time.  A descriptor per explicit
+ * argument would make a large argument list exhaust the process limit. */
+static int sender_source_root_fd_for(struct sender_source_root *root)
+{
+	STRUCT_STAT st;
+	int fd, fl, saved_errno;
+
+	if (sender_source_root_fd_owner == root && sender_source_root_fd >= 0)
+		return sender_source_root_fd;
+	if (sender_source_root_fd >= 0) {
+		reset_dir_fd_cache();
+		close(sender_source_root_fd);
+	}
+	sender_source_root_fd = -1;
+	sender_source_root_fd_owner = NULL;
+
+	fd = open_anchor_dirfd(root->path);
+	if (fd < 0)
+		return -1;
+	if (do_fstat(fd, &st) < 0)
+		saved_errno = errno;
+	else if (st.st_dev != root->dev || st.st_ino != root->ino)
+		saved_errno = ELOOP;
+	else
+		saved_errno = 0;
+	if (saved_errno) {
+		close(fd);
+		errno = saved_errno;
+		return -1;
+	}
+	if ((fl = fcntl(fd, F_GETFD)) >= 0)
+		fcntl(fd, F_SETFD, fl | FD_CLOEXEC);
+	sender_source_root_fd_owner = root;
+	sender_source_root_fd = fd;
+	return fd;
+}
+#endif
+
+int open_sender_source_path(const char *path, int flags, int *matched)
+{
+#if defined AT_FDCWD && defined O_NOFOLLOW && defined O_DIRECTORY
+	struct sender_source_root *root, *best = NULL;
+	char full[MAXPATHLEN], *rel;
+	size_t best_len = 0;
+	int rootfd;
+
+	*matched = 0;
+	if (!sender_source_roots)
+		return -1;
+	if (sender_source_full_path(path, full, sizeof full) < 0)
+		goto no_root;
+	for (root = sender_source_roots; root; root = root->next) {
+		size_t len = strlen(root->path);
+		if (len > best_len && strncmp(full, root->path, len) == 0
+		 && (root->path[len-1] == '/' || full[len] == '\0' || full[len] == '/')) {
+			best = root;
+			best_len = len;
+		}
+	}
+	if (!best)
+		goto no_root;
+
+	*matched = 1;
+	rootfd = sender_source_root_fd_for(best);
+	if (rootfd < 0)
+		return -1;
+	rel = full + best_len;
+	while (*rel == '/')
+		rel++;
+	if (remove_source_files)
+		return secure_relative_open_at(rootfd, *rel ? rel : ".", flags, 0);
+	return open_sender_root_entry(rootfd, *rel ? rel : ".", flags);
+
+  no_root:
+	if (sender_source_root_fd >= 0) {
+		int e = errno;
+		reset_dir_fd_cache();
+		errno = e;
+	}
+	return -1;
+#else
+	(void)path;
+	(void)flags;
+	*matched = 0;
+	errno = ENOSYS;
+	return -1;
+#endif
+}
+
+void clear_sender_source_roots(void)
+{
+	if (sender_source_root_fd >= 0) {
+		reset_dir_fd_cache();
+		close(sender_source_root_fd);
+	}
+	sender_source_root_fd = -1;
+	sender_source_root_fd_owner = NULL;
+	while (sender_source_roots) {
+		struct sender_source_root *root = sender_source_roots;
+		sender_source_roots = root->next;
+		free(root);
+	}
+}
+
+static int filesfrom_link_stat(const char *path, STRUCT_STAT *stp, int follow_dirlinks)
+{
+#if defined AT_FDCWD && defined O_NOFOLLOW && defined O_DIRECTORY
+	const char *bname;
+	int dfd, ret, save_errno;
+
+	dfd = owner_walk_parent(path, &bname);
+	if (dfd < 0)
+		return -1;
+	if (am_root < 0) {
+		close(dfd);
+		return link_stat(path, stp, follow_dirlinks);
+	}
+	ret = do_lstat_atfd(dfd, bname, stp);
+	/* A list-selected directory symlink is a path component too. Resolve it
+	 * through the ownership and confinement walk before following it. */
+	if (ret == 0 && S_ISLNK(stp->st_mode)
+	 && (follow_dirlinks || copy_links)) {
+		int targetfd = open_no_attacker_symlinks_dirfd(path);
+		if (targetfd >= 0) {
+			ret = do_fstat(targetfd, stp);
+			close(targetfd);
+		} else if (errno != ENOENT && errno != ENOTDIR && errno != EACCES) {
+			ret = -1;
+		}
+	}
+	save_errno = ret < 0 ? errno : 0;
+	close(dfd);
+	errno = save_errno;
+	return ret;
+#else
+	return link_stat(path, stp, follow_dirlinks);
+#endif
+}
+
+static int filesfrom_readlink(const char *path, char *linkbuf, size_t bufsiz)
+{
+#if defined AT_FDCWD && defined O_NOFOLLOW && defined O_DIRECTORY
+	const char *bname;
+	int dfd, ret, save_errno;
+
+	dfd = owner_walk_parent(path, &bname);
+	if (dfd < 0)
+		return -1;
+	ret = do_readlink_atfd(dfd, bname, linkbuf, bufsiz);
+	save_errno = ret < 0 ? errno : 0;
+	close(dfd);
+	errno = save_errno;
+	return ret;
+#else
+	return do_readlink(path, linkbuf, bufsiz);
+#endif
+}
+
 static int scan_link_stat(const char *path, STRUCT_STAT *stp, int follow_dirlinks)
 {
 	/* Use the held scan fd only for a single component directly inside the
 	 * scanned dir, and only when am_root >= 0 (link_stat_at folds in no
 	 * fake-super %stat xattr; link_stat does so via get_stat_xattr, a no-op
 	 * once am_root >= 0). */
-	if (scan_dirfd >= 0 && am_root >= 0
+	if (scan_dirfd >= 0 && am_root >= 0 && !filesfrom_owner_walk_active()
 	 && strncmp(path, scan_dir_prefix, scan_dir_prefix_len) == 0
 	 && path[scan_dir_prefix_len] == '/'
 	 && strchr(path + scan_dir_prefix_len + 1, '/') == NULL)
 		return link_stat_at(scan_dirfd, path + scan_dir_prefix_len + 1, stp, follow_dirlinks);
+	if (filesfrom_owner_walk_active())
+		return filesfrom_link_stat(path, stp, follow_dirlinks);
 	return link_stat(path, stp, follow_dirlinks);
 }
 
 static int scan_readlink(const char *path, char *linkbuf, size_t bufsiz)
 {
-	if (scan_dirfd >= 0 && am_root >= 0
+	if (scan_dirfd >= 0 && am_root >= 0 && !filesfrom_owner_walk_active()
 	 && strncmp(path, scan_dir_prefix, scan_dir_prefix_len) == 0
 	 && path[scan_dir_prefix_len] == '/'
 	 && strchr(path + scan_dir_prefix_len + 1, '/') == NULL)
 		return do_readlink_atfd(scan_dirfd, path + scan_dir_prefix_len + 1, linkbuf, bufsiz);
+	if (filesfrom_owner_walk_active())
+		return filesfrom_readlink(path, linkbuf, bufsiz);
 	return do_readlink(path, linkbuf, bufsiz);
 }
 
@@ -360,7 +603,8 @@ static inline int is_excluded(const char *fname, int is_dir, int filter_level)
 static void send_directory(int f, struct file_list *flist,
 			   char *fbuf, int len, int flags);
 
-static const char *pathname, *orig_dir;
+static const char *pathname;
+const char *orig_dir;
 static int pathname_len;
 
 /* Make sure flist can hold at least flist->used + extra entries. */
@@ -385,8 +629,6 @@ static void flist_expand(struct file_list *flist, int extra)
 			goto too_large;
 		flist->malloced += FLIST_LINEAR;
 	} else if (flist->malloced < FLIST_START_LARGE/16) {
-		if (flist->malloced > INT_MAX/4)
-			goto too_large;
 		flist->malloced *= 4;
 	} else {
 		if (flist->malloced > INT_MAX/2)
@@ -673,6 +915,9 @@ static void send_file_entry(int f, const char *fname, struct file_struct *file,
 	}
 #endif
 
+	/* Same-binary local restores have no batch or remote file-list format. */
+	if (ltfs_ndx)
+		write_varlong(f, F_LTFS_KEY(file), 3);
 	write_varlong30(f, F_LENGTH(file), 3);
 	if (!(xflags & XMIT_SAME_TIME)) {
 		if (protocol_version >= 30)
@@ -686,8 +931,6 @@ static void send_file_entry(int f, const char *fname, struct file_struct *file,
 	if (crtimes_ndx && !(xflags & XMIT_CRTIME_EQ_MTIME))
 		write_varlong(f, crtime, 4);
 #endif
-	if (startblock_ndx)
-		write_varlong(f, F_STARTBLOCK(file), 3);
 	if (!(xflags & XMIT_SAME_MODE))
 		write_int(f, to_wire_mode(mode));
 	if (atimes_ndx && !S_ISDIR(mode) && !(xflags & XMIT_SAME_ATIME))
@@ -783,7 +1026,6 @@ static struct file_struct *recv_file_entry(int f, struct file_list *flist, int x
 #ifdef SUPPORT_CRTIMES
 	static time_t crtime;
 #endif
-	static int64 startblock;
 	static mode_t mode;
 #ifdef SUPPORT_HARD_LINKS
 	static int64 dev;
@@ -804,6 +1046,7 @@ static struct file_struct *recv_file_entry(int f, struct file_list *flist, int x
 	int first_hlink_ndx = -1;
 	char real_ISREG_entry;
 	int64 file_length;
+	int64 ltfs_key = 0;
 #ifdef CAN_SET_NSEC
 	uint32 modtime_nsec;
 #endif
@@ -931,6 +1174,8 @@ static struct file_struct *recv_file_entry(int f, struct file_list *flist, int x
 	}
 #endif
 
+	if (ltfs_ndx)
+		ltfs_key = read_varlong(f, 3);
 	file_length = read_varlong30(f, 3);
 	if (!(xflags & XMIT_SAME_TIME)) {
 		if (protocol_version >= 30) {
@@ -968,8 +1213,6 @@ static struct file_struct *recv_file_entry(int f, struct file_list *flist, int x
 #endif
 	}
 #endif
-	if (startblock_ndx)
-		startblock = read_varlong(f, 3);
 	if (!(xflags & XMIT_SAME_MODE)) {
 		mode = from_wire_mode(read_int(f));
 		/* Reject modes whose type bits are not one of the standard
@@ -1209,6 +1452,13 @@ static struct file_struct *recv_file_entry(int f, struct file_list *flist, int x
 	}
 #endif
 	file->mode = mode;
+	if (ltfs_ndx) {
+		if (ltfs_key < 0 || (ltfs_key != 0) != (S_ISREG(mode) && file_length > 0)) {
+			rprintf(FERROR, "invalid local LTFS order key\n");
+			exit_cleanup(RERR_PROTOCOL);
+		}
+		F_LTFS_KEY(file) = ltfs_key;
+	}
 	if (preserve_uid)
 		F_OWNER(file) = uid;
 	if (preserve_gid) {
@@ -1221,8 +1471,6 @@ static struct file_struct *recv_file_entry(int f, struct file_list *flist, int x
 	if (crtimes_ndx)
 		F_CRTIME(file) = crtime;
 #endif
-	if (startblock_ndx)
-		F_STARTBLOCK(file) = startblock;
 	if (unsort_ndx)
 		F_NDX(file) = flist->used + flist->ndx_start;
 
@@ -1399,6 +1647,71 @@ static struct file_struct *recv_file_entry(int f, struct file_list *flist, int x
 	return file;
 }
 
+#ifdef SUPPORT_LTFS_ORDER
+static int64 ltfs_order_key(const char *name, const STRUCT_STAT *expected)
+{
+	static char volume[36];
+	const int64 partition_range = INT64_MAX / 2 + 1;
+	char uuid[36], partition[2], value[20];
+	int64 block = 0;
+	int fd, i;
+	ssize_t n;
+	STRUCT_STAT actual;
+
+	if (scan_dirfd < 0 || strchr(name, '/') || !*name)
+		goto invalid;
+	fd = openat(scan_dirfd, name, O_RDONLY | O_NOFOLLOW | O_NONBLOCK | O_NOCTTY | O_CLOEXEC);
+	if (fd < 0)
+		goto invalid;
+	if (do_fstat(fd, &actual) != 0 || !S_ISREG(actual.st_mode)
+	 || actual.st_dev != expected->st_dev || actual.st_ino != expected->st_ino
+	 || actual.st_size != expected->st_size
+	 || sys_fgetxattr(fd, "user.ltfs.volumeUUID", uuid, sizeof uuid) != sizeof uuid
+	 || sys_fgetxattr(fd, "user.ltfs.partition", partition, sizeof partition) != 1
+	 || (partition[0] != 'a' && partition[0] != 'b')) {
+		close(fd);
+		goto invalid;
+	}
+	n = sys_fgetxattr(fd, "user.ltfs.startblock", value, sizeof value);
+	close(fd);
+	if (n <= 0 || n >= (ssize_t)sizeof value)
+		goto invalid;
+
+	for (i = 0; i < (int)sizeof uuid; i++) {
+		char ch = uuid[i];
+		if (i == 8 || i == 13 || i == 18 || i == 23) {
+			if (ch != '-')
+				goto invalid;
+		} else if (!(ch >= '0' && ch <= '9') && !(ch >= 'a' && ch <= 'f')
+		        && !(ch >= 'A' && ch <= 'F'))
+			goto invalid;
+		else if (ch >= 'A' && ch <= 'F')
+			uuid[i] = ch - 'A' + 'a';
+	}
+
+	for (i = 0; i < n; i++) {
+		int digit = value[i] - '0';
+		if (digit < 0 || digit > 9 || block > (partition_range - 2 - digit) / 10)
+			goto invalid;
+		block = block * 10 + digit;
+	}
+
+	if (!volume[0])
+		memcpy(volume, uuid, sizeof volume);
+	else if (memcmp(volume, uuid, sizeof volume) != 0) {
+		rprintf(FERROR, "LTFS restore must use one volume: %s\n", full_fname(name));
+		exit_cleanup(RERR_FILEIO);
+	}
+
+	/* Zero is reserved for the directory and empty files. */
+	return block + 1 + (partition[0] == 'b' ? partition_range : 0);
+
+  invalid:
+	rprintf(FERROR, "cannot read a valid LTFS position for %s\n", full_fname(name));
+	exit_cleanup(RERR_FILEIO);
+}
+#endif
+
 /* Create a file_struct for a named file by reading its stat() information
  * and performing extensive checks against global options.
  *
@@ -1419,6 +1732,7 @@ struct file_struct *make_file(const char *fname, struct file_list *flist,
 	char linkname[MAXPATHLEN];
 	int alloc_len, basename_len, linkname_len;
 	int extra_len = file_extra_cnt * EXTRA_LEN;
+	int64 ltfs_key = 0;
 	const char *basename;
 	alloc_pool_t *pool;
 	STRUCT_STAT st = {0};
@@ -1526,6 +1840,19 @@ struct file_struct *make_file(const char *fname, struct file_list *flist,
 	}
 
   skip_filters:
+
+#ifdef SUPPORT_LTFS_ORDER
+	if (ltfs_ndx && am_sender && flist) {
+		if (S_ISREG(st.st_mode) && !(flags & FLAG_TOP_DIR)) {
+			if (st.st_size)
+				ltfs_key = ltfs_order_key(thisname, &st);
+		} else if (!(flags & FLAG_TOP_DIR) || !S_ISDIR(st.st_mode) || strcmp(thisname, ".") != 0) {
+			rprintf(FERROR, "LTFS ordering requires a flat source of regular files: %s\n",
+				full_fname(thisname));
+			exit_cleanup(RERR_FILEIO);
+		}
+	}
+#endif
 
 	/* Only divert a directory in the main transfer. */
 	if (flist) {
@@ -1675,6 +2002,8 @@ struct file_struct *make_file(const char *fname, struct file_list *flist,
 	}
 #endif
 	file->mode = st.st_mode;
+	if (ltfs_ndx)
+		F_LTFS_KEY(file) = ltfs_key;
 	if (preserve_uid)
 		F_OWNER(file) = st.st_uid;
 	if (preserve_gid)
@@ -1687,12 +2016,6 @@ struct file_struct *make_file(const char *fname, struct file_list *flist,
 	if (crtimes_ndx)
 		F_CRTIME(file) = get_create_time(fname, &st);
 #endif
-	if (startblock_ndx) {
-		int64 blk = am_sender && S_ISREG(file->mode) ? ltfs_startblock(fname) : -1;
-		/* Unknown sorts first; keep it non-negative so write_varlong
-		 * stays compact (a real LTFS data block is well past block 0). */
-		F_STARTBLOCK(file) = blk < 0 ? 0 : blk;
-	}
 
 	if (basename != thisname)
 		file->dirname = lastdir;
@@ -2028,7 +2351,7 @@ static void interpret_stat_error(const char *fname, int is_dir)
 }
 
 #if defined HAVE_FDOPENDIR && defined HAVE_DIRFD
-/* Open a source directory for scanning confined beneath the transfer root.
+/* Open a source directory for scanning under the applicable source authority.
  * secure_relative_open() does a per-component O_NOFOLLOW walk that refuses a
  * parent component raced into a symlink pointing out of the tree; fdopendir()
  * then turns the held fd into the DIR* the scan reads.  This mirrors the
@@ -2039,13 +2362,31 @@ static void interpret_stat_error(const char *fname, int is_dir)
  * O_NOFOLLOW makes secure_relative_open() follow in-tree directory symlinks
  * beneath the anchor and refuse escapes, so this serves both the default
  * no-follow scan and a daemon's symlink-following scan (see the caller).
+ * Files-from entries instead use the ownership walk: their source base is
+ * operator-selected, but each list entry may not be, so only trusted-owned
+ * symlinks are followed and a trusted link may retain its legacy target.
  * Returns NULL with errno set on failure, like opendir(). */
 static DIR *secure_opendir(const char *fbuf)
 {
-	int dfd, fl;
+	int dfd, fl, matched;
+	int dir_flags = O_RDONLY | O_CLOEXEC;
 	DIR *d;
 
-	if (am_daemon && (!am_chrooted || module_dirlen)
+#ifdef O_DIRECTORY
+	dir_flags |= O_DIRECTORY;
+#elif defined O_NONBLOCK
+	/* Avoid blocking on a raced special file before fdopendir validates it. */
+	dir_flags |= O_NONBLOCK;
+#endif
+	if (filesfrom_owner_walk_active()) {
+		/* The source base is operator-selected, while each list entry may not
+		 * be. Follow only trusted-owned symlinks while opening the directory. */
+		dfd = open_no_attacker_symlinks(fbuf, dir_flags, 0);
+	} else if (!am_daemon && am_sender
+	 && (dfd = open_sender_source_path(fbuf, dir_flags, &matched), matched)) {
+		/* The command-line directory is the operator-selected transfer root.
+		 * Follow that root, then keep every recursive scan beneath its held fd. */
+	} else if (am_daemon && (!am_chrooted || module_dirlen)
 	 && module_dir && module_dir[0] == '/' && *fbuf != '/' && module_dirfd >= 0
 	 && curr_dir_len >= module_dirlen
 	 && strncmp(curr_dir, module_dir, module_dirlen) == 0
@@ -2071,23 +2412,23 @@ static DIR *secure_opendir(const char *fbuf)
 			return NULL;
 		}
 		dfd = secure_relative_open_at(module_dirfd, *modrel ? modrel : ".",
-					      O_RDONLY | O_DIRECTORY, 0);
+					      dir_flags, 0);
 	} else if (*fbuf == '/') {
 		/* An absolute scan path (an absolute --relative / --files-from name, or a
 		 * "/" transfer root): anchor at "/" -- operator-named, trusted. */
 		const char *relp = fbuf;
 		while (*relp == '/')
 			relp++;
-		dfd = secure_relative_open("/", relp, O_RDONLY | O_DIRECTORY, 0);
+		dfd = secure_relative_open("/", relp, dir_flags, 0);
 	} else {
 		/* Non-daemon (or chrooted) sender: confine beneath the cwd the sender
 		 * chdir'd into (the transfer root). */
-		dfd = secure_relative_open(NULL, fbuf, O_RDONLY | O_DIRECTORY, 0);
+		dfd = secure_relative_open(NULL, fbuf, dir_flags, 0);
 	}
 
 	if (dfd < 0)
 		return NULL;
-	if ((fl = fcntl(dfd, F_GETFD)) >= 0)
+	if (!O_CLOEXEC && (fl = fcntl(dfd, F_GETFD)) >= 0)
 		fcntl(dfd, F_SETFD, fl | FD_CLOEXEC);
 	if (!(d = fdopendir(dfd))) {
 		int save = errno;
@@ -2265,8 +2606,11 @@ static void send_implied_dirs(int f, struct file_list *flist, char *fname,
 	if (need_new_dir) {
 		int save_copy_links = copy_links;
 		int save_xfer_dirs = xfer_dirs;
+		int save_filesfrom_owner_walk = filesfrom_owner_walk_override;
 		char *slash;
 
+		if (filesfrom_owner_walk_active())
+			filesfrom_owner_walk_override = 1;
 		copy_links = xfer_dirs = 1;
 
 		*limit = '\0';
@@ -2295,6 +2639,7 @@ static void send_implied_dirs(int f, struct file_list *flist, char *fname,
 
 		copy_links = save_copy_links;
 		xfer_dirs = save_xfer_dirs;
+		filesfrom_owner_walk_override = save_filesfrom_owner_walk;
 
 		if (!inc_recurse)
 			goto done;
@@ -2347,7 +2692,7 @@ static void send1extra(int f, struct file_struct *file, struct file_list *flist)
 	if (file->flags & FLAG_CONTENT_DIR) {
 		if (one_file_system) {
 			STRUCT_STAT st;
-			if (link_stat(fbuf, &st, copy_dirlinks) != 0) {
+			if (scan_link_stat(fbuf, &st, copy_dirlinks) != 0) {
 				interpret_stat_error(fbuf, True);
 				return;
 			}
@@ -2383,7 +2728,7 @@ static void send1extra(int f, struct file_struct *file, struct file_list *flist)
 		if (name_type != NORMAL_NAME) {
 			STRUCT_STAT st = {0};
 
-			if (name_type != MISSING_NAME && link_stat(fbuf, &st, 1) != 0) {
+			if (name_type != MISSING_NAME && scan_link_stat(fbuf, &st, 1) != 0) {
 				interpret_stat_error(fbuf, True);
 				continue;
 			}
@@ -2708,7 +3053,7 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 		if (fn != fbuf)
 			memmove(fbuf, fn, len + 1);
 
-		if (link_stat(fbuf, &st, copy_dirlinks || name_type != NORMAL_NAME) != 0
+		if (scan_link_stat(fbuf, &st, copy_dirlinks || name_type != NORMAL_NAME) != 0
 		 || (name_type != DOTDIR_NAME && is_excluded(fbuf, S_ISDIR(st.st_mode) != 0, SERVER_FILTERS))
 		 || (relative_paths && path_is_daemon_excluded(fbuf, 1))) {
 			if (errno != ENOENT || missing_args == 0) {
@@ -2738,6 +3083,9 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 			rprintf(FINFO, "skipping directory %s\n", fbuf);
 			continue;
 		}
+		if (!am_daemon && !use_ff_fd && st.st_mode != 0
+		 && (relative_paths || S_ISDIR(st.st_mode)))
+			remember_sender_source_arg(fbuf, &st);
 
 		if (inc_recurse && relative_paths && *fbuf) {
 			if ((p = strchr(fbuf+1, '/')) != NULL) {
