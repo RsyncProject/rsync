@@ -1076,6 +1076,25 @@ AC_CHECK_FUNCS(waitpid wait4 getcwd chown chmod lchmod mknod mkfifo fdopendir \
     initgroups utimensat futimens posix_fallocate attropen setvbuf nanosleep usleep \
     setenv unsetenv mbrtowc setpriority)
 
+AC_CACHE_CHECK([for FreeBSD descriptor-based file flags], [rsync_cv_fileflags], [
+    AC_LINK_IFELSE([AC_LANG_PROGRAM([[#include <sys/stat.h>
+#include <fcntl.h>
+#include <unistd.h>
+#ifndef __FreeBSD__
+#error FreeBSD file flags required
+#endif]], [[
+        struct stat st;
+        int fd = openat(AT_FDCWD, ".", O_PATH | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC);
+        (void) &chflagsat;
+        if (fstat(fd, &st) < 0)
+            return 1;
+        return chflagsat(fd, "", st.st_flags | UF_NODUMP, AT_EMPTY_PATH);
+    ]])], [rsync_cv_fileflags=yes], [rsync_cv_fileflags=no])
+])
+if test x"$rsync_cv_fileflags" = xyes; then
+    AC_DEFINE([SUPPORT_FILEFLAGS], 1, [Define to 1 for FreeBSD descriptor-based file flags.])
+fi
+
 dnl A link-only probe can find a symbol hidden by the target SDK headers.
 dnl Verify that each codeset query is declared and can actually be called.
 AC_CACHE_CHECK([for usable locale_charset()], [rsync_cv_HAVE_LOCALE_CHARSET], [

@@ -1615,6 +1615,9 @@ static struct file_struct *recv_file_entry(int f, struct file_list *flist, int x
 			read_buf(f, bp, flist_csum_len);
 	}
 
+	if (nodump_ndx)
+		F_NODUMP(file) = read_byte(f) != 0;
+
 #ifdef SUPPORT_ACLS
 	if (preserve_acls && !S_ISLNK(mode))
 		receive_acl(f, file);
@@ -1906,6 +1909,10 @@ struct file_struct *make_file(const char *fname, struct file_list *flist,
 	}
 #endif
 	file->mode = st.st_mode;
+#ifdef SUPPORT_FILEFLAGS
+	if (nodump_ndx && (S_ISREG(file->mode) || S_ISDIR(file->mode)))
+		F_NODUMP(file) = (st.st_flags & UF_NODUMP) != 0;
+#endif
 	if (preserve_uid)
 		F_OWNER(file) = st.st_uid;
 	if (preserve_gid)
@@ -2088,6 +2095,10 @@ static struct file_struct *send_file_name(int f, struct file_list *flist,
 				symlink_name, symlink_len,
 #endif
 				flist->used, flist->ndx_start);
+
+		/* The local child inherits the option. No external peer or batch sees this field. */
+		if (nodump_ndx)
+			write_byte(f, F_NODUMP(file));
 
 #ifdef SUPPORT_ACLS
 		if (preserve_acls && !S_ISLNK(file->mode)) {

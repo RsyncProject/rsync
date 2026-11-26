@@ -1319,13 +1319,26 @@ int recv_files(int f_in, int f_out, char *local_name)
 
 		if (fd1 != -1)
 			close(fd1);
+#ifdef SUPPORT_FILEFLAGS
+		/* Apply flags to the verified temporary inode before it is published. */
+		if (preserve_fileflags && recv_ok > 0) {
+			int ret = do_set_fileflags_fd(fd2, NULL, F_NODUMP(file));
+			if (ret < 0) {
+				rsyserr(FERROR_XFER, errno, "failed to set file flags on %s", full_fname(fname));
+				recv_ok = -1;
+			} else if (ret > 0 && do_fsync && fsync(fd2) != 0) {
+				rsyserr(FERROR_XFER, errno, "fsync failed on %s", full_fname(fname));
+				recv_ok = -1;
+			}
+		}
+#endif
 		if (close(fd2) < 0) {
 			rsyserr(FERROR, errno, "close failed on %s",
 				full_fname(fnametmp));
 			exit_cleanup(RERR_FILEIO);
 		}
 
-		if ((recv_ok && (!delay_updates || !partialptr)) || inplace) {
+		if ((recv_ok > 0 && (!delay_updates || !partialptr)) || inplace) {
 			if (partialptr == fname)
 				partialptr = NULL;
 			if (!finish_transfer(fname, fnametmp, fnamecmp, partialptr, file, recv_ok, 1))

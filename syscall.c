@@ -2457,6 +2457,25 @@ int do_rename(const char *old_path, const char *new_path)
 	return rename(old_path, new_path);
 }
 
+#ifdef AT_FDCWD
+static int guarded_renameat(int old_dfd, const char *old_name, int new_dfd, const char *new_name)
+{
+#ifdef SUPPORT_FILEFLAGS
+	if (preserve_fileflags) {
+		STRUCT_STAT st;
+		if (do_lstat_atfd(new_dfd, new_name, &st) == 0) {
+			if (st.st_flags & PROTECTED_FILEFLAGS) {
+				errno = EPERM;
+				return -1;
+			}
+		} else if (errno != ENOENT)
+			return -1;
+	}
+#endif
+	return renameat(old_dfd, old_name, new_dfd, new_name);
+}
+#endif
+
 /*
   Symlink-race-safe variant of do_rename() for receiver-side use. See
   the comment on do_chmod_at() for the threat model and design rationale.
@@ -2511,7 +2530,7 @@ int do_rename_at(const char *old_path, const char *new_path)
 			errno = e;
 			return -1;
 		}
-		ret = renameat(old_dfd, old_bname, new_dfd, new_bname);
+		ret = guarded_renameat(old_dfd, old_bname, new_dfd, new_bname);
 		e = errno;
 		close(new_dfd);
 		close(old_dfd);
@@ -2604,7 +2623,7 @@ int do_rename_at(const char *old_path, const char *new_path)
 		new_bname = new_path;
 	}
 
-	ret = renameat(old_dfd, old_bname, new_dfd, new_bname);
+	ret = guarded_renameat(old_dfd, old_bname, new_dfd, new_bname);
 	e = errno;
 	if (new_owns)
 		close(new_dfd);
@@ -4519,6 +4538,63 @@ int do_fchown(int fd, uid_t owner, gid_t group)
 	return fchown(fd, owner, group);
 }
 
+#ifdef SUPPORT_FILEFLAGS
+int do_set_fileflags_fd(int fd, const STRUCT_STAT *expected, int nodump)
+{
+	STRUCT_STAT st;
+	unsigned long flags = nodump ? UF_NODUMP : 0;
+
+	if (dry_run) return 0;
+	RETURN_ERROR_IF_RO_OR_LO;
+	if (do_fstat(fd, &st) < 0)
+		return -1;
+	if (!(S_ISREG(st.st_mode) || S_ISDIR(st.st_mode))
+	 || (expected && (st.st_dev != expected->st_dev || st.st_ino != expected->st_ino
+			  || ((st.st_mode ^ expected->st_mode) & S_IFMT)))) {
+		errno = ESTALE;
+		return -1;
+	}
+	if ((st.st_flags & UF_NODUMP) == flags)
+		return 0;
+	if (st.st_flags & PROTECTED_FILEFLAGS || (S_ISREG(st.st_mode) && st.st_nlink != 1)) {
+		errno = EPERM;
+		return -1;
+	}
+	/* The kernel replaces the flag word, so preserve all other observed bits. */
+	flags |= st.st_flags & ~(unsigned long)UF_NODUMP;
+	if (chflagsat(fd, "", flags, AT_EMPTY_PATH) < 0 || do_fstat(fd, &st) < 0)
+		return -1;
+	if ((st.st_flags & UF_NODUMP) != (flags & UF_NODUMP)) {
+		errno = EOPNOTSUPP;
+		return -1;
+	}
+	return 1;
+}
+
+int do_set_fileflags(const char *path, int dfd, const char *leaf,
+		     const STRUCT_STAT *expected, int nodump)
+{
+	int fd, ret, e;
+	int oflags = O_PATH | O_NOFOLLOW | O_CLOEXEC;
+
+	if (dry_run) return 0;
+	RETURN_ERROR_IF_RO_OR_LO;
+	if (S_ISDIR(expected->st_mode))
+		oflags |= O_DIRECTORY;
+	if (dfd >= 0)
+		fd = openat(dfd, leaf, oflags);
+	else
+		fd = secure_relative_open(NULL, path, oflags, 0);
+	if (fd < 0)
+		return -1;
+	ret = do_set_fileflags_fd(fd, expected, nodump);
+	e = errno;
+	close(fd);
+	errno = e;
+	return ret;
+}
+#endif
+
 #ifdef HAVE_FUTIMENS
 /* Set times on an already-open fd (the race-free counterpart for a pinned
  * cross-tree operator leaf -- see set_file_attrs()). */
@@ -4684,7 +4760,7 @@ int do_rename_atfd(int old_dfd, const char *old_name, int new_dfd, const char *n
 #ifdef AT_FDCWD
 	if (dry_run) return 0;
 	RETURN_ERROR_IF_RO_OR_LO;
-	return renameat(old_dfd, old_name, new_dfd, new_name);
+	return guarded_renameat(old_dfd, old_name, new_dfd, new_name);
 #else
 	(void)old_dfd; (void)old_name; (void)new_dfd; (void)new_name;
 	errno = ENOSYS;

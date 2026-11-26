@@ -59,6 +59,7 @@ int preserve_links = 0;
 int preserve_hard_links = 0;
 int preserve_acls = 0;
 int preserve_xattrs = 0;
+int preserve_fileflags = 0;
 int preserve_perms = 0;
 int preserve_executability = 0;
 int preserve_devices = 0;
@@ -659,6 +660,8 @@ static struct poptOption long_options[] = {
   {"xattrs",          'X', POPT_ARG_NONE,   0, 'X', 0, 0 },
   {"no-xattrs",        0,  POPT_ARG_VAL,    &preserve_xattrs, 0, 0, 0 },
   {"no-X",             0,  POPT_ARG_VAL,    &preserve_xattrs, 0, 0, 0 },
+  {"fileflags",        0,  POPT_ARG_VAL,    &preserve_fileflags, 1, 0, 0 },
+  {"no-fileflags",     0,  POPT_ARG_VAL,    &preserve_fileflags, 0, 0, 0 },
   {"times",           't', POPT_ARG_VAL,    &preserve_mtimes, 1, 0, 0 },
   {"no-times",         0,  POPT_ARG_VAL,    &preserve_mtimes, 0, 0, 0 },
   {"no-t",             0,  POPT_ARG_VAL,    &preserve_mtimes, 0, 0, 0 },
@@ -2293,6 +2296,35 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 
 	if (fuzzy_basis > 1)
 		fuzzy_basis = basis_dir_cnt + 1;
+
+	if (preserve_fileflags) {
+#ifndef SUPPORT_FILEFLAGS
+		strlcpy(err_buf, "--fileflags is not supported by this build\n", sizeof err_buf);
+		goto cleanup;
+#else
+		const char *conflict = read_batch ? "--read-batch"
+		    : write_batch ? "--write-batch or --only-write-batch"
+		    : remote_option_cnt ? "--remote-option"
+		    : am_root < 0 ? "--fake-super"
+		    : make_backups || backup_dir ? "--backup or --backup-dir"
+		    : inplace || append_mode || write_devices ? "--inplace, --append or --write-devices"
+		    : keep_partial || partial_dir || delay_updates ? "--partial, --partial-dir or --delay-updates"
+		    : tmpdir ? "--temp-dir"
+		    : basis_dir_cnt ? alt_dest_opt(0)
+		    : preserve_hard_links ? "--hard-links"
+		    : copy_devices ? "--copy-devices"
+		    : keep_dirlinks ? "--keep-dirlinks"
+		    : insecure_links ? "--insecure-links" : NULL;
+		if (am_server || am_daemon) {
+			strlcpy(err_buf, "--fileflags is only supported for local transfers\n", sizeof err_buf);
+			goto cleanup;
+		}
+		if (conflict) {
+			snprintf(err_buf, sizeof err_buf, "--fileflags cannot be combined with %s\n", conflict);
+			goto cleanup;
+		}
+#endif
+	}
 
 	/* Don't let the client reset protect_args if it was already processed */
 	if (orig_protect_args == 2 && am_server)

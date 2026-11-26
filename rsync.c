@@ -69,6 +69,7 @@ extern char *iconv_opt;
 #define UPDATED_ACLS  (1<<4)
 #define UPDATED_MODE  (1<<5)
 #define UPDATED_CRTIME (1<<6)
+#define UPDATED_FILEFLAGS (1<<7)
 
 const char *get_locale_charset(void)
 {
@@ -850,6 +851,19 @@ int set_file_attrs(const char *fname, struct file_struct *file, stat_x *sxp,
 		}
 		if (ret == 0)
 			updated |= UPDATED_MODE;
+	}
+#endif
+
+#ifdef SUPPORT_FILEFLAGS
+	if (flags & ATTRS_SET_FILEFLAGS && !dry_run
+	 && F_NODUMP(file) != ((sxp->st.st_flags & UF_NODUMP) != 0)) {
+		int ret = do_set_fileflags(fname, dfd, leaf, &sxp->st, F_NODUMP(file));
+		if (ret < 0) {
+			rsyserr(FERROR_XFER, errno, "failed to set file flags on %s", full_fname(fname));
+			goto failed;
+		}
+		if (ret > 0)
+			updated |= UPDATED_FILEFLAGS;
 	}
 #endif
 

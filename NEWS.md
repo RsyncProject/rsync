@@ -2,6 +2,8 @@
 
 ## Enhancements
 
+- Add `--fileflags` to preserve the native `nodump` flag on regular files and
+  directories in local FreeBSD transfers.
 - Accept `TCP_CONGESTION=NAME` in socket options on supported Linux builds.
   Distinguish unknown names, unavailable options and malformed values.
 - Add `--update-links` to skip newer destination symlinks independently

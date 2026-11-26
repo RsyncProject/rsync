@@ -575,6 +575,7 @@ has its own detailed description later in this manpage.
 --chmod-dest=CHMOD       set backup permissions with --fake-super
 --acls, -A               preserve ACLs (implies --perms)
 --xattrs, -X             preserve extended attributes
+--fileflags              preserve FreeBSD nodump flags in local transfers
 --owner, -o              preserve owner (super-user only)
 --group, -g              preserve group
 --devices                preserve device files (super-user only)
@@ -988,7 +989,7 @@ sign) if you want the local shell to expand it.
     This is equivalent to `-rlptgoD`.  It is a quick way of saying you want
     recursion and want to preserve almost everything.  Be aware that it does
     **not** include preserving ACLs (`-A`), xattrs (`-X`), atimes (`-U`),
-    crtimes (`-N`), nor the finding and preserving of hardlinks (`-H`).
+    creation times (`-N`), [`--fileflags`](#opt) or hard links (`-H`).
 
     The only exception to the above equivalence is when [`--files-from`](#opt)
     is specified, in which case [`-r`](#opt) is not implied.
@@ -1759,6 +1760,26 @@ sign) if you want the local shell to expand it.
     Note that the `-X` option does not copy rsync's special xattr values (e.g.
     those used by [`--fake-super`](#opt)) unless you repeat the option (e.g. `-XX`).
     This "copy all xattrs" mode cannot be used with [`--fake-super`](#opt).
+
+0.  `--fileflags`
+
+    Preserve the native FreeBSD `nodump` flag (`UF_NODUMP`) on regular files
+    and directories. Other source flags are ignored. A flag-only update keeps
+    other destination flags in place and refuses to change `nodump` on a
+    protected object or a regular file with multiple hard links. Replacement
+    files receive `nodump` before installation. A failed flag write prevents
+    installation of that regular file. An existing entry of a different type
+    is not removed to make way for a regular file or directory. A dry run
+    reports differences without changing flags.
+
+    This option requires a FreeBSD build with descriptor-based file flag
+    support and a local transfer. Other builds, remote peers and batch modes
+    do not support it. The option cannot be combined with `--backup`,
+    `--backup-dir`, `--inplace`, `--append`, `--append-verify`, `--partial`,
+    `--partial-dir`, `--delay-updates`, `--temp-dir`, `--compare-dest`,
+    `--copy-dest`, `--link-dest`, `--hard-links`, `--fake-super`,
+    `--copy-devices`, `--write-devices`, `--keep-dirlinks`, `--insecure-links`
+    or `--remote-option`. Disable it with `--no-fileflags`.
 
 0.  `--chmod=CHMOD`
 
@@ -3574,6 +3595,8 @@ sign) if you want the local shell to expand it.
       changed value.  Note that if you are sending files to an rsync prior to
       3.0.1 (April 2008), this change flag will be present only for checksum-differing
       regular files.
+      In a local [`--fileflags`](#opt) transfer, `c` also reports a `nodump`
+      difference on a regular file or directory.
     - A `s` means the size of a regular file is different and will be updated
       by the file transfer.
     - A `t` means the modification time is different and is being updated to

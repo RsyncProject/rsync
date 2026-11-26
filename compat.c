@@ -78,6 +78,7 @@ extern struct name_num_item *xfer_sum_nni;
 
 int remote_protocol = 0;
 int file_extra_cnt = 0; /* count of file-list extras that everyone gets */
+int nodump_ndx = 0;
 int inc_recurse = 0;
 int compat_flags = 0;
 int use_safe_inc_flist = 0;
@@ -654,6 +655,8 @@ void setup_protocol(int f_out,int f_in)
 		acls_ndx = ++file_extra_cnt;
 	if (preserve_xattrs)
 		xattrs_ndx = ++file_extra_cnt;
+	if (preserve_fileflags)
+		nodump_ndx = ++file_extra_cnt;
 
 	if (!saw_stderr_opt && protocol_version <= 28 && am_server)
 		msgs2stderr = 0; /* The client side may not have stderr setup for us. */

@@ -1553,6 +1553,11 @@ static int start_client(int argc, char *argv[])
 		rsync_port = 0;
 	}
 
+	if (preserve_fileflags && (!local_server || list_only)) {
+		rprintf(FERROR, "--fileflags is only supported for local transfers\n");
+		exit_cleanup(RERR_SYNTAX);
+	}
+
 	/* A local transfer doesn't unbackslash anything, so leave the args alone. */
 	if (local_server) {
 		old_style_args = 2;

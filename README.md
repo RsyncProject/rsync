@@ -25,6 +25,9 @@ options.  To get a complete list of supported options type:
 
 See the [manpage][0] for more detailed information.
 
+FreeBSD builds with descriptor-based file flag support can preserve the
+`nodump` flag in local transfers with `--fileflags`.
+
 [0]: https://download.samba.org/pub/rsync/rsync.1
 
 BUILDING AND INSTALLING

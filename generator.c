@@ -583,6 +583,11 @@ void itemize(const char *fnamecmp, struct file_struct *file, int ndx, int statre
 
 		if (S_ISREG(file->mode) && F_LENGTH(file) != sxp->st.st_size)
 			iflags |= ITEM_REPORT_SIZE;
+#ifdef SUPPORT_FILEFLAGS
+		if (nodump_ndx && (S_ISREG(file->mode) || S_ISDIR(file->mode))
+		 && F_NODUMP(file) != ((sxp->st.st_flags & UF_NODUMP) != 0))
+			iflags |= ITEM_REPORT_CHANGE;
+#endif
 		if (file->flags & FLAG_TIME_FAILED) { /* symlinks only */
 			if (iflags & ITEM_LOCAL_CHANGE)
 				iflags |= symlink_timeset_failed_flags;
@@ -2122,6 +2127,13 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 		mode_t added_perms;
 		if (!implied_dirs && file->flags & FLAG_IMPLIED_DIR)
 			goto cleanup;
+		if (preserve_fileflags && statret == 0 && stype != FT_DIR) {
+			if (is_dir < 0)
+				goto cleanup;
+			rprintf(FERROR_XFER, "--fileflags refuses to replace a non-directory with %s\n",
+				full_fname(fname));
+			goto skipping_dir_contents;
+		}
 		if (am_root < 0) {
 			/* For --fake-super, the dir must be usable by the copying
 			 * user, just like it would be for root. */
@@ -2203,7 +2215,8 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 		if (preserve_xattrs && statret == 1)
 			gen_entry_copy_xattrs(fnamecmpbuf, fname, file);
 #endif
-		if (set_file_attrs(fname, file, real_ret ? NULL : &real_sx, NULL, 0)
+		if (set_file_attrs(fname, file, real_ret ? NULL : &real_sx, NULL,
+				   preserve_fileflags ? ATTRS_SET_FILEFLAGS : 0)
 		 && INFO_GTE(NAME, 1) && code != FNONE && f_out != -1)
 			rprintf(code, "%s/\n", fname);
 
@@ -2461,6 +2474,12 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 	fnamecmp_type = FNAMECMP_FNAME;
 
 	if (statret == 0 && !(stype == FT_REG || (write_devices && stype == FT_DEVICE))) {
+		/* Do not remove the old entry before the receiver can set the staged flags. */
+		if (preserve_fileflags) {
+			rprintf(FERROR_XFER, "--fileflags refuses to replace a non-regular file with %s\n",
+				full_fname(fname));
+			goto cleanup;
+		}
 		if (delete_item(fname, sx.st.st_mode, del_opts | DEL_FOR_FILE) != 0)
 			goto cleanup;
 		statret = -1;
@@ -2565,7 +2584,9 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 			operator_path_resolve = 0;
 			handle_partial_dir(partialptr, PDIR_DELETE);
 		}
-		set_file_attrs(fname, file, &sx, NULL, maybe_ATTRS_REPORT | maybe_ATTRS_ACCURATE_TIME);
+		if (set_file_attrs(fname, file, &sx, NULL, maybe_ATTRS_REPORT | maybe_ATTRS_ACCURATE_TIME
+				   | (preserve_fileflags ? ATTRS_SET_FILEFLAGS | ATTRS_REQUIRE_SUCCESS : 0)) < 0)
+			goto cleanup;
 		if (itemizing)
 			itemize(fnamecmp, file, ndx, statret, &sx, 0, 0, NULL);
 #ifdef SUPPORT_HARD_LINKS

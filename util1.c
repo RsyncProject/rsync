@@ -662,6 +662,9 @@ int robust_rename(const char *from, const char *to, const char *partialptr,
 			rr = do_rename_at(from, to);
 		if (rr == 0)
 			return 0;
+		/* With file flags, neither unlink-first nor copy can publish the staged inode. */
+		if (preserve_fileflags)
+			return -1;
 
 		switch (errno) {
 #ifdef ETXTBSY

@@ -36,6 +36,7 @@ int munge_symlinks = 0;
 int relative_paths = 0;
 unsigned int module_dirlen = 0;
 int preserve_xattrs = 0;
+int preserve_fileflags = 0;
 int preserve_perms = 0;
 int preserve_executability = 0;
 int omit_link_times = 0;

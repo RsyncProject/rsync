@@ -226,6 +226,7 @@
 #define ATTRS_SKIP_ATIME	(1<<3)
 #define ATTRS_SKIP_CRTIME	(1<<5)
 #define ATTRS_REQUIRE_SUCCESS	(1<<6)
+#define ATTRS_SET_FILEFLAGS	(1<<7)
 
 #define MSG_FLUSH	2
 #define FULL_FLUSH	1
@@ -348,6 +349,14 @@ enum delret {
 #include "errcode.h"
 
 #include "config.h"
+
+#if defined RSYNC_TEST_NO_AT_FDCWD || defined RSYNC_TEST_NO_O_DIRECTORY
+#undef SUPPORT_FILEFLAGS
+#endif
+#ifdef SUPPORT_FILEFLAGS
+#define PROTECTED_FILEFLAGS (UF_IMMUTABLE | SF_IMMUTABLE | UF_APPEND | SF_APPEND \
+			     | UF_NOUNLINK | SF_NOUNLINK | UF_READONLY | SF_SNAPSHOT)
+#endif
 
 /* The default RSYNC_RSH is always set in config.h. */
 
@@ -883,6 +892,8 @@ extern int uid_ndx;
 extern int gid_ndx;
 extern int acls_ndx;
 extern int xattrs_ndx;
+extern int preserve_fileflags;
+extern int nodump_ndx;
 extern int file_sum_extra_cnt;
 
 #ifdef USE_FLEXIBLE_ARRAY
@@ -938,6 +949,7 @@ extern int file_sum_extra_cnt;
 #define F_GROUP(f) REQ_EXTRA(f, gid_ndx)->unum
 #define F_ACL(f) REQ_EXTRA(f, acls_ndx)->num
 #define F_XATTR(f) REQ_EXTRA(f, xattrs_ndx)->num
+#define F_NODUMP(f) REQ_EXTRA(f, nodump_ndx)->num
 #define F_NDX(f) REQ_EXTRA(f, unsort_ndx)->num
 #define F_ATIME(f) REQ_EXTRA64(f, atimes_ndx)->num
 #define F_CRTIME(f) REQ_EXTRA64(f, crtimes_ndx)->num

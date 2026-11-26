@@ -77,6 +77,29 @@ static int del_unlink(const char *fbuf)
 	return robust_unlink(fbuf);	/* fall back (ETXTBSY retry, or not held) */
 }
 
+#ifdef SUPPORT_FILEFLAGS
+static BOOL fileflags_allow_delete(const char *path)
+{
+	STRUCT_STAT st;
+	const char *leaf;
+	int dfd, ret;
+
+	if (!preserve_fileflags || dry_run)
+		return True;
+	dfd = del_held_dfd(path, &leaf);
+	ret = dfd >= 0 ? do_lstat_atfd(dfd, leaf, &st) : do_lstat_at(path, &st);
+	if (ret < 0 && errno == ENOENT)
+		return True;
+	if (ret == 0) {
+		if (!(st.st_flags & PROTECTED_FILEFLAGS))
+			return True;
+		errno = EPERM;
+	}
+	rsyserr(FERROR_XFER, errno, "refusing to delete %s with --fileflags", full_fname(path));
+	return False;
+}
+#endif
+
 static inline int is_backup_file(char *fn)
 {
 	int k = strlen(fn) - backup_suffix_len;
@@ -191,6 +214,12 @@ static enum delret delete_dir_contents(char *fname, uint16 flags, BOOL back_up_d
 		}
 
 		strlcpy(p, fp->basename, remainder);
+#ifdef SUPPORT_FILEFLAGS
+		if (!fileflags_allow_delete(fname)) {
+			ret = DR_NOT_EMPTY;
+			continue;
+		}
+#endif
 		back_up = back_up_dirs ? directory_backup_stat(fname, fp->mode, flags, &st) : 0;
 		if (back_up < 0) {
 			if (errno != ENOENT)
@@ -253,6 +282,11 @@ static enum delret delete_item_with_stat(char *fbuf, uint16 mode, uint16 flags,
 		rprintf(FINFO, "delete_item(%s) mode=%o flags=%d\n",
 			fbuf, (int)mode, (int)flags);
 	}
+
+#ifdef SUPPORT_FILEFLAGS
+	if (!(flags & DEL_DIR_IS_EMPTY) && !fileflags_allow_delete(fbuf))
+		return DR_FAILURE;
+#endif
 
 	if (flags & DEL_NO_UID_WRITE)
 		restore_mode = del_chmod(fbuf, mode | S_IWUSR) == 0 && backup_stat;
