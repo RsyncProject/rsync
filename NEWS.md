@@ -4,6 +4,8 @@
 
 - Accept `TCP_CONGESTION=NAME` in socket options on supported Linux builds.
   Distinguish unknown names, unavailable options and malformed values.
+- Add `--placement-log` for local receivers to record verified regular files
+  that reached their final names.
 - Add `--update-links` to skip newer destination symlinks independently
   of `--update`.
 - Allow daemon modules to apply PAM account policy after rsync authentication.

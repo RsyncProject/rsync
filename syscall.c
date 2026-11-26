@@ -620,8 +620,13 @@ static int ona_open(const char *path, int flags, mode_t mode, char *out_abs, siz
 				saved_errno = stat_errno;
 				goto out;
 			}
-		} else
+		} else {
+			if (is_last && (flags & (O_CREAT | O_EXCL)) == (O_CREAT | O_EXCL)) {
+				saved_errno = EEXIST;
+				goto out;
+			}
 			comp_mode = lst.st_mode;
+		}
 
 		if (S_ISLNK(comp_mode)) {
 			/* Symlink: untrusted owner is refused; trusted owner is followed
@@ -833,6 +838,22 @@ out:
 int open_no_attacker_symlinks(const char *path, int flags, mode_t mode)
 {
 	return ona_open(path, flags, mode, NULL, 0, NULL);
+}
+
+/* The receiver has already changed into the destination directory. */
+int open_placement_log(const char *path)
+{
+#if defined AT_FDCWD && defined O_NOFOLLOW && defined O_DIRECTORY
+	STRUCT_STAT dest;
+
+	if (fstatat(AT_FDCWD, ".", &dest, 0) < 0)
+		return -1;
+	return ona_open(path, O_WRONLY | O_CREAT | O_EXCL | O_BINARY | O_CLOEXEC, 0600, NULL, 0, &dest);
+#else
+	(void)path;
+	errno = ENOTSUP;
+	return -1;
+#endif
 }
 
 int open_rrsync_logfile(const char *path)

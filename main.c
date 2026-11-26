@@ -100,6 +100,7 @@ extern int trust_sender_args;
 extern struct stats stats;
 extern char *stdout_format;
 extern char *logfile_format;
+extern char *placement_log;
 extern char *filesfrom_host;
 extern char *skip_dir_marker;
 extern char *partial_dir;
@@ -1021,6 +1022,7 @@ static int do_recv(int f_in, int f_out, char *local_name)
 	int pid;
 	int exit_code = 0;
 	int error_pipe[2];
+	int placement_fd = -1;
 
 	/* The receiving side mustn't obey this, or an existing symlink that
 	 * points to an identical file won't be replaced by the referent. */
@@ -1077,6 +1079,11 @@ static int do_recv(int f_in, int f_out, char *local_name)
 		}
 	}
 
+	if (placement_log && !dry_run && (placement_fd = open_placement_log(placement_log)) < 0) {
+		rsyserr(FERROR, errno, "cannot create placement log %s", full_fname(placement_log));
+		exit_cleanup(RERR_FILEIO);
+	}
+
 	io_flush(FULL_FLUSH);
 
 	if ((pid = do_fork()) == -1) {
@@ -1103,7 +1110,7 @@ static int do_recv(int f_in, int f_out, char *local_name)
 			io_start_buffering_in(f_in);
 		io_start_multiplex_out(f_out);
 
-		recv_files(f_in, f_out, local_name);
+		recv_files(f_in, f_out, local_name, placement_fd);
 		io_flush(FULL_FLUSH);
 		handle_stats(f_in);
 
@@ -1143,6 +1150,8 @@ static int do_recv(int f_in, int f_out, char *local_name)
 		receive_sigusr2();
 	}
 
+	if (placement_fd >= 0)
+		close(placement_fd);
 	am_generator = 1;
 	implied_filter_list.head = implied_filter_list.tail = NULL;
 	flist_receiving_enabled = True;
@@ -1552,6 +1561,11 @@ static int start_client(int argc, char *argv[])
 		remote_argv = argv += argc - 1;
 		remote_argc = argc = 1;
 		rsync_port = 0;
+	}
+
+	if (placement_log && am_sender && !local_server) {
+		rprintf(FERROR, "--placement-log requires a local receiver\n");
+		exit_cleanup(RERR_SYNTAX);
 	}
 
 	if (skip_dir_marker && (!local_server || argc != 1)) {

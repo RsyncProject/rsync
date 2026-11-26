@@ -676,6 +676,7 @@ has its own detailed description later in this manpage.
 --out-format=FORMAT      output updates using the specified FORMAT
 --log-file=FILE          log what we're doing to the specified FILE
 --log-file-format=FMT    log updates using the specified FMT
+--placement-log=FILE    record verified files reaching their final names
 --password-file=FILE     read daemon-access password from FILE
 --early-input=FILE       use FILE for daemon's early exec input
 --list-only              list the files instead of copying them
@@ -4072,6 +4073,30 @@ sign) if you want the local shell to expand it.
     signal all of them (since the non-client processes ignore the signal).
 
     CAUTION: sending SIGVTALRM to an older rsync (pre-3.2.0, June 2020) will kill it.
+
+0.  `--placement-log=FILE`
+
+    Create a separate event log on the receiver of a local copy or pull.
+    Give an absolute path outside the destination directory or, for a
+    single renamed file, outside its parent directory. The path must not
+    already exist. A dry run does not create the log.
+
+    Each record is the file's final pathname relative to that directory
+    followed by one NUL byte. A record is written only after verified
+    regular-file transfer data reaches that name. With `--delay-updates`,
+    this is after the final rename. Unchanged files, metadata-only updates,
+    links and local copies from an alternate destination produce no record.
+    Ordinary logs are unchanged.
+
+    A record does not promise durability or successful application of
+    all metadata. A log write failure makes rsync report a failed transfer
+    without rolling back files already installed. Consumers must ignore
+    an unterminated final record.
+
+    This option requires confined temporary-file output. It does not work
+    with in-place or device writes, alternate temporary or backup
+    directories, an explicit partial directory, directory-link following
+    on the receiver, disabled confinement or batch mode.
 
 0.  `--password-file=FILE`
 

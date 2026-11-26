@@ -200,6 +200,7 @@ char *basis_dir[MAX_BASIS_DIRS+1];
 char *config_file = NULL;
 char *shell_cmd = NULL;
 char *logfile_name = NULL;
+char *placement_log = NULL;
 char *rrsync_logfile_name = NULL;
 char *logfile_format = NULL;
 char *stdout_format = NULL;
@@ -615,6 +616,7 @@ enum {OPT_SERVER = 1000, OPT_DAEMON, OPT_SENDER, OPT_EXCLUDE, OPT_EXCLUDE_FROM,
       OPT_USERMAP, OPT_GROUPMAP, OPT_CHOWN, OPT_BWLIMIT, OPT_STDERR,
       OPT_OLD_COMPRESS, OPT_NEW_COMPRESS, OPT_NO_COMPRESS, OPT_OLD_ARGS,
       OPT_STOP_AFTER, OPT_STOP_AT, OPT_NICE, OPT_NO_NICE, OPT_CHMOD_DEST,
+      OPT_PLACEMENT_LOG,
       OPT_REFUSED_BASE = 9000};
 
 static struct poptOption long_options[] = {
@@ -814,6 +816,7 @@ static struct poptOption long_options[] = {
   {"log-file",         0,  POPT_ARG_STRING, &logfile_name, 0, 0, 0 },
   {"rrsync-log-file",  0,  POPT_ARG_STRING | POPT_ARGFLAG_DOC_HIDDEN, &rrsync_logfile_name, 0, 0, 0 },
   {"log-file-format",  0,  POPT_ARG_STRING, &logfile_format, 0, 0, 0 },
+  {"placement-log",    0,  POPT_ARG_STRING, 0, OPT_PLACEMENT_LOG, 0, 0 },
   {"out-format",       0,  POPT_ARG_STRING, &stdout_format, 0, 0, 0 },
   {"log-format",       0,  POPT_ARG_STRING, &stdout_format, 0, 0, 0 }, /* DEPRECATED */
   {"itemize-changes", 'i', POPT_ARG_NONE,   0, 'i', 0, 0 },
@@ -1976,6 +1979,16 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 			break;
 		}
 
+		case OPT_PLACEMENT_LOG:
+			arg = poptGetOptArg(pc);
+			if (am_server || am_daemon || *arg != '/') {
+				snprintf(err_buf, sizeof err_buf,
+					 "--placement-log requires an absolute path on the local receiver\n");
+				goto cleanup;
+			}
+			placement_log = (char *)arg;
+			break;
+
 		case OPT_INFO:
 			arg = poptGetOptArg(pc);
 			parse_output_words(info_words, info_levels, arg, USER_PRIORITY);
@@ -2300,7 +2313,14 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 	if (orig_protect_args == 2 && am_server)
 		protect_args = orig_protect_args;
 
-	if (protect_args == 1 && am_server) {
+	/* A forked local receiver inherits the log when it reparses -M options. */
+	if (placement_log && (am_daemon || (am_server && !local_server))) {
+		snprintf(err_buf, sizeof err_buf, "--placement-log requires a local receiver\n");
+		goto cleanup;
+	}
+
+	/* Only the remote server will read a second argument vector. */
+	if (protect_args == 1 && am_server && !local_server) {
 		poptFreeContext(pc);
 		return 1;
 	}
@@ -2834,6 +2854,14 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 				goto cleanup;
 			}
 		}
+	}
+
+	if (placement_log && (list_only || inplace || tmpdir || backup_dir || keep_dirlinks
+	                   || insecure_links || confine_root
+	                   || (partial_dir && partial_dir != tmp_partialdir) || read_batch || write_batch)) {
+		snprintf(err_buf, sizeof err_buf,
+			 "--placement-log requires confined temporary-file output on the local receiver\n");
+		goto cleanup;
 	}
 
 	if (trust_sender || am_server || read_batch)
