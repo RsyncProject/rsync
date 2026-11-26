@@ -1,0 +1,39 @@
+#!/bin/sh
+
+# This script does personal backups to a rsync backup server. You will end up
+# with a 7 day rotating incremental backup. The incrementals will go
+# into subdirectories named after the day of the week, and the current
+# full backup goes into a directory called "current"
+# tridge@linuxcare.com
+
+# directory to backup
+BDIR=/home/$USER
+
+# excludes file - this contains a wildcard pattern per line of files to exclude
+EXCLUDES=$HOME/cron/excludes
+
+# the name of the backup machine
+BSERVER=owl
+
+# your password on the backup server
+export RSYNC_PASSWORD=XXXXXX
+
+
+########################################################################
+
+BACKUPDIR=$(date +%A) || exit 1
+DESTINATION=$BSERVER::$USER
+EMPTYDIR=$HOME/emptydir
+
+PATH="$PATH:/bin:/usr/bin:/usr/local/bin"
+export PATH
+
+# Clear the previous backup for this weekday using a newly created empty directory.
+mkdir "$EMPTYDIR" || exit 1
+rsync --delete -a "$EMPTYDIR/" "$DESTINATION/$BACKUPDIR/"
+status=$?
+rmdir "$EMPTYDIR" || exit 1
+[ "$status" -eq 0 ] || exit "$status"
+
+rsync --force --ignore-errors --delete-excluded --exclude-from="$EXCLUDES" \
+      --delete --backup --backup-dir="/$BACKUPDIR" -a "$BDIR" "$DESTINATION/current"

@@ -130,6 +130,7 @@ pid_t local_child(int argc, char **argv, int *f_in, int *f_out,
 	if (pid == 0) {
 		am_sender = 0;
 		am_server = 1;
+		niceness_use_remote();
 		filesfrom_fd = -1;
 		munge_symlinks = 0; /* Each side needs its own option. */
 		chmod_modes = NULL; /* Let the sending side handle this. */
