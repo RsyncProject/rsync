@@ -93,6 +93,7 @@
 #define FLAG_TIME_FAILED (1<<11)/* generator */
 #define FLAG_MOD_NSEC (1<<12)	/* sender/receiver/generator */
 #define FLAG_GOT_DIR_FLIST (1<<13)/* sender/receiver/generator - dir_flist only */
+#define FLAG_HLINK_WAIT (1<<14) /* generator (w/FLAG_HLINKED): counted in in_progress, pending hard-link processing */
 
 /* These flags are passed to functions but not stored. */
 
@@ -111,7 +112,7 @@
 
 /* Update this if you make incompatible changes and ALSO update the
  * SUBPROTOCOL_VERSION if it is not a final (official) release. */
-#define PROTOCOL_VERSION 32
+#define PROTOCOL_VERSION 33
 
 /* This is used when working on a new protocol version or for any unofficial
  * protocol tweaks.  It should be a non-zero value for each pre-release repo
@@ -192,6 +193,13 @@
 #define IOERR_VANISHED	(1<<1)
 #define IOERR_DEL_LIMIT (1<<2)
 
+/* Mask of all currently defined IOERR_* bits.  Used to sanitize values
+ * received from a peer via MSG_IO_ERROR so a malicious peer cannot set
+ * arbitrary (undefined) bits in the local io_error, which would then be
+ * stored and re-forwarded upstream.  (Undefined bits never reach the exit
+ * code: cleanup.c maps only these defined bits onto RERR_* values.) */
+#define IOERR_VALID_MASK (IOERR_GENERAL | IOERR_VANISHED | IOERR_DEL_LIMIT)
+
 #define MAX_ARGS 1000
 #define MAX_BASIS_DIRS 20
 #define MAX_SERVER_ARGS (MAX_BASIS_DIRS*2 + 100)
@@ -217,6 +225,7 @@
 #define ATTRS_ACCURATE_TIME	(1<<2)
 #define ATTRS_SKIP_ATIME	(1<<3)
 #define ATTRS_SKIP_CRTIME	(1<<5)
+#define ATTRS_REQUIRE_SUCCESS	(1<<6)
 
 #define MSG_FLUSH	2
 #define FULL_FLUSH	1
@@ -292,6 +301,7 @@ enum msgcode {
 	MSG_LOG=FLOG, MSG_CLIENT=FCLIENT, /* sibling logging */
 	MSG_REDO=9,	/* reprocess indicated flist index */
 	MSG_STATS=10,	/* message has stats data for generator */
+	MSG_BLOCK_STATS=11,/* message has block-level stats for sender */
 	MSG_IO_ERROR=22,/* the sending side had an I/O error */
 	MSG_IO_TIMEOUT=33,/* tell client about a daemon's timeout value */
 	MSG_NOOP=42,	/* a do-nothing message (legacy protocol-30 only) */
@@ -299,7 +309,6 @@ enum msgcode {
 	MSG_SUCCESS=100,/* successfully updated indicated flist index */
 	MSG_DELETED=101,/* successfully deleted a file on receiving side */
 	MSG_NO_SEND=102,/* sender failed to open a file we wanted */
-	MSG_DATA_LIMIT_REACHED=62, /* transfer limit reached */
 };
 
 enum filetype {
@@ -404,6 +413,21 @@ enum delret {
 #endif
 #endif
 
+/* O_CLOEXEC is absent on some still-supported targets.  Defining it to zero
+ * preserves the open flags there; the test macro exercises that fallback on
+ * build hosts that provide O_CLOEXEC. */
+#ifdef RSYNC_TEST_NO_O_CLOEXEC
+#undef O_CLOEXEC
+#endif
+#ifndef O_CLOEXEC
+#define O_CLOEXEC 0
+#endif
+
+/* Exercise the O_DIRECTORY portability path on build hosts that provide it. */
+#ifdef RSYNC_TEST_NO_O_DIRECTORY
+#undef O_DIRECTORY
+#endif
+
 #ifdef HAVE_SYS_IOCTL_H
 #include <sys/ioctl.h>
 #endif
@@ -423,6 +447,16 @@ enum delret {
 #include <grp.h>
 #endif
 #include <errno.h>
+
+/* O_NOFOLLOW refuses a final-component symlink with ELOOP on Linux, EMLINK on
+ * FreeBSD, and EFTYPE on NetBSD/OpenBSD. Treat all three as "hit a symlink". A
+ * genuine EMLINK (too many hard links) is harmless where this is used: callers
+ * fall through to a readlink/lstat, which restores the real error. */
+#ifdef EFTYPE
+# define NOFOLLOW_HIT_SYMLINK(e) ((e) == ELOOP || (e) == EMLINK || (e) == EFTYPE)
+#else
+# define NOFOLLOW_HIT_SYMLINK(e) ((e) == ELOOP || (e) == EMLINK)
+#endif
 
 #ifdef HAVE_UTIME_H
 #include <utime.h>
@@ -699,6 +733,8 @@ typedef unsigned int size_t;
 # define SIZEOF_INT64 SIZEOF_OFF_T
 #endif
 
+#define MAX_INT32 ((int32)0x7fffffff)
+
 #define HT_KEY32 0
 #define HT_KEY64 1
 
@@ -719,7 +755,7 @@ struct ht_int64_node {
 	int64 key;
 };
 
-#define HT_NODE(tbl, bkts, i) ((void*)((char*)(bkts) + (i)*(tbl)->node_size))
+#define HT_NODE(tbl, bkts, i) ((void*)((char*)(bkts) + (size_t)(i)*(tbl)->node_size))
 #define HT_KEY(node, k64) ((k64)? ((struct ht_int64_node*)(node))->key \
 			 : (int64)((struct ht_int32_node*)(node))->key)
 
@@ -800,11 +836,13 @@ struct ht_int64_node {
 
 #if defined __STDC_VERSION__ && __STDC_VERSION__ >= 199901L
 #define USE_FLEXIBLE_ARRAY 1
-#define SIZE_T_FMT_MOD "z" /* printf supports %zd */
+#define SIZE_T_FMT_MOD "z" /* printf has a size_t length modifier */
 #define SIZE_T_FMT_CAST size_t
+#define SSIZE_T_FMT_CAST ssize_t
 #else
-#define SIZE_T_FMT_MOD "l" /* printf supports %ld */
-#define SIZE_T_FMT_CAST long
+#define SIZE_T_FMT_MOD "l"
+#define SIZE_T_FMT_CAST unsigned long
+#define SSIZE_T_FMT_CAST long
 #endif
 
 union file_extras {
@@ -846,8 +884,6 @@ extern int gid_ndx;
 extern int acls_ndx;
 extern int xattrs_ndx;
 extern int file_sum_extra_cnt;
-extern int64 data_transfer_limit;
-extern int delay_transfer_limit_check;
 
 #ifdef USE_FLEXIBLE_ARRAY
 #define FILE_STRUCT_LEN (sizeof (struct file_struct))
@@ -1036,6 +1072,7 @@ struct map_struct {
 #define FILTRULE_CLEAR_LIST	(1<<18)/* this item is the "!" token */
 #define FILTRULE_PERISHABLE	(1<<19)/* perishable if parent dir goes away */
 #define FILTRULE_XATTR		(1<<20)/* rule only applies to xattr names */
+#define FILTRULE_FROM_FILE	(1<<21)/* pattern text came from a file's contents */
 
 #define FILTRULES_SIDES (FILTRULE_SENDER_SIDE | FILTRULE_RECEIVER_SIDE)
 
@@ -1063,6 +1100,7 @@ struct stats {
 	int64 total_read;
 	int64 literal_data;
 	int64 matched_data;
+	int64 touched_blocks_4k;
 	int64 flist_buildtime;
 	int64 flist_xfertime;
 	int64 flist_size;
@@ -1159,6 +1197,20 @@ typedef struct {
 #define NORETURN __attribute__((__noreturn__))
 #endif
 
+/* Under --enable-coverage, gcov flushes counters via an atexit handler that
+ * _exit() bypasses.  Forked helpers that terminate via _exit() -- the
+ * pre/post-xfer-exec children, the become_daemon original process, the
+ * per-connection accept-loop child on early return -- must dump explicitly
+ * or their counters are lost, which systematically under-reports daemon-side
+ * coverage.  cleanup.c and main.c already inline this for the two main exit
+ * paths; this macro covers the rest.  No-op when not a coverage build. */
+#ifdef GCOV_COVERAGE
+extern void __gcov_dump(void);
+#define gcov_flush() __gcov_dump()
+#else
+#define gcov_flush() ((void)0)
+#endif
+
 typedef struct {
     STRUCT_STAT st;
     time_t crtime;
@@ -1185,6 +1237,11 @@ typedef struct {
 
 #define NSTR_CHECKSUM 0
 #define NSTR_COMPRESS 1
+
+#define NNI_BUILTIN (1<<0)
+#define NNI_EVP (1<<1)
+#define NNI_EVP_OK (1<<2)
+#define NNI_EXPLICIT_ONLY (1<<3)
 
 struct name_num_item {
 	int num, flags;

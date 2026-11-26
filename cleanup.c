@@ -34,7 +34,6 @@ extern int protocol_version;
 extern int output_needs_newline;
 extern char *partial_dir;
 extern char *logfile_name;
-extern int data_transfer_limit_reached;
 
 int called_from_signal_handler = 0;
 BOOL shutting_down = False;
@@ -117,6 +116,8 @@ NORETURN void _exit_cleanup(int code, const char *file, int line)
 		exit_line = line < 0 ? -line : line;
 	}
 
+	end_backup_access();
+
 	/* If this is the exit at the end of the run, the server side
 	 * should not attempt to output a message (see log_exit()). */
 	if (am_server && code == 0)
@@ -163,7 +164,8 @@ NORETURN void _exit_cleanup(int code, const char *file, int line)
 				cleanup_fd_r = -1;
 			}
 			if (cleanup_fd_w != -1) {
-				flush_write_file(cleanup_fd_w);
+				if (!called_from_signal_handler)
+					flush_write_file(cleanup_fd_w);
 				close(cleanup_fd_w);
 				cleanup_fd_w = -1;
 			}
@@ -211,8 +213,6 @@ NORETURN void _exit_cleanup(int code, const char *file, int line)
 		if (exit_code == 0) {
 			if (code)
 				exit_code = code;
-			if (data_transfer_limit_reached)
-				exit_code = RERR_DATA_LIMIT;
 			if (io_error & IOERR_DEL_LIMIT)
 				exit_code = RERR_DEL_LIMIT;
 			if (io_error & IOERR_VANISHED)

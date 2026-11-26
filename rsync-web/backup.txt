@@ -21,16 +21,19 @@ export RSYNC_PASSWORD=XXXXXX
 
 ########################################################################
 
-BACKUPDIR=`date +%A`
-OPTS="--force --ignore-errors --delete-excluded --exclude-from=$EXCLUDES 
-      --delete --backup --backup-dir=/$BACKUPDIR -a"
+BACKUPDIR=$(date +%A) || exit 1
+DESTINATION=$BSERVER::$USER
+EMPTYDIR=$HOME/emptydir
 
-export PATH=$PATH:/bin:/usr/bin:/usr/local/bin
+PATH="$PATH:/bin:/usr/bin:/usr/local/bin"
+export PATH
 
-# the following line clears the last weeks incremental directory
-[ -d $HOME/emptydir ] || mkdir $HOME/emptydir
-rsync --delete -a $HOME/emptydir/ $BSERVER::$USER/$BACKUPDIR/
-rmdir $HOME/emptydir
+# Clear the previous backup for this weekday using a newly created empty directory.
+mkdir "$EMPTYDIR" || exit 1
+rsync --delete -a "$EMPTYDIR/" "$DESTINATION/$BACKUPDIR/"
+status=$?
+rmdir "$EMPTYDIR" || exit 1
+[ "$status" -eq 0 ] || exit "$status"
 
-# now the actual transfer
-rsync $OPTS $BDIR $BSERVER::$USER/current
+rsync --force --ignore-errors --delete-excluded --exclude-from="$EXCLUDES" \
+      --delete --backup --backup-dir="/$BACKUPDIR" -a "$BDIR" "$DESTINATION/current"
