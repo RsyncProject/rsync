@@ -572,6 +572,7 @@ has its own detailed description later in this manpage.
 --perms, -p              preserve permissions
 --executability, -E      preserve executability
 --chmod=CHMOD            affect file and/or directory permissions
+--chmod-dest=CHMOD       set backup permissions with --fake-super
 --acls, -A               preserve ACLs (implies --perms)
 --xattrs, -X             preserve extended attributes
 --owner, -o              preserve owner (super-user only)
@@ -647,6 +648,7 @@ has its own detailed description later in this manpage.
 --compress-level=NUM     explicitly set compression level (aka --zl)
 --compress-threads=NUM   explicitly set compression threads (aka --zt)
 --skip-compress=LIST     skip compressing files with suffix in LIST
+--skip-dir-with=FILE     skip source directories containing a marker file
 --cvs-exclude, -C        auto-ignore files in the same way CVS does
 --filter=RULE, -f        add a file-filtering RULE
 -F                       same as --filter='dir-merge /.rsync-filter'
@@ -676,6 +678,7 @@ has its own detailed description later in this manpage.
 --out-format=FORMAT      output updates using the specified FORMAT
 --log-file=FILE          log what we're doing to the specified FILE
 --log-file-format=FMT    log updates using the specified FMT
+--placement-log=FILE    record verified files reaching their final names
 --password-file=FILE     read daemon-access password from FILE
 --early-input=FILE       use FILE for daemon's early exec input
 --list-only              list the files instead of copying them
@@ -1798,6 +1801,27 @@ sign) if you want the local shell to expand it.
 
     See the [`--perms`](#opt) and [`--executability`](#opt) options for how the
     resulting permission value can be applied to the files in the transfer.
+
+0.  `--chmod-dest=CHMOD`
+
+    Apply a [`--chmod`](#opt) expression to the physical permissions of
+    backup files and directories. The stored permissions still describe
+    the permissions to restore. As with [`--fake-super`](#opt), rsync keeps
+    owner read and write access and owner search access on directories.
+    Setuid, setgid and sticky bits are not applied to the backup. Symlinks
+    and special files are not affected by this option.
+
+    Enable this option with `--fake-super` and [`--perms`](#opt) on the
+    receiver. For a remote-shell push, pass both receiver options with
+    [`--remote-option`](#opt), for example:
+
+    >     rsync -a -M--fake-super -M--chmod-dest=g+r /src/ host:/backup/
+
+    Applying this option to an existing regular file with multiple hard
+    links is refused. This option is not available to an rsync daemon. It requires
+    ordinary temporary-file transfers and cannot be combined with alternate
+    destinations, `--hard-links`, `--backup`, `--inplace`, `--partial`,
+    `--temp-dir`, `--remove-source-files` or batch mode.
 
 0.  `--owner`, `-o`
 
@@ -3397,6 +3421,19 @@ sign) if you want the local shell to expand it.
     list of non-compressing files (and its list may be configured to a
     different default).
 
+0.  `--skip-dir-with=FILE`
+
+    In a recursive local copy with one source directory, omit a directory
+    and its contents if it contains a regular file with the given basename.
+    The source directory itself can be omitted even when it ends in a slash.
+    A symlink or directory with the marker name does not count as a marker.
+    An error checking the marker is reported rather than treated as absence.
+
+    The marker name cannot contain a slash, backslash or colon. This is a
+    filename test, not a test of the marker's contents. The option cannot
+    be used with `--delete`, `--delete-missing-args`, `--force`, `--relative`,
+    `--files-from`, `--remote-option` or batch mode.
+
 0.  `--numeric-ids`
 
     With this option rsync will transfer numeric group and user IDs rather than
@@ -4048,6 +4085,24 @@ sign) if you want the local shell to expand it.
     specify the [`--progress`](#opt) option in order to use
     [`--info=progress2`](#opt).)
 
+    The percentage compares the size of the files transferred so far with the
+    size of the files in the transfer.  Both are full file sizes, not the
+    amount of data sent.  When the whole file list is known before the
+    transfer starts (see [`--no-inc-recursive`](#opt)), a file that needed no
+    transfer is taken out of that total once rsync starts transferring a later
+    file, or once it reaches the end of the list.  Such a file is still in the
+    total while it lies ahead of the current transfer, so the percentage can
+    understate progress and it moves straight to 100% at the end if files
+    needing no transfer follow the last one transferred.  A run that transfers
+    nothing ends at 100%.  A file that has to be sent a second time is added
+    to the total again, which can make the percentage step back.
+
+    With incremental recursion the total covers only the part of the file
+    list scanned so far. When pushing with [`--iconv`](#opt), the sender
+    cannot use its file list to infer the receiver's check order. In both
+    cases the estimate keeps files that needed no transfer. The percentage
+    can finish below 100% or exceed it after a retry.
+
     The time field estimates time remaining during the transfer and shows
     elapsed time in the final summary.
 
@@ -4063,6 +4118,30 @@ sign) if you want the local shell to expand it.
     signal all of them (since the non-client processes ignore the signal).
 
     CAUTION: sending SIGVTALRM to an older rsync (pre-3.2.0, June 2020) will kill it.
+
+0.  `--placement-log=FILE`
+
+    Create a separate event log on the receiver of a local copy or pull.
+    Give an absolute path outside the destination directory or, for a
+    single renamed file, outside its parent directory. The path must not
+    already exist. A dry run does not create the log.
+
+    Each record is the file's final pathname relative to that directory
+    followed by one NUL byte. A record is written only after verified
+    regular-file transfer data reaches that name. With `--delay-updates`,
+    this is after the final rename. Unchanged files, metadata-only updates,
+    links and local copies from an alternate destination produce no record.
+    Ordinary logs are unchanged.
+
+    A record does not promise durability or successful application of
+    all metadata. A log write failure makes rsync report a failed transfer
+    without rolling back files already installed. Consumers must ignore
+    an unterminated final record.
+
+    This option requires confined temporary-file output. It does not work
+    with in-place or device writes, alternate temporary or backup
+    directories, an explicit partial directory, directory-link following
+    on the receiver, disabled confinement or batch mode.
 
 0.  `--password-file=FILE`
 

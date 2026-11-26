@@ -714,7 +714,17 @@ static void discard_receive_data(int f_in, struct file_struct *file)
 	receive_data(f_in, NULL, -1, 0, NULL, -1, file, 0);
 }
 
-static void handle_delayed_updates(char *local_name)
+static void record_placement(int *log_fd, const char *name)
+{
+	if (*log_fd >= 0 && full_write(*log_fd, name, strlen(name) + 1) < 0) {
+		int error = errno;
+		close(*log_fd);
+		*log_fd = -1;
+		rsyserr(FERROR_XFER, error, "cannot write placement log");
+	}
+}
+
+static void handle_delayed_updates(char *local_name, int *log_fd)
 {
 	char *fname, *partialptr;
 	int ndx;
@@ -743,6 +753,8 @@ static void handle_delayed_updates(char *local_name)
 					"rename failed for %s (from %s)",
 					full_fname(fname), partialptr);
 			} else {
+				if (S_ISREG(file->mode))
+					record_placement(log_fd, fname);
 				if (remove_source_files || (preserve_hard_links && F_IS_HLINKED(file)))
 					send_msg_success(fname, ndx);
 				handle_partial_dir(partialptr, PDIR_DELETE);
@@ -824,7 +836,7 @@ static int gen_wants_ndx(int desired_ndx, int flist_num)
  * main routine for receiver process.
  *
  * Receiver process runs on the same host as the generator process. */
-int recv_files(int f_in, int f_out, char *local_name)
+int recv_files(int f_in, int f_out, char *local_name, int placement_fd)
 {
 	int fd1,fd2;
 	STRUCT_STAT st;
@@ -891,7 +903,7 @@ int recv_files(int f_in, int f_out, char *local_name)
 			if (DEBUG_GTE(RECV, 1))
 				rprintf(FINFO, "recv_files phase=%d\n", phase);
 			if (phase == 2 && delay_updates)
-				handle_delayed_updates(local_name);
+				handle_delayed_updates(local_name, &placement_fd);
 			write_int(f_out, NDX_DONE);
 			continue;
 		}
@@ -1391,6 +1403,8 @@ int recv_files(int f_in, int f_out, char *local_name)
 		case 2:
 			break;
 		case 1:
+			if (S_ISREG(file->mode))
+				record_placement(&placement_fd, fname);
 			if (remove_source_files || inc_recurse || (preserve_hard_links && F_IS_HLINKED(file)))
 				send_msg_success(fname, ndx);
 			break;
@@ -1436,7 +1450,10 @@ int recv_files(int f_in, int f_out, char *local_name)
 		make_backups = -make_backups;
 
 	if (phase == 2 && delay_updates) /* for protocol_version < 29 */
-		handle_delayed_updates(local_name);
+		handle_delayed_updates(local_name, &placement_fd);
+
+	if (placement_fd >= 0 && close(placement_fd) < 0)
+		rsyserr(FERROR_XFER, errno, "cannot close placement log");
 
 	finish_progress();
 

@@ -46,6 +46,7 @@ extern int inc_recurse;
 extern int blocking_io;
 extern int always_checksum;
 extern int time_only;
+extern struct chmod_mode_struct *dest_chmod_modes;
 extern int remove_source_files;
 extern int output_needs_newline;
 extern int called_from_signal_handler;
@@ -100,7 +101,9 @@ extern int trust_sender_args;
 extern struct stats stats;
 extern char *stdout_format;
 extern char *logfile_format;
+extern char *placement_log;
 extern char *filesfrom_host;
+extern char *skip_dir_marker;
 extern char *partial_dir;
 extern char *rsync_path;
 extern char *shell_cmd;
@@ -1043,6 +1046,7 @@ static int do_recv(int f_in, int f_out, char *local_name)
 	int pid;
 	int exit_code = 0;
 	int error_pipe[2];
+	int placement_fd = -1;
 
 	/* The receiving side mustn't obey this, or an existing symlink that
 	 * points to an identical file won't be replaced by the referent. */
@@ -1099,6 +1103,11 @@ static int do_recv(int f_in, int f_out, char *local_name)
 		}
 	}
 
+	if (placement_log && !dry_run && (placement_fd = open_placement_log(placement_log)) < 0) {
+		rsyserr(FERROR, errno, "cannot create placement log %s", full_fname(placement_log));
+		exit_cleanup(RERR_FILEIO);
+	}
+
 	io_flush(FULL_FLUSH);
 
 	if ((pid = do_fork()) == -1) {
@@ -1125,7 +1134,7 @@ static int do_recv(int f_in, int f_out, char *local_name)
 			io_start_buffering_in(f_in);
 		io_start_multiplex_out(f_out);
 
-		recv_files(f_in, f_out, local_name);
+		recv_files(f_in, f_out, local_name, placement_fd);
 		if (per_dir_basis_root_fd >= 0) {
 			close(per_dir_basis_root_fd);
 			per_dir_basis_root_fd = -1;
@@ -1169,6 +1178,8 @@ static int do_recv(int f_in, int f_out, char *local_name)
 		receive_sigusr2();
 	}
 
+	if (placement_fd >= 0)
+		close(placement_fd);
 	am_generator = 1;
 	implied_filter_list.head = implied_filter_list.tail = NULL;
 	flist_receiving_enabled = True;
@@ -1584,6 +1595,16 @@ static int start_client(int argc, char *argv[])
 		rsync_port = 0;
 	}
 
+	if (placement_log && am_sender && !local_server) {
+		rprintf(FERROR, "--placement-log requires a local receiver\n");
+		exit_cleanup(RERR_SYNTAX);
+	}
+
+	if (skip_dir_marker && (!local_server || argc != 1)) {
+		rprintf(FERROR, "--skip-dir-with requires a local copy with one source directory\n");
+		exit_cleanup(RERR_SYNTAX);
+	}
+
 	/* A local transfer doesn't unbackslash anything, so leave the args alone. */
 	if (local_server) {
 		old_style_args = 2;
@@ -1591,6 +1612,10 @@ static int start_client(int argc, char *argv[])
 	}
 	if (time_only && am_sender && !local_server) {
 		rprintf(FERROR, "--time-only requires a local receiver or a remote source\n");
+		exit_cleanup(RERR_SYNTAX);
+	}
+	if (dest_chmod_modes && am_sender && !local_server) {
+		rprintf(FERROR, "--chmod-dest must be set on the receiver; use -M for a remote-shell receiver\n");
 		exit_cleanup(RERR_SYNTAX);
 	}
 

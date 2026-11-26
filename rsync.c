@@ -57,6 +57,7 @@ extern int make_backups;
 extern int sanitize_paths;
 extern struct file_list *cur_flist, *first_flist, *dir_flist;
 extern struct chmod_mode_struct *daemon_chmod_modes;
+extern struct chmod_mode_struct *dest_chmod_modes;
 #ifdef ICONV_OPTION
 extern char *iconv_opt;
 #endif
@@ -722,15 +723,24 @@ int set_file_attrs(const char *fname, struct file_struct *file, stat_x *sxp,
 	}
 
 #ifdef SUPPORT_XATTRS
+	BOOL backup_mode = dest_chmod_modes && (S_ISREG(new_mode) || S_ISDIR(new_mode));
+	if (backup_mode && !dry_run
+	 && (op_refuse || xattr_refuse || held_fd < 0)) {
+		errno = ENOTSUP;
+		rsyserr(FERROR_XFER, errno, "cannot safely set backup mode on %s", full_fname(fname));
+		goto failed;
+	}
 	if (am_root < 0 && !op_refuse && !xattr_refuse) {
 		/* Changing the fake stat xattr can change mtime on disk. */
 		int ret = set_stat_xattr(fname, file, new_mode, held_fd);
-		if (ret < 0 && (flags & ATTRS_REQUIRE_SUCCESS))
+		if (ret < 0 && (backup_mode || (flags & ATTRS_REQUIRE_SUCCESS)))
 			goto failed;
 		mtime_stale = ret > 0;
 	}
-	if (preserve_xattrs && fnamecmp && !op_refuse && !xattr_refuse)
-		set_xattr(fname, file, fnamecmp, sxp, held_fd);
+	if (preserve_xattrs && fnamecmp && !op_refuse && !xattr_refuse
+	 && set_xattr(fname, file, fnamecmp, sxp, held_fd) < 0
+	 && (flags & ATTRS_REQUIRE_SUCCESS))
+		goto failed;
 #endif
 
 	if ((omit_dir_times && S_ISDIR(sxp->st.st_mode))
@@ -916,8 +926,13 @@ int finish_transfer(const char *fname, const char *fnametmp,
 		    int overwriting_basis)
 {
 	int ret;
+	int attr_flags = ok_to_set_time ? ATTRS_ACCURATE_TIME
+		       : ATTRS_SKIP_MTIME | ATTRS_SKIP_ATIME | ATTRS_SKIP_CRTIME;
 	BOOL backup_basis = False;
 	const char *temp_copy_name = partialptr && *partialptr != '/' ? partialptr : NULL;
+
+	if (dest_chmod_modes)
+		attr_flags |= ATTRS_REQUIRE_SUCCESS;
 
 	if (inplace) {
 		if (DEBUG_GTE(RECV, 1))
@@ -944,16 +959,22 @@ int finish_transfer(const char *fname, const char *fnametmp,
 	if (backup_basis && !begin_backup_read())
 		return 0;
 	operator_path_resolve = 1;
-	set_file_attrs(fnametmp, file, NULL, fnamecmp,
-		       ok_to_set_time ? ATTRS_ACCURATE_TIME : ATTRS_SKIP_MTIME | ATTRS_SKIP_ATIME | ATTRS_SKIP_CRTIME);
+	ret = set_file_attrs(fnametmp, file, NULL, fnamecmp, attr_flags);
 	operator_path_resolve = 0;
 	if (backup_basis && !end_backup_access())
 		return 0;
+	if (ret < 0) {
+		rsyserr(FERROR_XFER, errno, "cannot prepare backup attributes for %s", full_fname(fname));
+		do_unlink_at(fnametmp);
+		return 0;
+	}
 
 	/* move tmp file over real file */
 	if (DEBUG_GTE(RECV, 1))
 		rprintf(FINFO, "renaming %s to %s\n", fnametmp, fname);
-	ret = robust_rename(fnametmp, fname, temp_copy_name, file->mode, file);
+	/* A copy fallback would publish before the requested mode was applied. */
+	ret = dest_chmod_modes ? do_rename_at(fnametmp, fname)
+	    : robust_rename(fnametmp, fname, temp_copy_name, file->mode, file);
 	if (ret < 0) {
 		rsyserr(FERROR_XFER, errno, "%s %s -> \"%s\"",
 			ret == -2 ? "copy" : "rename",
@@ -975,9 +996,10 @@ int finish_transfer(const char *fname, const char *fnametmp,
 	backup_basis = preserve_xattrs && fnamecmp == backup_dir_buf;
 	if (backup_basis && !begin_backup_read())
 		return 0;
-	set_file_attrs(fnametmp, file, NULL, fnamecmp,
-		       ok_to_set_time ? ATTRS_ACCURATE_TIME : ATTRS_SKIP_MTIME | ATTRS_SKIP_ATIME | ATTRS_SKIP_CRTIME);
+	ret = set_file_attrs(fnametmp, file, NULL, fnamecmp, attr_flags);
 	if (backup_basis && !end_backup_access())
+		return 0;
+	if (ret < 0)
 		return 0;
 
 	if (temp_copy_name) {

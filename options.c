@@ -162,6 +162,7 @@ int32 block_size = 0;
 time_t stop_at_utime = 0;
 char *skip_compress = NULL;
 char *copy_as = NULL;
+char *skip_dir_marker = NULL;
 item_list dparam_list = EMPTY_ITEM_LIST;
 
 /** Network address family. **/
@@ -199,6 +200,7 @@ char *basis_dir[MAX_BASIS_DIRS+1];
 char *config_file = NULL;
 char *shell_cmd = NULL;
 char *logfile_name = NULL;
+char *placement_log = NULL;
 char *rrsync_logfile_name = NULL;
 char *logfile_format = NULL;
 char *stdout_format = NULL;
@@ -249,6 +251,7 @@ char *iconv_opt =
 #endif
 
 struct chmod_mode_struct *chmod_modes = NULL;
+struct chmod_mode_struct *dest_chmod_modes = NULL;
 
 static const char *const debug_verbosity[] = {
 	/*0*/ NULL,
@@ -614,7 +617,8 @@ enum {OPT_SERVER = 1000, OPT_DAEMON, OPT_SENDER, OPT_EXCLUDE, OPT_EXCLUDE_FROM,
       OPT_NO_D, OPT_APPEND, OPT_NO_ICONV, OPT_INFO, OPT_DEBUG, OPT_BLOCK_SIZE,
       OPT_USERMAP, OPT_GROUPMAP, OPT_CHOWN, OPT_BWLIMIT, OPT_STDERR,
       OPT_OLD_COMPRESS, OPT_NEW_COMPRESS, OPT_NO_COMPRESS, OPT_OLD_ARGS,
-      OPT_STOP_AFTER, OPT_STOP_AT, OPT_NICE, OPT_NO_NICE,
+      OPT_STOP_AFTER, OPT_STOP_AT, OPT_NICE, OPT_NO_NICE, OPT_CHMOD_DEST,
+      OPT_PLACEMENT_LOG,
       OPT_REFUSED_BASE = 9000};
 
 static struct poptOption long_options[] = {
@@ -722,6 +726,7 @@ static struct poptOption long_options[] = {
   {"i-d",              0,  POPT_ARG_VAL,    &implied_dirs, 1, 0, 0 },
   {"no-i-d",           0,  POPT_ARG_VAL,    &implied_dirs, 0, 0, 0 },
   {"chmod",            0,  POPT_ARG_STRING, 0, OPT_CHMOD, 0, 0 },
+  {"chmod-dest",       0,  POPT_ARG_STRING, 0, OPT_CHMOD_DEST, 0, 0 },
   {"ignore-times",    'I', POPT_ARG_NONE,   &ignore_times, 0, 0, 0 },
   {"size-only",        0,  POPT_ARG_NONE,   &size_only, 0, 0, 0 },
   {"time-only",        0,  POPT_ARG_NONE,   &time_only, 0, 0, 0 },
@@ -794,6 +799,7 @@ static struct poptOption long_options[] = {
   {"compress-choice",  0,  POPT_ARG_STRING, &compress_choice, 0, 0, 0 },
   {"zc",               0,  POPT_ARG_STRING, &compress_choice, 0, 0, 0 },
   {"skip-compress",    0,  POPT_ARG_STRING, &skip_compress, 0, 0, 0 },
+  {"skip-dir-with",    0,  POPT_ARG_STRING, &skip_dir_marker, 0, 0, 0 },
   {"compress-level",   0,  POPT_ARG_INT,    &do_compression_level, 0, 0, 0 },
   {"zl",               0,  POPT_ARG_INT,    &do_compression_level, 0, 0, 0 },
   {"compress-threads", 0,  POPT_ARG_INT,    &do_compression_threads, 0, 0, 0 },
@@ -814,6 +820,7 @@ static struct poptOption long_options[] = {
   {"log-file",         0,  POPT_ARG_STRING, &logfile_name, 0, 0, 0 },
   {"rrsync-log-file",  0,  POPT_ARG_STRING | POPT_ARGFLAG_DOC_HIDDEN, &rrsync_logfile_name, 0, 0, 0 },
   {"log-file-format",  0,  POPT_ARG_STRING, &logfile_format, 0, 0, 0 },
+  {"placement-log",    0,  POPT_ARG_STRING, 0, OPT_PLACEMENT_LOG, 0, 0 },
   {"out-format",       0,  POPT_ARG_STRING, &stdout_format, 0, 0, 0 },
   {"log-format",       0,  POPT_ARG_STRING, &stdout_format, 0, 0, 0 }, /* DEPRECATED */
   {"itemize-changes", 'i', POPT_ARG_NONE,   0, 'i', 0, 0 },
@@ -1999,13 +2006,26 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 		}
 
 		case OPT_CHMOD:
+		case OPT_CHMOD_DEST: {
+			BOOL dest = opt == OPT_CHMOD_DEST;
 			arg = poptGetOptArg(pc);
-			if (!parse_chmod(arg, &chmod_modes)) {
+			if (!parse_chmod(arg, dest ? &dest_chmod_modes : &chmod_modes)) {
 				snprintf(err_buf, sizeof err_buf,
-					"Invalid argument passed to --chmod (%s)\n",
-					arg);
+					"Invalid argument passed to --chmod%s (%s)\n",
+					dest ? "-dest" : "", arg);
 				goto cleanup;
 			}
+			break;
+		}
+
+		case OPT_PLACEMENT_LOG:
+			arg = poptGetOptArg(pc);
+			if (am_server || am_daemon || *arg != '/') {
+				snprintf(err_buf, sizeof err_buf,
+					 "--placement-log requires an absolute path on the local receiver\n");
+				goto cleanup;
+			}
+			placement_log = (char *)arg;
 			break;
 
 		case OPT_INFO:
@@ -2337,7 +2357,14 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 		goto cleanup;
 	}
 
-	if (protect_args == 1 && am_server) {
+	/* A forked local receiver inherits the log when it reparses -M options. */
+	if (placement_log && (am_daemon || (am_server && !local_server))) {
+		snprintf(err_buf, sizeof err_buf, "--placement-log requires a local receiver\n");
+		goto cleanup;
+	}
+
+	/* Only the remote server will read a second argument vector. */
+	if (protect_args == 1 && am_server && !local_server) {
 		poptFreeContext(pc);
 		return 1;
 	}
@@ -2534,6 +2561,26 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 	if (refused_delete && (delete_mode || missing_args == 2)) {
 		create_refuse_error(refused_delete);
 		goto cleanup;
+	}
+
+	if (skip_dir_marker) {
+#if !defined HAVE_DIRFD || !defined AT_FDCWD || !defined AT_SYMLINK_NOFOLLOW
+		snprintf(err_buf, sizeof err_buf, "--skip-dir-with needs directory-relative stat support\n");
+		goto cleanup;
+#endif
+		if (!*skip_dir_marker || strcmp(skip_dir_marker, ".") == 0
+		 || strcmp(skip_dir_marker, "..") == 0 || strpbrk(skip_dir_marker, "/\\:")) {
+			snprintf(err_buf, sizeof err_buf, "--skip-dir-with requires a marker basename\n");
+			goto cleanup;
+		}
+		if (am_daemon || am_server || !recurse || relative_paths || files_from
+		 || delete_mode || missing_args == 2 || force_delete || remote_option_cnt
+		 || read_batch || write_batch) {
+			snprintf(err_buf, sizeof err_buf,
+				 "--skip-dir-with requires a recursive local copy without deletion,"
+				 " --relative, --files-from, remote options or batch files\n");
+			goto cleanup;
+		}
 	}
 
 	if (remove_source_files) {
@@ -2816,6 +2863,21 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 		}
 	}
 
+	if (dest_chmod_modes) {
+		if (am_daemon || (am_server && am_sender) || am_root >= 0 || !preserve_perms) {
+			snprintf(err_buf, sizeof err_buf,
+				 "--chmod-dest requires --fake-super and --perms on a non-daemon receiver\n");
+			goto cleanup;
+		}
+		if (inplace || keep_partial || tmpdir || make_backups || basis_dir_cnt
+		 || preserve_hard_links || remove_source_files || read_batch || write_batch) {
+			snprintf(err_buf, sizeof err_buf,
+				 "--chmod-dest requires ordinary temporary-file transfers without backups,"
+				 " alternate destinations, hard links, source removal or batch files\n");
+			goto cleanup;
+		}
+	}
+
 	if (files_from) {
 		char *h, *p;
 		int q = 0;
@@ -2873,6 +2935,14 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 				goto cleanup;
 			}
 		}
+	}
+
+	if (placement_log && (list_only || inplace || tmpdir || backup_dir || keep_dirlinks
+	                   || insecure_links || confine_root
+	                   || (partial_dir && partial_dir != tmp_partialdir) || read_batch || write_batch)) {
+		snprintf(err_buf, sizeof err_buf,
+			 "--placement-log requires confined temporary-file output on the local receiver\n");
+		goto cleanup;
 	}
 
 	if (trust_sender || am_server || read_batch)

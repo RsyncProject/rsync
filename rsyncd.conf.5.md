@@ -323,6 +323,7 @@ in the values of parameters.  See that section for details.
     to supply a `proxy protocol` header.  The syntax is the same token format
     used by `hosts allow`.  When `proxy protocol = true`, this list must match
     the direct peer before rsync trusts the forwarded client address.
+    The `unix:` module access rule is not available for proxy trust.
 
 0.  `name converter`
 
@@ -874,7 +875,7 @@ in the values of parameters.  See that section for details.
     client's hostname and IP address.  If none of the patterns match, then the
     connection is rejected.
 
-    Each pattern can be in one of six forms:
+    Each pattern can be in one of these forms:
 
     - a dotted decimal IPv4 address of the form a.b.c.d, or an IPv6 address of
       the form a:b:c::d:e:f. In this case the incoming machine's IP address
@@ -896,6 +897,11 @@ in the values of parameters.  See that section for details.
       is enabled, as it is by default).  Any match will be allowed in.
     - an '@' followed by a netgroup name, which will match if the reverse DNS
       of the connecting IP is in the specified netgroup.
+    - `unix:`, which matches a direct connection accepted on a named Unix
+      domain socket passed to the daemon on standard input. This rule
+      applies to the transport, not the client's user or group. It does not
+      match a client forwarded through the PROXY protocol or replace the
+      module's authentication checks.
 
     If rsync was built with IDN support (look for "IDN" in `rsync --version`),
     a hostname pattern may contain non-ASCII characters: this file is read as
