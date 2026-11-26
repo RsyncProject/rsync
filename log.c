@@ -22,6 +22,17 @@
 #include "rsync.h"
 #include "itypes.h"
 #include "inums.h"
+#include "rounding.h"	/* EXTRA_ROUNDING, so log_delete() aligns its file_struct */
+
+#if defined CONFIG_LOCALE && defined HAVE_LOCALE_H
+#include <locale.h>
+#endif
+#if defined HAVE_WCHAR_H && defined HAVE_MBRTOWC
+#include <wchar.h>
+typedef mbstate_t filter_mbstate;
+#else
+typedef int filter_mbstate;
+#endif
 
 extern int dry_run;
 extern int am_daemon;
@@ -47,8 +58,8 @@ extern mode_t orig_umask;
 extern char *auth_user;
 extern char *stdout_format;
 extern char *logfile_format;
-extern char *logafter_format;
 extern char *logfile_name;
+extern char *rrsync_logfile_name;
 #ifdef ICONV_CONST
 extern iconv_t ic_chck;
 #endif
@@ -66,6 +77,17 @@ extern struct name_num_item *xfer_sum_nni, *file_sum_nni;
 static int log_initialised;
 static int logfile_was_closed;
 static FILE *logfile_fp;
+static BOOL logfile_regular;
+
+enum output_filter {
+	FILTER_PRINTABLE,
+	FILTER_CONSOLE_LOCALE,
+	FILTER_FILE_ASCII,
+	FILTER_FILE_LOCALE,
+	FILTER_FILE_UTF8
+};
+
+static enum output_filter logfile_filter;
 struct stats stats;
 
 int got_xfer_error = 0;
@@ -120,16 +142,65 @@ static char const *rerr_name(int code)
 	return NULL;
 }
 
-static void logit(int priority, const char *buf)
+static void filtered_fwrite(FILE *f, const char *in_buf, size_t in_len,
+			    enum output_filter filter, char end_char);
+static void append_log_record(const char *buf, size_t len);
+static void logit(int priority, const char *buf, size_t len);
+
+static void exit_log_write_error(FILE *stream, int error)
+{
+	static int reporting;
+	const char *name = stream == stdout ? "stdout" : stream == stderr ? "stderr" : "log file";
+	char message[512];
+	int len;
+
+	/* The diagnostic can fail too. Never fall back to stdout. */
+	if (reporting)
+		exit_cleanup(RERR_MESSAGEIO);
+	reporting = 1;
+	len = snprintf(message, sizeof message, RSYNC_NAME ": [%s] write to %s failed: %s (%d)\n",
+		       who_am_i(), name, strerror(error), error);
+	if (len > 0 && (size_t)len < sizeof message) {
+		if (logfile_fp && stream != logfile_fp && !ferror(logfile_fp))
+			logit(LOG_ERR, message, (size_t)len);
+		else if (stream != stderr
+		      && ((!am_server && !am_daemon) || (rrsync_logfile_name && stream == logfile_fp)))
+			fputs(message, stderr);
+	}
+	exit_cleanup(RERR_MESSAGEIO);
+}
+
+static void flush_log_stream(FILE *stream)
+{
+	if (fflush(stream) == EOF)
+		exit_log_write_error(stream, errno);
+}
+
+static void logit(int priority, const char *buf, size_t len)
 {
 	if (logfile_was_closed)
 		logfile_reopen();
-	if (logfile_fp) {
-		fprintf(logfile_fp, "%s [%d] %s", timestring(time(NULL)), (int)getpid(), buf);
-		fflush(logfile_fp);
-	} else {
-		syslog(priority, "%s", buf);
+	if (!logfile_fp) {
+		/* Syslog still needs a bounded, NUL-terminated string. */
+		char msg[2048];
+		len = MIN(sizeof msg - 1, len);
+		memcpy(msg, buf, len);
+		msg[len] = '\0';
+		syslog(priority, "%s", msg);
+		return;
 	}
+
+	/* File records have one terminating newline; escape any within the message. */
+	if (len && buf[len - 1] == '\n')
+		len--;
+	if (logfile_regular) {
+		append_log_record(buf, len);
+		return;
+	}
+	if (fprintf(logfile_fp, "%s [%d] ", timestring(time(NULL)), (int)getpid()) < 0)
+		exit_log_write_error(logfile_fp, errno);
+	filtered_fwrite(logfile_fp, buf, len, logfile_filter, '\n');
+	flush_log_stream(logfile_fp);
 }
 
 static void syslog_init()
@@ -147,20 +218,64 @@ static void syslog_init()
 #endif
 
 #ifndef LOG_NDELAY
-	logit(LOG_INFO, "rsyncd started\n");
+	static const char started[] = "rsyncd started\n";
+	logit(LOG_INFO, started, sizeof started - 1);
 #endif
+}
+
+static enum output_filter select_logfile_filter(void)
+{
+#if defined CONFIG_LOCALE && defined HAVE_LOCALE_H && defined HAVE_SETLOCALE
+	const char *ctype = setlocale(LC_CTYPE, NULL);
+	const char *charset;
+
+	if (!ctype || strcmp(ctype, "C") == 0 || strcmp(ctype, "POSIX") == 0)
+		return FILTER_FILE_ASCII;
+
+	charset = get_locale_charset();
+	if (!charset || !*charset)
+		return FILTER_FILE_ASCII;
+	/* Match the codeset label without locale-dependent case conversion. */
+	if ((charset[0] == 'U' || charset[0] == 'u')
+	 && (charset[1] == 'T' || charset[1] == 't')
+	 && (charset[2] == 'F' || charset[2] == 'f')
+	 && (strcmp(charset + 3, "-8") == 0 || strcmp(charset + 3, "8") == 0))
+		return FILTER_FILE_UTF8;
+#if defined HAVE_WCHAR_H && defined HAVE_MBRTOWC
+	return FILTER_FILE_LOCALE;
+#endif
+#endif
+	return FILTER_FILE_ASCII;
 }
 
 static void logfile_open(void)
 {
+	STRUCT_STAT st;
 	mode_t old_umask = umask(022 | orig_umask);
-	logfile_fp = fopen(logfile_name, "a");
+	/* --log-file/`log file =` are operator-supplied paths that may transit
+	 * attacker-writable dirs; a planted symlink could redirect root's log
+	 * into e.g. /root/.ssh/authorized_keys.  Refuse symlinks not owned by
+	 * uid 0 or our euid. */
+	int fd = rrsync_logfile_name ? open_rrsync_logfile(logfile_name)
+		: open_no_attacker_symlinks(logfile_name, O_WRONLY | O_APPEND | O_CREAT, 0644);
+	int open_errno;
+
+	logfile_fp = fd >= 0 && do_fstat(fd, &st) == 0 ? fdopen(fd, "a") : NULL;
+	open_errno = errno;
+	if (!logfile_fp && fd >= 0)
+		close(fd);
 	umask(old_umask);
-	if (!logfile_fp) {
-		int fopen_errno = errno;
+	if (logfile_fp) {
+		logfile_regular = S_ISREG(st.st_mode);
+		logfile_filter = select_logfile_filter();
+	} else if (rrsync_logfile_name) {
+		logfile_name = logfile_format = NULL;
+		rsyserr(FERROR, open_errno, "failed to open required log file");
+		exit_cleanup(RERR_MESSAGEIO);
+	} else {
 		/* Rsync falls back to using syslog on failure. */
 		syslog_init();
-		rsyserr(FERROR, fopen_errno,
+		rsyserr(FERROR, open_errno,
 			"failed to open log-file %s", logfile_name);
 		rprintf(FINFO, "Ignoring \"log file\" setting.\n");
 		logfile_name = "";
@@ -223,27 +338,205 @@ void logfile_reopen(void)
 	}
 }
 
-static void filtered_fwrite(FILE *f, const char *in_buf, int in_len, int use_isprint, char end_char)
+/* Decode a non-ASCII UTF-8 character without libc-specific extensions. */
+static size_t utf8_char_len(const uchar *s, size_t len, int *is_control)
 {
-	char outbuf[1024], *ob = outbuf;
-	const char *end = in_buf + in_len;
-	while (in_buf < end) {
-		if (ob - outbuf >= (int)sizeof outbuf - 10) {
-			if (fwrite(outbuf, ob - outbuf, 1, f) != 1)
-				exit_cleanup(RERR_MESSAGEIO);
-			ob = outbuf;
-		}
-		if ((in_buf < end - 4 && *in_buf == '\\' && in_buf[1] == '#'
-		  && isDigit(in_buf + 2) && isDigit(in_buf + 3) && isDigit(in_buf + 4))
-		 || (*in_buf != '\t' && ((use_isprint && !isPrint(in_buf)) || *(uchar*)in_buf < ' ')))
-			ob += snprintf(ob, 6, "\\#%03o", *(uchar*)in_buf++);
-		else
-			*ob++ = *in_buf++;
+	size_t width, i;
+
+	if (len < 2 || s[0] < 0xc2 || s[0] > 0xf4)
+		return 0;
+	width = s[0] < 0xe0 ? 2 : s[0] < 0xf0 ? 3 : 4;
+	if (len < width)
+		return 0;
+	for (i = 1; i < width; i++) {
+		if ((s[i] & 0xc0) != 0x80)
+			return 0;
 	}
-	if (end_char) /* The "- 10" above means that there is always room for one more char here. */
-		*ob++ = end_char;
-	if (ob != outbuf && fwrite(outbuf, ob - outbuf, 1, f) != 1)
+	/* RFC 3629 excludes overlong forms, surrogates and values above U+10FFFF. */
+	if ((s[0] == 0xe0 && s[1] < 0xa0) || (s[0] == 0xed && s[1] >= 0xa0)
+	 || (s[0] == 0xf0 && s[1] < 0x90) || (s[0] == 0xf4 && s[1] >= 0x90))
+		return 0;
+	*is_control = s[0] == 0xc2 && s[1] <= 0x9f;
+	return width;
+}
+
+/* Decode one character using the active locale. Invalid or incomplete input
+ * returns 0 so its bytes are filtered individually. */
+static size_t locale_char_len(const char *buf, size_t len, filter_mbstate *state,
+			      int *is_control)
+{
+#if defined HAVE_WCHAR_H && defined HAVE_MBRTOWC
+	wchar_t wc;
+	size_t char_len = mbrtowc(&wc, buf, len, state);
+
+	if (char_len == (size_t)-1 || char_len == (size_t)-2) {
+		memset(state, 0, sizeof *state);
+		return 0;
+	}
+	if (char_len == 0)
+		char_len = 1;
+	*is_control = wc != L'\t'
+		&& (wc < L' ' || (wc >= 0x7f && wc <= 0x9f));
+	return char_len;
+#else
+	(void)buf;
+	(void)len;
+	(void)state;
+	(void)is_control;
+	return 0;
+#endif
+}
+
+static size_t filtered_high_char_len(const char *buf, size_t len,
+				     enum output_filter filter,
+				     filter_mbstate *state, int *escape)
+{
+	uchar byte = *(const uchar *)buf;
+	int is_control = 0;
+	size_t char_len = 0;
+
+	if (filter == FILTER_FILE_UTF8)
+		char_len = utf8_char_len((const uchar *)buf, len, &is_control);
+	else if (filter == FILTER_CONSOLE_LOCALE || filter == FILTER_FILE_LOCALE)
+		char_len = locale_char_len(buf, len, state, &is_control);
+	if (char_len) {
+		*escape = is_control;
+		return char_len;
+	}
+
+	/* Console fallback preserves its byte policy. File logs escape every
+	 * high byte that could not be decoded in the selected encoding. */
+	if (filter == FILTER_CONSOLE_LOCALE)
+		*escape = byte <= 0x9f;
+	else if (filter == FILTER_PRINTABLE)
+		*escape = byte <= 0x9f || !isPrint(buf);
+	else
+		*escape = 1;
+	return 1;
+}
+
+static size_t filtered_char_len(const char *buf, size_t len, enum output_filter filter,
+				filter_mbstate *state, int *escape)
+{
+	uchar byte = *(const uchar *)buf;
+
+	if (byte >= 0x80)
+		return filtered_high_char_len(buf, len, filter, state, escape);
+	*escape = (len > 4 && *buf == '\\' && buf[1] == '#'
+		   && isDigit(buf + 2) && isDigit(buf + 3) && isDigit(buf + 4))
+	       || (byte != '\t' && (byte < ' ' || byte == 0x7f
+		   || (filter == FILTER_PRINTABLE && !isPrint(buf))));
+	return 1;
+}
+
+#define LOG_ESCAPE_LEN 5
+
+struct filter_output {
+	char *data;
+	size_t capacity, used;
+	FILE *stream;
+};
+
+static void flush_filter_output(struct filter_output *out)
+{
+	if (!out->stream)
 		exit_cleanup(RERR_MESSAGEIO);
+	if (out->used && fwrite(out->data, 1, out->used, out->stream) != out->used)
+		exit_log_write_error(out->stream, errno);
+	out->used = 0;
+}
+
+static void reserve_filter_output(struct filter_output *out, size_t size)
+{
+	if (out->used > out->capacity || size > out->capacity)
+		exit_cleanup(RERR_MESSAGEIO);
+	if (out->capacity - out->used < size)
+		flush_filter_output(out);
+}
+
+static void filter_message(struct filter_output *out, const char *in_buf, size_t in_len,
+			   enum output_filter filter)
+{
+	filter_mbstate state;
+	const char *end = in_buf + in_len;
+	memset(&state, 0, sizeof state);
+
+	while (in_buf < end) {
+		int escape;
+		size_t i, char_len = filtered_char_len(
+			in_buf, (size_t)(end - in_buf), filter, &state, &escape);
+		size_t expansion = escape ? LOG_ESCAPE_LEN : 1;
+
+		if (char_len > out->capacity / expansion)
+			exit_cleanup(RERR_MESSAGEIO);
+		reserve_filter_output(out, char_len * expansion);
+		if (escape) {
+			for (i = 0; i < char_len; i++) {
+				uchar byte = (uchar)in_buf[i];
+				out->data[out->used++] = '\\';
+				out->data[out->used++] = '#';
+				out->data[out->used++] = (char)('0' + ((byte >> 6) & 7));
+				out->data[out->used++] = (char)('0' + ((byte >> 3) & 7));
+				out->data[out->used++] = (char)('0' + (byte & 7));
+			}
+		} else {
+			memcpy(out->data + out->used, in_buf, char_len);
+			out->used += char_len;
+		}
+		in_buf += char_len;
+	}
+}
+
+static void filtered_fwrite(FILE *f, const char *in_buf, size_t in_len,
+			    enum output_filter filter, char end_char)
+{
+	char buf[1024];
+	struct filter_output out = { buf, sizeof buf, 0, f };
+
+	filter_message(&out, in_buf, in_len, filter);
+	if (end_char) {
+		reserve_filter_output(&out, 1);
+		out.data[out.used++] = end_char;
+	}
+	flush_filter_output(&out);
+}
+
+static void append_log_record(const char *buf, size_t len)
+{
+	char local[4096];
+	struct filter_output out = { local, sizeof local, 0, NULL };
+	int prefix = snprintf(local, sizeof local, "%s [%d] ",
+			      timestring(time(NULL)), (int)getpid());
+	size_t capacity;
+	ssize_t written;
+	int write_error;
+
+	if (prefix < 0 || (size_t)prefix >= sizeof local
+	 || len > (SIZE_MAX / 2 - (size_t)prefix - 1) / LOG_ESCAPE_LEN)
+		exit_cleanup(RERR_MESSAGEIO);
+	out.used = (size_t)prefix;
+	capacity = out.used + len * LOG_ESCAPE_LEN + 1;
+	if (capacity > out.capacity) {
+		out.data = new_array(char, capacity);
+		if (!out.data)
+			out_of_memory("append_log_record");
+		out.capacity = capacity;
+		memcpy(out.data, local, out.used);
+	}
+	filter_message(&out, buf, len, logfile_filter);
+	reserve_filter_output(&out, 1);
+	out.data[out.used++] = '\n';
+
+	/* O_APPEND applies to one write at a time. Retrying a short write
+	 * could put the rest of the record after another writer's entry. */
+	do {
+		written = write(fileno(logfile_fp), out.data, out.used);
+	} while (written < 0 && errno == EINTR);
+	write_error = written < 0 ? errno : EIO;
+	if (out.data != local)
+		free(out.data);
+	if (written < 0 || (size_t)written != out.used)
+		exit_log_write_error(logfile_fp, write_error);
 }
 
 /* this is the underlying (unformatted) rsync debugging function. Call
@@ -251,7 +544,7 @@ static void filtered_fwrite(FILE *f, const char *in_buf, int in_len, int use_isp
  * can happen with certain fatal conditions. */
 void rwrite(enum logcode code, const char *buf, int len, int is_utf8)
 {
-	char trailing_CR_or_NL;
+	char trailing_NL;
 	FILE *f = msgs2stderr == 1 ? stderr : stdout;
 #ifdef ICONV_OPTION
 	iconv_t ic = is_utf8 && ic_recv != (iconv_t)-1 ? ic_recv : ic_chck;
@@ -272,11 +565,13 @@ void rwrite(enum logcode code, const char *buf, int len, int is_utf8)
 		 * that the msg gets logged and then sent to stderr after that. */
 		if (am_daemon > 0 && code != FCLIENT)
 			code = FLOG;
-	} else if (code == FLOG_AFTER) {
-		code = FLOG;
 	} else if (send_msgs_to_gen) {
-		assert(!is_utf8);
-		/* Pass the message to our sibling in native charset. */
+		/* Pass the message to our sibling in native charset.  is_utf8
+		 * may be set here if a malicious peer sends MSG_INFO/MSG_ERROR
+		 * to a daemon receiver (read_a_msg passes !am_generator); the
+		 * old assert(!is_utf8) made that a remotely-reachable abort.
+		 * Forwarding the bytes raw is safe -- the generator's rwrite()
+		 * gets is_utf8=0 and filtered_fwrite escapes non-printables. */
 		send_msg((enum msgcode)code, buf, len, 0);
 		return;
 	}
@@ -292,7 +587,6 @@ void rwrite(enum logcode code, const char *buf, int len, int is_utf8)
 		code = FINFO;
 	else if (am_daemon || logfile_name) {
 		static int in_block;
-		char msg[2048];
 		int priority = code == FINFO || code == FLOG ? LOG_INFO :  LOG_WARNING;
 
 		if (in_block)
@@ -300,8 +594,7 @@ void rwrite(enum logcode code, const char *buf, int len, int is_utf8)
 		in_block = 1;
 		if (!log_initialised)
 			log_init(0);
-		strlcpy(msg, buf, MIN((int)sizeof msg, len + 1));
-		logit(priority, msg);
+		logit(priority, buf, len);
 		in_block = 0;
 
 		if (code == FLOG || (am_daemon && !am_server))
@@ -349,17 +642,12 @@ void rwrite(enum logcode code, const char *buf, int len, int is_utf8)
 	}
 
 	if (output_needs_newline) {
-		fputc('\n', f);
+		if (fputc('\n', f) == EOF)
+			exit_log_write_error(f, errno);
 		output_needs_newline = 0;
 	}
 
-	trailing_CR_or_NL = len && (buf[len-1] == '\n' || buf[len-1] == '\r') ? buf[--len] : '\0';
-
-	if (len && buf[0] == '\r') {
-		fputc('\r', f);
-		buf++;
-		len--;
-	}
+	trailing_NL = len && buf[len-1] == '\n' ? buf[--len] : '\0';
 
 #ifdef ICONV_CONST
 	if (ic != (iconv_t)-1) {
@@ -374,11 +662,11 @@ void rwrite(enum logcode code, const char *buf, int len, int is_utf8)
 			iconvbufs(ic, &inbuf, &outbuf, inbuf.pos ? 0 : ICB_INIT);
 			ierrno = errno;
 			if (outbuf.len) {
-				char trailing = inbuf.len ? '\0' : trailing_CR_or_NL;
-				filtered_fwrite(f, convbuf, outbuf.len, 0, trailing);
+				char trailing = inbuf.len ? '\0' : trailing_NL;
+				filtered_fwrite(f, outbuf.buf, outbuf.len, FILTER_CONSOLE_LOCALE, trailing);
 				if (trailing) {
-					trailing_CR_or_NL = '\0';
-					fflush(f);
+					trailing_NL = '\0';
+					flush_log_stream(f);
 				}
 				outbuf.len = 0;
 			}
@@ -386,22 +674,38 @@ void rwrite(enum logcode code, const char *buf, int len, int is_utf8)
 			 * the next character. Check that the buffer is non-empty for the
 			 * sake of robustness. */
 			if ((ierrno == EILSEQ || ierrno == EINVAL) && inbuf.len) {
-				fprintf(f, "\\#%03o", CVAL(inbuf.buf, inbuf.pos++));
+				if (fprintf(f, "\\#%03o", CVAL(inbuf.buf, inbuf.pos++)) < 0)
+					exit_log_write_error(f, errno);
 				inbuf.len--;
 			}
 		}
 
-		if (trailing_CR_or_NL) {
-			fputc(trailing_CR_or_NL, f);
-			fflush(f);
+		if (trailing_NL) {
+			if (fputc(trailing_NL, f) == EOF)
+				exit_log_write_error(f, errno);
+			flush_log_stream(f);
 		}
 	} else
 #endif
 	{
-		filtered_fwrite(f, buf, len, !allow_8bit_chars, trailing_CR_or_NL);
-		if (trailing_CR_or_NL)
-			fflush(f);
+		filtered_fwrite(f, buf, len,
+				allow_8bit_chars ? FILTER_CONSOLE_LOCALE : FILTER_PRINTABLE,
+				trailing_NL);
+		if (trailing_NL)
+			flush_log_stream(f);
 	}
+}
+
+/* Emit the carriage return owned by rsync's progress displays. */
+void rput_progress(void)
+{
+	FILE *f = msgs2stderr == 1 ? stderr : stdout;
+
+	if (quiet)
+		return;
+	if (fputc('\r', f) == EOF)
+		exit_log_write_error(f, errno);
+	flush_log_stream(f);
 }
 
 /* This is the rsync debugging function. Call it with FINFO, FERROR_*,
@@ -459,11 +763,17 @@ void rsyserr(enum logcode code, int errcode, const char *format, ...)
 	char buf[BIGPATHBUFLEN];
 	size_t len;
 
+	/* snprintf returns the would-have-been length on truncation, so
+	 * each cumulative call must be guarded; if not, sizeof buf - len
+	 * can underflow when promoted to size_t and the next call writes
+	 * past the buffer. */
 	len = snprintf(buf, sizeof buf, RSYNC_NAME ": [%s] ", who_am_i());
 
-	va_start(ap, format);
-	len += vsnprintf(buf + len, sizeof buf - len, format, ap);
-	va_end(ap);
+	if (len < sizeof buf) {
+		va_start(ap, format);
+		len += vsnprintf(buf + len, sizeof buf - len, format, ap);
+		va_end(ap);
+	}
 
 	if (len < sizeof buf) {
 		len += snprintf(buf + len, sizeof buf - len,
@@ -487,7 +797,7 @@ void rflush(enum logcode code)
 	else
 		f = stderr;
 
-	fflush(f);
+	flush_log_stream(f);
 }
 
 void remember_initial_stats(void)
@@ -496,12 +806,17 @@ void remember_initial_stats(void)
 	initial_data_written = total_data_written;
 }
 
+/* Size of log_formatted()'s per-escape "fmt" scratch buffer.  log_format_has()
+ * must bound its width-digit scan to the same limit so the two parsers agree on
+ * where an escape letter falls (see the digit loop in each). */
+#define LOG_FMT_SIZE 32
+
 /* A generic logging routine for send/recv, with parameter substitiution. */
 static void log_formatted(enum logcode code, const char *format, const char *op,
 			  struct file_struct *file, const char *fname, int iflags,
 			  const char *hlink)
 {
-	char buf[MAXPATHLEN+1024], buf2[MAXPATHLEN], fmt[32];
+	char buf[MAXPATHLEN+1024], buf2[MAXPATHLEN], fmt[LOG_FMT_SIZE];
 	char *p, *s, *c;
 	const char *n;
 	size_t len, total;
@@ -682,7 +997,7 @@ static void log_formatted(enum logcode code, const char *format, const char *op,
 		case 'C':
 			n = NULL;
 			if (S_ISREG(file->mode)) {
-				if (always_checksum)
+				if (always_checksum && !(iflags & ITEM_DELETED))
 					n = sum_as_hex(file_sum_nni->num, F_SUM(file), 1);
 				else if (iflags & ITEM_TRANSFER)
 					n = sum_as_hex(xfer_sum_nni->num, sender_file_sum, 0);
@@ -747,6 +1062,9 @@ static void log_formatted(enum logcode code, const char *format, const char *op,
 				}
 			}
 			break;
+		case '%':
+			n = "%";
+			break;
 		}
 
 		/* "n" is the string to be inserted in place of this % code. */
@@ -790,21 +1108,33 @@ static void log_formatted(enum logcode code, const char *format, const char *op,
 int log_format_has(const char *format, char esc)
 {
 	const char *p;
+	int width;
 
 	if (!format)
 		return 0;
 
 	for (p = format; (p = strchr(p, '%')) != NULL; ) {
 		for (p++; *p == '\''; p++) {} /*SHARED ITERATOR*/
-		if (*p == '-')
+		/* Mirror log_formatted()'s width-digit scan exactly (c starts at
+		 * fmt+1, so width starts at 1): both must stop at the same digit
+		 * or they disagree on where the escape letter is, which for %C
+		 * can leave sender_keeps_checksum unset and over-read F_SUM. */
+		width = 1;
+		if (*p == '-') {
 			p++;
-		while (isDigit(p))
+			width++;
+		}
+		while (isDigit(p) && width < LOG_FMT_SIZE - 8) {
 			p++;
+			width++;
+		}
 		while (*p == '\'') p++;
 		if (!*p)
 			break;
 		if (*p == esc)
 			return 1;
+		if (*p == '%')	/* %% is a literal '%', not the start of an escape */
+			p++;
 	}
 	return 0;
 }
@@ -815,12 +1145,6 @@ int log_format_has(const char *format, char esc)
 void log_item(enum logcode code, struct file_struct *file, int iflags, const char *hlink)
 {
 	const char *s_or_r = am_sender ? "send" : "recv";
-
-	if (code == FLOG_AFTER) {
-		if (logafter_format && *logafter_format)
-			log_formatted(FLOG_AFTER, logafter_format, s_or_r, file, NULL, iflags, hlink);
-		return;
-	}
 
 	if (code != FLOG && stdout_format && !am_server)
 		log_formatted(FCLIENT, stdout_format, s_or_r, file, NULL, iflags, hlink);
@@ -866,15 +1190,18 @@ void log_delete(const char *fname, int mode)
 
 	file->mode = mode;
 
-	if (am_server && protocol_version >= 29 && len < MAXPATHLEN) {
-		if (S_ISDIR(mode))
-			len++; /* directories include trailing null */
-		send_msg(MSG_DELETED, fname, len, am_generator);
-	} else if (!INFO_GTE(DEL, 1) && !stdout_format)
-		;
-	else {
-		fmt = stdout_format_has_o_or_i ? stdout_format : "deleting %n";
-		log_formatted(FCLIENT, fmt, "del.", file, fname, ITEM_DELETED, NULL);
+	if (INFO_GTE(DEL, 1) || stdout_format) {
+		if (am_server && protocol_version >= 29 && len < MAXPATHLEN) {
+			/* The generator may be unable to flush these messages until
+			 * the sender's file list is complete.  Only queue names that
+			 * the client requested as per-item output. */
+			if (S_ISDIR(mode))
+				len++; /* directories include trailing null */
+			send_msg(MSG_DELETED, fname, len, am_generator);
+		} else {
+			fmt = stdout_format_has_o_or_i ? stdout_format : "deleting %n";
+			log_formatted(FCLIENT, fmt, "del.", file, fname, ITEM_DELETED, NULL);
+		}
 	}
 
 	if (!logfile_name || dry_run || !logfile_format)

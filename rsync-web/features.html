@@ -1,0 +1,28 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 3.2//EN">
+<HTML>
+<HEAD>
+<TITLE>rsync features</TITLE>
+</HEAD>
+<!--#include virtual="header.html" -->
+
+<H2 align="center">rsync features</H2>
+
+rsync is a file transfer program for Unix systems. rsync uses the
+"rsync algorithm" which provides a very fast method for bringing
+remote files into sync. It does this by sending just the differences
+in the files across the link, without requiring that both sets of
+files are present at one of the ends of the link beforehand. <p>
+
+Some features of rsync include
+
+<ul>
+<li> can update whole directory trees and filesystems
+<li> optionally preserves symbolic links, hard links, file ownership,
+permissions, devices and times
+<li> requires no special privileges to install
+<li> internal pipelining reduces latency for multiple files
+<li> can use rsh, ssh or direct sockets as the transport
+<li> supports <A HREF="http://dslab.lzu.edu.cn:8080/members/wangbj/wangbaojun/howtos/rsync-mirror-HOWTO/rsync-mirroring02.html">anonymous rsync</A> which is ideal for mirroring
+</ul>
+
+<!--#include virtual="footer.html" -->

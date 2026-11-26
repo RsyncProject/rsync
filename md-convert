@@ -120,6 +120,7 @@ TZ_RE = re.compile(r'^#define\s+MAINTAINER_TZ_OFFSET\s+(-?\d+(\.\d+)?)', re.M)
 VAR_REF_RE = re.compile(r'\$\{(\w+)\}')
 VERSION_RE = re.compile(r' (\d[.\d]+)[, ]')
 BIN_CHARS_RE = re.compile(r'[\1-\7]+')
+LONG_OPT_DASH_RE = re.compile(r'(--\w[-\w]+)')
 SPACE_DOUBLE_DASH_RE = re.compile(r'\s--(\s)')
 NON_SPACE_SINGLE_DASH_RE = re.compile(r'(^|\W)-')
 WHITESPACE_RE = re.compile(r'\s')
@@ -247,6 +248,9 @@ def find_man_substitutions():
 
     env_subs['date'] = time.strftime('%d %b %Y', time.gmtime(mtime + tz_offset)).lstrip('0')
 
+    if 'SOURCE_DATE_EPOCH' in os.environ:
+        env_subs['date'] = time.strftime('%d %b %Y', time.gmtime(int(os.environ.get('SOURCE_DATE_EPOCH', time.time()))))
+
 
 def html_via_commonmark(txt):
     return commonmark.HtmlRenderer().render(commonmark.Parser().parse(txt))
@@ -276,7 +280,10 @@ class TransformHtml(HTMLParser):
                 bad_hashtags = set(),
                 latest_targets = [ ],
                 opt_prefix = 'opt',
+                a_href = None,
+                a_href_external = False,
                 a_txt_start = None,
+                after_a_tag = False,
                 target_suf = '',
                 )
 
@@ -314,6 +321,13 @@ class TransformHtml(HTMLParser):
 
         for bad in st.referenced_hashtags - st.created_hashtags:
             warn('Unknown hashtag link in', self.fn + ':', '#' + bad)
+
+    def handle_UE(self):
+        st = self.state
+        if st.txt.startswith(('.', ',', '!', '?', ';', ':')):
+            st.man_out[-1] = ".UE " + st.txt[0] + "\n"
+            st.txt = st.txt[1:]
+        st.after_a_tag = False
 
     def handle_starttag(self, tag, attrs_list):
         st = self.state
@@ -387,13 +401,20 @@ class TransformHtml(HTMLParser):
             for var, val in attrs_list:
                 if var == 'href':
                     if val.startswith(('https://', 'http://', 'mailto:', 'ftp:')):
-                        pass # nothing to check
+                        if st.after_a_tag:
+                            self.handle_UE()
+                        st.man_out.append(manify(st.txt.strip()) + "\n")
+                        st.man_out.append(".UR " + val + "\n")
+                        st.txt = ''
+                        st.a_href = val
+                        st.a_href_external = True
                     elif '#' in val:
                         pg, tgt = val.split('#', 1)
                         if pg and pg not in VALID_PAGES or '#' in tgt:
                             st.bad_hashtags.add(val)
                         elif tgt in ('', 'opt', 'dopt'):
                             st.a_href = val
+                            st.a_href_external = False
                         elif pg == '':
                             st.referenced_hashtags.add(tgt)
                             if tgt in st.latest_targets:
@@ -409,6 +430,8 @@ class TransformHtml(HTMLParser):
         st = self.state
         if args.debug:
             self.output_debug('END', (tag,))
+        if st.after_a_tag:
+            self.handle_UE()
         if tag in CONSUMES_TXT or st.dt_from == tag:
             txt = st.txt.strip()
             st.txt = ''
@@ -473,7 +496,15 @@ class TransformHtml(HTMLParser):
         elif tag == 'hr':
             return
         elif tag == 'a':
-            if st.a_href:
+            if st.a_href_external:
+                st.txt = st.txt.strip()
+                if args.force_link_text or st.a_href != st.txt:
+                    st.man_out.append(manify(st.txt) + "\n")
+                st.man_out.append(".UE\n") # This might get replaced with a punctuation version in handle_UE()
+                st.after_a_tag = True
+                st.a_href_external = False
+                st.txt = ''
+            elif st.a_href:
                 atxt = st.txt[st.a_txt_start:]
                 find = 'href="' + st.a_href + '"'
                 for j in range(len(st.html_out)-1, 0, -1):
@@ -513,6 +544,7 @@ class TransformHtml(HTMLParser):
         if st.in_pre:
             html = htmlify(txt)
         else:
+            txt = LONG_OPT_DASH_RE.sub(lambda x: x.group(1).replace('-', NBR_DASH[0]), txt)
             txt = SPACE_DOUBLE_DASH_RE.sub(NBR_SPACE[0] + r'--\1', txt).replace('--', NBR_DASH[0]*2)
             txt = NON_SPACE_SINGLE_DASH_RE.sub(r'\1' + NBR_DASH[0], txt)
             html = htmlify(txt)
@@ -612,6 +644,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="Convert markdown into html and (optionally) nroff. Each input filename must have a .md suffix, which is changed to .html for the output filename. If the input filename ends with .num.md (e.g. foo.1.md) then a nroff file is also output with the input filename's .md suffix removed (e.g. foo.1).", add_help=False)
     parser.add_argument('--test', action='store_true', help="Just test the parsing without outputting any files.")
     parser.add_argument('--dest', metavar='DIR', help="Create files in DIR instead of the current directory.")
+    parser.add_argument('--force-link-text', action='store_true', help="Don't remove the link text if it matches the link href. Useful when nroff doesn't understand .UR and .UE.")
     parser.add_argument('--debug', '-D', action='count', default=0, help='Output copious info on the html parsing. Repeat for even more.')
     parser.add_argument("--help", "-h", action="help", help="Output this help message and exit.")
     parser.add_argument("mdfiles", metavar='FILE.md', nargs='+', help="One or more .md files to convert.")

@@ -167,7 +167,7 @@ int read_proxy_protocol_header(int fd)
 			char sig[PROXY_V2_SIG_SIZE];
 			char ver_cmd;
 			char fam;
-			char len[2];
+			unsigned char len[2];
 			union {
 				struct {
 					char src_addr[4];
