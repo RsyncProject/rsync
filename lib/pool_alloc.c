@@ -396,8 +396,8 @@ pool_stats(alloc_pool_t p, int fd, int summarize)
 
 	FDPRINT("  Extent size:       %12ld\n",	(long)	pool->size);
 	FDPRINT("  Alloc quantum:     %12ld\n",	(long)	pool->quantum);
-	FDPRINT("  Extents created:   %12ld\n",		pool->e_created);
-	FDPRINT("  Extents freed:     %12ld\n",		pool->e_freed);
+	FDPRINT("  Extents created:   %12lu\n",		pool->e_created);
+	FDPRINT("  Extents freed:     %12lu\n",		pool->e_freed);
 	FDPRINT("  Alloc count:       %12.0f\n", (double) pool->n_allocated);
 	FDPRINT("  Free Count:        %12.0f\n", (double) pool->n_freed);
 	FDPRINT("  Bytes allocated:   %12.0f\n", (double) pool->b_allocated);

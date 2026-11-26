@@ -344,7 +344,7 @@ static int safe_read(int desc, char *ptr, size_t len)
 }
 
 /* Remove existing file @dest and reopen, creating a new file with @mode */
-static int unlink_and_reopen(const char *dest, mode_t mode)
+int open_copy_destination(const char *dest, mode_t mode)
 {
 	int ofd;
 
@@ -388,12 +388,9 @@ static int unlink_and_reopen(const char *dest, mode_t mode)
  *
  * This is used in conjunction with the --temp-dir, --backup, and
  * --copy-dest options. */
-int copy_file(const char *source, const char *dest, int tmpfilefd, mode_t mode)
+int open_copy_source(const char *source)
 {
-	int ifd, ofd;
-	char buf[1024 * 8];
-	int len;   /* Number of bytes read into `buf'. */
-	OFF_T prealloc_len = 0, offset = 0;
+	int ifd;
 
 	/* For any hardened (non-chrooted) receiver, route the source open through
 	 * secure_relative_open so a parent-symlink on the source path (e.g.
@@ -437,10 +434,32 @@ int copy_file(const char *source, const char *dest, int tmpfilefd, mode_t mode)
 		return -1;
 	}
 
+	return ifd;
+}
+
+int copy_file(const char *source, const char *dest, int tmpfilefd, mode_t mode)
+{
+	int ifd = open_copy_source(source);
+
+	if (ifd < 0)
+		return -1;
+	return copy_file_from_fd(source, ifd, dest, tmpfilefd, mode, -1);
+}
+
+/* Own the already-open input; source is used only for diagnostics and
+ * attribute reporting. A nonnegative max_len copies exactly that many bytes
+ * and refuses a short input; a negative value copies through EOF. */
+int copy_file_from_fd(const char *source, int ifd, const char *dest, int tmpfilefd,
+		      mode_t mode, OFF_T max_len)
+{
+	int ofd, len = 0;
+	char buf[1024 * 8];
+	OFF_T prealloc_len = 0, offset = 0;
+
 	if (tmpfilefd >= 0) {
 		ofd = tmpfilefd;
 	} else {
-		ofd = unlink_and_reopen(dest, mode);
+		ofd = open_copy_destination(dest, mode);
 		if (ofd < 0) {
 			int save_errno = errno;
 			close(ifd);
@@ -458,14 +477,24 @@ int copy_file(const char *source, const char *dest, int tmpfilefd, mode_t mode)
 		if (do_fstat(ifd, &srcst) < 0)
 			rsyserr(FWARNING, errno, "fstat %s", full_fname(source));
 		else if (srcst.st_size > 0) {
-			prealloc_len = do_fallocate(ofd, 0, srcst.st_size);
-			if (prealloc_len < 0)
-				rsyserr(FWARNING, errno, "do_fallocate %s", full_fname(dest));
+			OFF_T reserve_len = max_len >= 0 && srcst.st_size > max_len
+				? max_len : srcst.st_size;
+			if (reserve_len > 0) {
+				prealloc_len = do_fallocate(ofd, 0, reserve_len);
+				if (prealloc_len < 0)
+					rsyserr(FWARNING, errno, "do_fallocate %s", full_fname(dest));
+			}
 		}
 	}
 #endif
 
-	while ((len = safe_read(ifd, buf, sizeof buf)) > 0) {
+	while (max_len < 0 || offset < max_len) {
+		size_t wanted = sizeof buf;
+		if (max_len >= 0 && max_len - offset < (OFF_T)wanted)
+			wanted = (size_t)(max_len - offset);
+		len = safe_read(ifd, buf, (int)wanted);
+		if (len <= 0)
+			break;
 		if (full_write(ofd, buf, len) < 0) {
 			int save_errno = errno;
 			rsyserr(FERROR_XFER, errno, "write %s", full_fname(dest));
@@ -475,6 +504,14 @@ int copy_file(const char *source, const char *dest, int tmpfilefd, mode_t mode)
 			return -1;
 		}
 		offset += len;
+	}
+
+	if (len == 0 && max_len >= 0 && offset < max_len) {
+		errno = EIO;
+		rsyserr(FERROR_XFER, errno, "source %s shrank while copying", full_fname(source));
+		close(ifd);
+		close(ofd);
+		return -1;
 	}
 
 	if (len < 0) {
@@ -499,22 +536,27 @@ int copy_file(const char *source, const char *dest, int tmpfilefd, mode_t mode)
 #endif
 	}
 
-	if (do_fsync && fsync(ofd) < 0) {
-		int save_errno = errno;
-		rsyserr(FERROR, errno, "fsync failed on %s", full_fname(dest));
-		close(ofd);
-		close(ifd);	/* ifd is held open until after the xattr copy below */
-		errno = save_errno;
-		return -1;
-	}
-
 #ifdef SUPPORT_XATTRS
 	/* Read the source xattrs through the held source fd (ifd) and set them
 	 * through ofd while both are still held, so a parent-symlink race can't
 	 * redirect the read out of tree or the write onto a file outside it. */
-	if (preserve_xattrs)
-		copy_xattrs(source, ifd, dest, ofd);
+	if (preserve_xattrs && copy_xattrs(source, ifd, dest, ofd) < 0) {
+		int save_errno = errno;
+		close(ofd);
+		close(ifd);
+		errno = save_errno;
+		return -1;
+	}
 #endif
+
+	if (do_fsync && fsync(ofd) < 0) {
+		int save_errno = errno;
+		rsyserr(FERROR, errno, "fsync failed on %s", full_fname(dest));
+		close(ofd);
+		close(ifd);
+		errno = save_errno;
+		return -1;
+	}
 
 	if (close(ifd) < 0) {
 		rsyserr(FWARNING, errno, "close failed on %s",
@@ -1079,20 +1121,14 @@ size_t pathjoin(char *dest, size_t destsize, const char *p1, const char *p2)
 	return len;
 }
 
-/* Join any number of strings together, putting them in "dest".  The return
- * value is the length of all the strings, regardless of whether the null-
- * terminated whole fits in destsize.  Your list of string pointers must end
- * with a NULL to indicate the end of the list. */
-size_t stringjoin(char *dest, size_t destsize, ...)
+/* Join up to count parts, stopping at the first NULL. Return the full
+ * length even if the result is truncated. */
+size_t stringjoin(char *dest, size_t destsize, const char *const *parts, size_t count)
 {
-	va_list ap;
 	size_t len, ret = 0;
 	const char *src;
 
-	va_start(ap, destsize);
-	while (1) {
-		if (!(src = va_arg(ap, const char *)))
-			break;
+	for (; count && (src = *parts++) != NULL; count--) {
 		len = strlen(src);
 		ret += len;
 		if (destsize > 1) {
@@ -1103,8 +1139,8 @@ size_t stringjoin(char *dest, size_t destsize, ...)
 			dest += len;
 		}
 	}
-	*dest = '\0';
-	va_end(ap);
+	if (destsize)
+		*dest = '\0';
 
 	return ret;
 }
@@ -1502,11 +1538,11 @@ char *normalize_path(char *path, BOOL force_newbuf, unsigned int *len_ptr)
 	unsigned int len;
 
 	if (*path != '/') { /* Make path absolute. */
-		int len = strlen(path);
-		if (curr_dir_len + 1 + len >= sizeof curr_dir)
+		int path_len = strlen(path);
+		if (curr_dir_len + 1 + path_len >= sizeof curr_dir)
 			return NULL;
 		curr_dir[curr_dir_len] = '/';
-		memcpy(curr_dir + curr_dir_len + 1, path, len + 1);
+		memcpy(curr_dir + curr_dir_len + 1, path, path_len + 1);
 		path = strdup(curr_dir);
 		curr_dir[curr_dir_len] = '\0';
 	} else if (force_newbuf)

@@ -26,7 +26,6 @@ extern int do_xfers;
 extern int open_noatime;
 extern int am_server;
 extern int am_daemon;
-extern int am_sender;
 extern int local_server;
 extern int inc_recurse;
 extern int log_before_transfer;
@@ -43,10 +42,12 @@ extern int insecure_links;
 extern int io_error;
 extern int flist_eof;
 extern int whole_file;
+extern int stream_source;
+extern int stream_timeout;
+extern OFF_T stream_size;
 extern int allowed_lull;
 extern int copy_devices;
 extern int preserve_xattrs;
-extern int eof_reached;
 extern int protocol_version;
 extern int remove_source_files;
 extern int updating_basis_file;
@@ -65,10 +66,6 @@ extern BOOL want_progress_now;
 extern struct stats stats;
 extern struct file_list *cur_flist, *first_flist, *dir_flist;
 extern char num_dev_ino_buf[4 + 8 + 8];
-extern int stream_source_mode;
-extern int stream_timeout;
-extern OFF_T stream_max_size;
-extern int stream_pipe_sz;
 
 BOOL extra_flist_sending_enabled;
 
@@ -212,11 +209,6 @@ static int secure_sender_parent_fd(struct file_struct *file, const char *fname, 
 #endif
 }
 
-int is_stream()
-{
-	return stream_source_mode && am_sender && !am_server;
-}
-
 /* Go through the do_*() wrapper rather than a raw unlinkat(): it carries the
  * dry_run no-op and the read-only/list-only refusal that do_unlink() applies
  * on the non-fd path, plus the missing-AT_FDCWD fallback. */
@@ -324,11 +316,13 @@ static int sender_open_copylinks_confined(const char *anchor, const char *relpat
 		if (n < 0) {
 			/* EINVAL: not a symlink -> the resolved target file.  Open it
 			 * O_NOFOLLOW (a raced symlink flip is still refused). */
-			fd = e == EINVAL
-			   ? openat(pdfd, bname, O_RDONLY | O_NOFOLLOW | O_BINARY | extra, 0)
-			   : -1;
+			if (e == EINVAL) {
+				fd = openat(pdfd, bname, O_RDONLY | O_NOFOLLOW | O_BINARY | extra, 0);
+				e = fd < 0 ? errno : 0;
+			} else
+				fd = -1;
 			close(pdfd);
-			if (n < 0 && e != EINVAL)
+			if (fd < 0)
 				errno = e;
 			return fd;
 		}
@@ -504,6 +498,46 @@ static void write_ndx_and_attrs(int f_out, int ndx, int iflags,
 #endif
 }
 
+#ifdef SUPPORT_STREAM_SOURCE
+static int stream_source_pin = -1;
+static STRUCT_STAT stream_source_stat;
+
+void pin_stream_source(const char *fname, STRUCT_STAT *st)
+{
+	assert(stream_source_pin < 0);
+	stream_source_pin = do_open_nofollow(fname, O_PATH | O_CLOEXEC);
+	if (stream_source_pin < 0 || do_fstat(stream_source_pin, st) < 0) {
+		rsyserr(FERROR, errno, "cannot inspect FIFO source %s", full_fname(fname));
+		exit_cleanup(RERR_FILEIO);
+	}
+	if (!S_ISFIFO(st->st_mode)) {
+		rprintf(FERROR, "--stream-source requires a FIFO: %s\n", full_fname(fname));
+		exit_cleanup(RERR_FILEIO);
+	}
+	stream_source_stat = *st;
+}
+
+static int open_stream_source(const char *fname, STRUCT_STAT *st)
+{
+	int fd;
+
+	if (stream_source_pin < 0) {
+		rprintf(FERROR, "Cannot read a FIFO source more than once\n");
+		exit_cleanup(RERR_FILEIO);
+	}
+	*st = stream_source_stat;
+	fd = reopen_stream_file(stream_source_pin, st, O_NONBLOCK);
+	if (fd < 0) {
+		rsyserr(FERROR, errno, "cannot open pinned FIFO source %s", full_fname(fname));
+		exit_cleanup(RERR_FILEIO);
+	}
+	close(stream_source_pin);
+	stream_source_pin = -1;
+	st->st_size = stream_size;
+	return fd;
+}
+#endif
+
 void send_files(int f_in, int f_out)
 {
 	int fd = -1;
@@ -667,6 +701,11 @@ void send_files(int f_in, int f_out)
 			exit_cleanup(RERR_PROTOCOL);
 		}
 
+#ifdef SUPPORT_STREAM_SOURCE
+		if (stream_source)
+			fd = open_stream_source(fname, &st);
+		else
+#endif
 		if (symlink_optout_allowed()) {
 			/* Module opted out of symlink confinement ("insecure links =
 			 * yes", admin-only) -- or a non-daemon --insecure-links: legacy
@@ -727,7 +766,21 @@ void send_files(int f_in, int f_out)
 		} else {
 			fd = do_open_checklinks(fname);
 		}
-		if (fd == -1) {
+		/* A file may have become a directory after the file-list scan.
+		 * The direct sender-root open shares this post-open type check. */
+		if (!stream_source && fd >= 0 && do_fstat(fd, &st) != 0) {
+			io_error |= IOERR_GENERAL;
+			rsyserr(FERROR_XFER, errno, "fstat failed");
+			free_sums(s);
+			close(fd);
+			exit_cleanup(RERR_FILEIO);
+		}
+		if (fd >= 0 && S_ISDIR(st.st_mode)) {
+			close(fd);
+			fd = -1;
+			errno = EISDIR;
+		}
+		if (fd < 0) {
 			if (errno == ENOENT) {
 				enum logcode c = am_daemon && protocol_version < 28 ? FERROR : FWARNING;
 				io_error |= IOERR_VANISHED;
@@ -743,26 +796,6 @@ void send_files(int f_in, int f_out)
 			if (protocol_version >= 30)
 				send_msg_int(MSG_NO_SEND, ndx);
 			continue;
-		}
-
-		/* map the local file */
-		if (do_fstat(fd, &st) != 0) {
-			io_error |= IOERR_GENERAL;
-			rsyserr(FERROR_XFER, errno, "fstat failed");
-			free_sums(s);
-			close(fd);
-			exit_cleanup(RERR_FILEIO);
-		}
-
-		if (is_stream()) {
-			if (!S_ISFIFO(st.st_mode)) {
-				rprintf(FERROR, "stream-source requires a named pipe (FIFO): %s\n",
-					full_fname(fname));
-				close(fd);
-				exit_cleanup(RERR_FILEIO);
-			}
-			st.st_mode = (st.st_mode & ~S_IFMT) | S_IFREG;
-			st.st_size = stream_max_size;
 		}
 
 		if (IS_DEVICE(st.st_mode)) {
@@ -784,9 +817,13 @@ void send_files(int f_in, int f_out)
 			continue;
 		}
 
-		if (st.st_size) {
+		if (st.st_size || stream_source) {
 			int32 read_size = MAX(s->blength * 3, MAX_MAP_SIZE);
 			mbuf = map_file(fd, st.st_size, read_size, s->blength);
+#ifdef SUPPORT_STREAM_SOURCE
+			if (stream_source)
+				mbuf->stream_timeout = stream_timeout;
+#endif
 		} else
 			mbuf = NULL;
 
@@ -809,13 +846,6 @@ void send_files(int f_in, int f_out)
 		set_compression(fname);
 
 		match_sums(f_xfer, s, mbuf, st.st_size);
-		/* Update the stats for right tracking. */
-		if (is_stream() && mbuf && mbuf->file_size < st.st_size) {
-			OFF_T diff = st.st_size - mbuf->file_size;
-			stats.total_size -= diff;
-			stats.total_transferred_size -= diff;
-			st.st_size = mbuf->file_size;
-		}
 		if (INFO_GTE(PROGRESS, 1))
 			end_progress(st.st_size);
 		else if (want_progress_now)
@@ -842,6 +872,7 @@ void send_files(int f_in, int f_out)
 		/* Flag that we actually sent this entry. */
 		file->flags |= FLAG_FILE_SENT;
 	}
+	finish_progress();
 	if (make_backups < 0)
 		make_backups = -make_backups;
 

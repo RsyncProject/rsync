@@ -788,7 +788,7 @@ static void send_zstd_token(int f, int32 token, struct map_struct *buf, OFF_T of
 		zstd_in_buff.src = map_ptr(buf, offset, nb);
 		zstd_in_buff.size = nb;
 		zstd_in_buff.pos = 0;
-		
+
 		int finished;
 		do {
 			zstd_out_buff.size = MAX_DATA_COUNT;
@@ -928,7 +928,7 @@ static int32 recv_zstd_token(int f, char **data)
 static void
 send_compressed_token(int f, int32 token, struct map_struct *buf, OFF_T offset, int32 nb)
 {
-	static int init_done, flush_pending;
+	static int init_done;
 	int size = MAX(LZ4_compressBound(CHUNK_SIZE), MAX_DATA_COUNT+2);
 	int32 n, r;
 
@@ -939,7 +939,6 @@ send_compressed_token(int f, int32 token, struct map_struct *buf, OFF_T offset, 
 		}
 		last_run_end = 0;
 		run_start = token;
-		flush_pending = 0;
 	} else if (last_token == -2) {
 		run_start = token;
 	} else if (nb != 0 || token != last_token + 1 || token >= run_start + 65536) {
@@ -962,7 +961,8 @@ send_compressed_token(int f, int32 token, struct map_struct *buf, OFF_T offset, 
 
 	last_token = token;
 
-	if (nb != 0 || flush_pending) {
+	/* Each LZ4 block is complete; there is no pending data to flush. */
+	if (nb != 0) {
 		int available_in, available_out = 0;
 		const char *next_in;
 
@@ -991,7 +991,6 @@ send_compressed_token(int f, int32 token, struct map_struct *buf, OFF_T offset, 
 				offset += available_in;
 			}
 		} while (nb != 0);
-		flush_pending = token == -2;
 	}
 	if (token == -1) {
 		/* end of file - clean up */

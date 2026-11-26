@@ -38,6 +38,7 @@ extern int am_sender;
 extern int am_generator;
 extern int inc_recurse;
 extern int always_checksum;
+extern int remove_source_files;
 extern int module_id;
 extern int ignore_errors;
 extern int numeric_ids;
@@ -49,6 +50,8 @@ extern int filesfrom_fd;
 extern char *files_from;
 extern int one_file_system;
 extern int copy_devices;
+extern int stream_source;
+extern OFF_T stream_size;
 extern int copy_dirlinks;
 extern int preserve_uid;
 extern int preserve_gid;
@@ -86,7 +89,6 @@ extern uid_t our_uid;
 extern struct stats stats;
 extern char *filesfrom_host;
 extern char *usermap, *groupmap;
-extern OFF_T stream_max_size;
 
 extern struct name_num_item *file_sum_nni;
 
@@ -317,8 +319,10 @@ static int sender_source_root_fd_for(struct sender_source_root *root)
 
 	if (sender_source_root_fd_owner == root && sender_source_root_fd >= 0)
 		return sender_source_root_fd;
-	if (sender_source_root_fd >= 0)
+	if (sender_source_root_fd >= 0) {
+		reset_dir_fd_cache();
 		close(sender_source_root_fd);
+	}
 	sender_source_root_fd = -1;
 	sender_source_root_fd_owner = NULL;
 
@@ -350,13 +354,13 @@ int open_sender_source_path(const char *path, int flags, int *matched)
 	struct sender_source_root *root, *best = NULL;
 	char full[MAXPATHLEN], *rel;
 	size_t best_len = 0;
-	int rootfd, fd, saved_errno;
+	int rootfd;
 
 	*matched = 0;
 	if (!sender_source_roots)
 		return -1;
 	if (sender_source_full_path(path, full, sizeof full) < 0)
-		return -1;
+		goto no_root;
 	for (root = sender_source_roots; root; root = root->next) {
 		size_t len = strlen(root->path);
 		if (len > best_len && strncmp(full, root->path, len) == 0
@@ -366,7 +370,7 @@ int open_sender_source_path(const char *path, int flags, int *matched)
 		}
 	}
 	if (!best)
-		return -1;
+		goto no_root;
 
 	*matched = 1;
 	rootfd = sender_source_root_fd_for(best);
@@ -375,10 +379,17 @@ int open_sender_source_path(const char *path, int flags, int *matched)
 	rel = full + best_len;
 	while (*rel == '/')
 		rel++;
-	fd = secure_relative_open_at(rootfd, *rel ? rel : ".", flags, 0);
-	saved_errno = errno;
-	errno = saved_errno;
-	return fd;
+	if (remove_source_files)
+		return secure_relative_open_at(rootfd, *rel ? rel : ".", flags, 0);
+	return open_sender_root_entry(rootfd, *rel ? rel : ".", flags);
+
+  no_root:
+	if (sender_source_root_fd >= 0) {
+		int e = errno;
+		reset_dir_fd_cache();
+		errno = e;
+	}
+	return -1;
 #else
 	(void)path;
 	(void)flags;
@@ -390,8 +401,10 @@ int open_sender_source_path(const char *path, int flags, int *matched)
 
 void clear_sender_source_roots(void)
 {
-	if (sender_source_root_fd >= 0)
+	if (sender_source_root_fd >= 0) {
+		reset_dir_fd_cache();
 		close(sender_source_root_fd);
+	}
 	sender_source_root_fd = -1;
 	sender_source_root_fd_owner = NULL;
 	while (sender_source_roots) {
@@ -614,8 +627,6 @@ static void flist_expand(struct file_list *flist, int extra)
 			goto too_large;
 		flist->malloced += FLIST_LINEAR;
 	} else if (flist->malloced < FLIST_START_LARGE/16) {
-		if (flist->malloced > INT_MAX/4)
-			goto too_large;
 		flist->malloced *= 4;
 	} else {
 		if (flist->malloced > INT_MAX/2)
@@ -1655,7 +1666,12 @@ struct file_struct *make_file(const char *fname, struct file_list *flist,
 	if (sanitize_paths)
 		sanitize_path(thisname, thisname, "", 0, SP_DEFAULT);
 
-	if (stp && (S_ISDIR(stp->st_mode) || IS_MISSING_FILE(*stp))) {
+	if (stream_source && am_sender && stp && S_ISFIFO(stp->st_mode)) {
+		/* The sender pinned this FIFO before advertising its exact byte count. */
+		st = *stp;
+		st.st_mode = S_IFREG | (st.st_mode & ACCESSPERMS);
+		st.st_size = stream_size;
+	} else if (stp && (S_ISDIR(stp->st_mode) || IS_MISSING_FILE(*stp))) {
 		/* This is needed to handle a "symlink/." with a --relative
 		 * dir, or a request to delete a specific file. */
 		st = *stp;
@@ -1704,11 +1720,6 @@ struct file_struct *make_file(const char *fname, struct file_list *flist,
 		rprintf(FINFO, "skipping file with bogus (zero) st_mode: %s\n",
 			full_fname(thisname));
 		return NULL;
-	}
-	if (is_stream() && S_ISFIFO(st.st_mode)) {
-		/* Disguise the FIFO pipe as a regular file globally */
-		st.st_mode = (st.st_mode & ~S_IFMT) | S_IFREG;
-		st.st_size = stream_max_size;
 	}
 
 	if (filter_level == NO_FILTERS)
@@ -2267,7 +2278,7 @@ static void interpret_stat_error(const char *fname, int is_dir)
 static DIR *secure_opendir(const char *fbuf)
 {
 	int dfd, fl, matched;
-	int dir_flags = O_RDONLY;
+	int dir_flags = O_RDONLY | O_CLOEXEC;
 	DIR *d;
 
 #ifdef O_DIRECTORY
@@ -2326,7 +2337,7 @@ static DIR *secure_opendir(const char *fbuf)
 
 	if (dfd < 0)
 		return NULL;
-	if ((fl = fcntl(dfd, F_GETFD)) >= 0)
+	if (!O_CLOEXEC && (fl = fcntl(dfd, F_GETFD)) >= 0)
 		fcntl(dfd, F_SETFD, fl | FD_CLOEXEC);
 	if (!(d = fdopendir(dfd))) {
 		int save = errno;
@@ -2951,6 +2962,11 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 		if (fn != fbuf)
 			memmove(fbuf, fn, len + 1);
 
+#ifdef SUPPORT_STREAM_SOURCE
+		if (stream_source)
+			pin_stream_source(fbuf, &st);
+		else
+#endif
 		if (scan_link_stat(fbuf, &st, copy_dirlinks || name_type != NORMAL_NAME) != 0
 		 || (name_type != DOTDIR_NAME && is_excluded(fbuf, S_ISDIR(st.st_mode) != 0, SERVER_FILTERS))
 		 || (relative_paths && path_is_daemon_excluded(fbuf, 1))) {
@@ -3025,6 +3041,11 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 				send_if_directory(f, flist, file, fbuf, len, flags);
 		} else
 			send_file_name(f, flist, fbuf, &st, flags, NO_FILTERS);
+	}
+
+	if (stream_source && flist->used != 1) {
+		rprintf(FERROR, "--stream-source requires one readable FIFO source\n");
+		exit_cleanup(RERR_FILESELECT);
 	}
 
 	if (reenable_multiplex >= 0)

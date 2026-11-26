@@ -18,14 +18,12 @@
  * You should have received a copy of the GNU General Public License along
  * with this program; if not, visit the http://fsf.org website.
  */
-#ifdef __APPLE__
-#define _DARWIN_UNLIMITED_SELECT 1
-#define FD_SETSIZE 65536
-#endif
 
 #include "rsync.h"
 #include "inums.h"
+#ifdef SUPPORT_STREAM_SOURCE
 #include <poll.h>
+#endif
 
 #ifndef ENODATA
 #define ENODATA EAGAIN
@@ -40,10 +38,7 @@
 
 extern int sparse_files;
 extern struct stats stats;
-extern int stream_timeout;
-extern int stream_pipe_sz;
 
-int eof_reached = 0;
 OFF_T preallocated_len = 0;
 
 static OFF_T sparse_seek = 0;
@@ -321,69 +316,6 @@ int skip_matched(int fd, OFF_T offset, const char *buf, int len)
 	return 0;
 }
 
-void wait_stream_fd(int fd)
-{
-	if (!is_stream() || eof_reached || stream_timeout <= 0)
-		return;
-
-#ifdef __APPLE__
-	if (fd < 0 || fd >= FD_SETSIZE) {
-		rprintf(FERROR, "stream fd %d exceeds FD_SETSIZE (%d)\n",
-			fd, (int)FD_SETSIZE);
-		exit_cleanup(RERR_FILEIO);
-	}
-
-	for (;;) {
-		fd_set rfds;
-		struct timeval tv;
-
-		FD_ZERO(&rfds);
-		FD_SET(fd, &rfds);
-		tv.tv_sec = stream_timeout;
-		tv.tv_usec = 0;
-
-		int res = select(fd + 1, &rfds, NULL, NULL, &tv);
-		if (res == 0) {
-			rprintf(FERROR, "Stream timed out after %d seconds waiting for data\n",
-				stream_timeout);
-			exit_cleanup(RERR_TIMEOUT);
-		}
-		if (res < 0) {
-			if (errno == EINTR)
-				continue;
-			rsyserr(FERROR, errno, "select failed on stream");
-			exit_cleanup(RERR_FILEIO);
-		}
-		break;
-	}
-#else
-	int timeout_ms = stream_timeout > INT_MAX / 1000
-		       ? INT_MAX
-		       : stream_timeout * 1000;
-
-	for (;;) {
-		struct pollfd pfd;
-		pfd.fd = fd;
-		pfd.events = POLLIN;
-		pfd.revents = 0;
-
-		int res = poll(&pfd, 1, timeout_ms);
-		if (res == 0) {
-			rprintf(FERROR, "Stream timed out after %d seconds waiting for data\n",
-				stream_timeout);
-			exit_cleanup(RERR_TIMEOUT);
-		}
-		if (res < 0) {
-			if (errno == EINTR)
-				continue;
-			rsyserr(FERROR, errno, "poll failed on stream");
-			exit_cleanup(RERR_FILEIO);
-		}
-		break;
-	}
-#endif
-}
-
 /* This provides functionality somewhat similar to mmap() but using read().
  * It gives sliding window access to a file.  mmap() is not used because of
  * the possibility of another program (such as a mailer) truncating the
@@ -401,24 +333,110 @@ struct map_struct *map_file(int fd, OFF_T len, int32 read_size, int32 blk_size)
 	map->file_size = len;
 	map->def_window_size = ALIGNED_LENGTH(read_size);
 
-	if (is_stream()) {
-		eof_reached = 0;
-#ifdef F_SETPIPE_SZ
-		if (fcntl(map->fd, F_SETPIPE_SZ, stream_pipe_sz) < 0) {
-			if (stream_pipe_sz != DEFAULT_STREAM_PIPE_SZ || errno != EPERM)
-				rsyserr(FWARNING, errno, "Warning: could not resize pipe buffer to %d bytes, using OS default",
-						stream_pipe_sz);
-		} else if (INFO_GTE(MISC, 1)) {
-			rprintf(FINFO, "Stream pipe buffer resized to %d bytes\n", stream_pipe_sz);
-		}
-#else
-		rprintf(FWARNING, "Warning: F_SETPIPE_SZ is not supported on this platform, using OS default pipe buffer size\n");
-#endif
-	}
-
 	return map;
 }
 
+
+#ifdef SUPPORT_STREAM_SOURCE
+static int64 stream_millis(void)
+{
+	struct timespec now;
+
+	if (clock_gettime(CLOCK_MONOTONIC, &now) < 0) {
+		rsyserr(FERROR, errno, "cannot read monotonic clock for FIFO input");
+		exit_cleanup(RERR_FILEIO);
+	}
+	return (int64)now.tv_sec * 1000 + now.tv_nsec / 1000000;
+}
+
+static int32 read_stream(struct map_struct *map, char *buf, int32 len)
+{
+	int64 deadline = stream_millis() + map->stream_timeout * 1000;
+	struct pollfd pfd = { map->fd, POLLIN, 0 };
+
+	/* Linux suppresses POLLHUP on this nonblocking FIFO reader until a
+	 * writer has opened it. Do not interpret a bare read of zero as EOF. */
+	for (;;) {
+		int64 remaining = deadline - stream_millis();
+		int ready;
+		ssize_t n;
+
+		if (remaining <= 0 || (ready = poll(&pfd, 1, (int)remaining)) == 0) {
+			rprintf(FERROR, "FIFO input timed out after %d seconds waiting for data or EOF\n",
+				map->stream_timeout);
+			exit_cleanup(RERR_TIMEOUT);
+		}
+		if (ready < 0) {
+			if (errno == EINTR)
+				continue;
+			rsyserr(FERROR, errno, "cannot poll FIFO input");
+			exit_cleanup(RERR_FILEIO);
+		}
+		if (pfd.revents & (POLLERR | POLLNVAL) || !(pfd.revents & (POLLIN | POLLHUP))) {
+			rprintf(FERROR, "unexpected FIFO poll events %#x\n", (unsigned int)pfd.revents);
+			exit_cleanup(RERR_FILEIO);
+		}
+		n = read(map->fd, buf, len);
+		if (n >= 0)
+			return (int32)n;
+		if (errno != EINTR && errno != EAGAIN && errno != EWOULDBLOCK) {
+			rsyserr(FERROR, errno, "cannot read FIFO input");
+			exit_cleanup(RERR_FILEIO);
+		}
+	}
+}
+
+void check_stream_eof(struct map_struct *map)
+{
+	char extra;
+
+	if (map->p_fd_offset != map->file_size) {
+		rprintf(FERROR, "FIFO transfer did not read the declared stream size\n");
+		exit_cleanup(RERR_FILEIO);
+	}
+	if (read_stream(map, &extra, 1) != 0) {
+		rprintf(FERROR, "FIFO input exceeds --stream-size (%s bytes)\n", big_num(map->file_size));
+		exit_cleanup(RERR_FILEIO);
+	}
+}
+
+static char *map_stream_ptr(struct map_struct *map, OFF_T offset, int32 len)
+{
+	/* The matcher may look ahead beyond unsent literals. Keep those bytes
+	 * until it has sent and checksummed them rather than seeking backwards. */
+	const int32 max_window = 4 * MAX_BLOCK_SIZE + 3 * CHUNK_SIZE + ALIGN_BOUNDARY;
+	OFF_T start = map->stream_keep - ALIGNED_OVERSHOOT(map->stream_keep);
+	int32 window, kept;
+
+	if (start < map->p_offset || start > map->p_fd_offset || offset < start
+	 || len > map->file_size - offset || offset - start > max_window - len) {
+		rprintf(FERROR, "FIFO read exceeds the forward input window\n");
+		exit_cleanup(RERR_FILEIO);
+	}
+	window = MAX(map->def_window_size, ALIGNED_LENGTH((int32)(offset - start) + len));
+	window = (int32)MIN((OFF_T)window, map->file_size - start);
+	if (window > map->p_size) {
+		map->p = realloc_array(map->p, char, window);
+		map->p_size = window;
+	}
+	kept = (int32)(map->p_fd_offset - start);
+	if (kept)
+		memmove(map->p, map->p + (start - map->p_offset), kept);
+	while (kept < window) {
+		int32 n = read_stream(map, map->p + kept, window - kept);
+		if (!n) {
+			rprintf(FERROR, "FIFO input ended before --stream-size at %s of %s bytes\n",
+				big_num(map->p_fd_offset), big_num(map->file_size));
+			exit_cleanup(RERR_FILEIO);
+		}
+		map->p_fd_offset += n;
+		kept += n;
+	}
+	map->p_offset = start;
+	map->p_len = window;
+	return map->p + (offset - start);
+}
+#endif
 
 /* slide the read window in the file */
 char *map_ptr(struct map_struct *map, OFF_T offset, int32 len)
@@ -437,6 +455,11 @@ char *map_ptr(struct map_struct *map, OFF_T offset, int32 len)
 	/* in most cases the region will already be available */
 	if (offset >= map->p_offset && offset+len <= map->p_offset+map->p_len)
 		return map->p + (offset - map->p_offset);
+
+#ifdef SUPPORT_STREAM_SOURCE
+	if (map->stream_timeout)
+		return map_stream_ptr(map, offset, len);
+#endif
 
 	/* nope, we are going to have to do a read. Work out our desired window */
 	align_fudge = (int32)ALIGNED_OVERSHOOT(offset);
@@ -472,44 +495,21 @@ char *map_ptr(struct map_struct *map, OFF_T offset, int32 len)
 		exit_cleanup(RERR_FILEIO);
 	}
 
-    if (map->p_fd_offset != read_start) {
-        if (is_stream()) {
-			rprintf(FERROR, "stream-source illegal seek from %s to %s\n",
-				big_num(map->p_fd_offset), big_num(read_start));
+	if (map->p_fd_offset != read_start) {
+		OFF_T ret = do_lseek(map->fd, read_start, SEEK_SET);
+		if (ret != read_start) {
+			rsyserr(FERROR, errno, "lseek returned %s, not %s",
+				big_num(ret), big_num(read_start));
 			exit_cleanup(RERR_FILEIO);
-		} else {
-            OFF_T ret = do_lseek(map->fd, read_start, SEEK_SET);
-            if (ret != read_start) {
-                rsyserr(FERROR, errno, "lseek returned %s, not %s",
-                    big_num(ret), big_num(read_start));
-                exit_cleanup(RERR_FILEIO);
-            }
-            map->p_fd_offset = read_start;
-        }
-    }
+		}
+		map->p_fd_offset = read_start;
+	}
 	map->p_offset = window_start;
 	map->p_len = window_size;
 
 	while (read_size > 0) {
-		wait_stream_fd(map->fd);
-		int32 nread = eof_reached ? 0 : read(map->fd, map->p + read_offset, read_size);
+		int32 nread = read(map->fd, map->p + read_offset, read_size);
 		if (nread <= 0) {
-			/* Retry if a blocking pipe read was interrupted by a signal. */
-			if (nread < 0 && errno == EINTR)
-				continue;
-			/* On early EOF from a FIFO/pipe, shrink file_size and window
-			 * length to the actual bytes read so far and zero the tail. */
-			if (is_stream() && nread == 0) {
-				if (!eof_reached && INFO_GTE(MISC, 1)) {
-					rprintf(FINFO, "Stream reached early EOF at %s bytes (ceiling was %s)\n",
-						big_num(map->p_fd_offset), big_num(map->file_size));
-				}
-				eof_reached = 1;
-				map->file_size = map->p_fd_offset;
-				map->p_len = read_offset;
-				memset(map->p + read_offset, 0, read_size);
-				break;
-			}
 			if (!map->status)
 				map->status = nread ? errno : ENODATA;
 			/* The best we can do is zero the buffer -- the file

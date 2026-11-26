@@ -23,6 +23,9 @@
 #include "itypes.h"
 #include "ifuncs.h"
 #include <popt.h>
+#if defined CONFIG_LOCALE && defined HAVE_LOCALE_H
+#include <locale.h>
+#endif
 
 extern int module_id;
 extern int local_server;
@@ -72,6 +75,7 @@ int omit_dir_times = 0;
 int omit_link_times = 0;
 int trust_sender = 0;
 int update_only = 0;
+int update_links = 0;
 int open_noatime = 0;
 int cvs_exclude = 0;
 int dry_run = 0;
@@ -116,14 +120,12 @@ int old_style_args = -1;
 int human_readable = 1;
 int recurse = 0;
 int mkpath_dest_arg = 0;
+int stream_source = 0;
+OFF_T stream_size = 0;
+int stream_timeout = 30;
+static int stream_timeout_given = 0;
+static char *stream_size_arg = NULL;
 int allow_inc_recurse = 1;
-int stream_source_mode = 0;
-int stream_timeout = DEFAULT_STREAM_TIMEOUT;
-static int stream_timeout_seen = 0;
-OFF_T stream_max_size = 0;
-int stream_pipe_sz = -1;
-char *stream_max_size_arg = NULL;
-char *stream_pipe_sz_arg = NULL;
 int xfer_dirs = -1;
 int am_daemon = 0;
 /* Set after a successful per-module chroot ("use chroot = yes") in
@@ -142,12 +144,14 @@ int insecure_links = 0;
 int munge_symlinks = 0;
 int use_secure_symlinks = 0;
 int size_only = 0;
+int time_only = 0;
 int daemon_bwlimit = 0;
 int bwlimit = 0;
 int fuzzy_basis = 0;
 size_t bwlimit_writemax = 0;
 int ignore_existing = 0;
 int ignore_non_existing = 0;
+int ignore_non_existing_dirs = 0;
 int need_messages_from_generator = 0;
 int max_delete = INT_MIN;
 OFF_T max_size = -1;
@@ -200,6 +204,7 @@ char *basis_dir[MAX_BASIS_DIRS+1];
 char *config_file = NULL;
 char *shell_cmd = NULL;
 char *logfile_name = NULL;
+char *rrsync_logfile_name = NULL;
 char *logfile_format = NULL;
 char *stdout_format = NULL;
 char *password_file = NULL;
@@ -460,27 +465,27 @@ static void parse_output_words(struct output_struct *words, short *levels, const
 			len = strlen(str);
 		if (!len)
 			continue;
-		if (!isDigit(str)) {
-			while (len && isDigit(str+len-1))
+		if (!ascii_is_digit((uchar)*str)) {
+			while (len && ascii_is_digit((uchar)str[len-1]))
 				len--;
 		}
-		lev = isDigit(str+len) ? atoi(str+len) : 1;
+		lev = ascii_is_digit((uchar)str[len]) ? atoi(str+len) : 1;
 		/* atoi() of an overflowing positive digit string can return a
 		 * negative int (LONG_MAX truncated on LP64); a negative lev
 		 * here later indexes counts[lev] in make_output_option(). */
 		if (lev > MAX_OUT_LEVEL || lev < 0)
 			lev = MAX_OUT_LEVEL;
-		if (len == 4 && strncasecmp(str, "help", 4) == 0) {
+		if (len == 4 && ascii_strncasecmp(str, "help", 4) == 0) {
 			output_item_help(words);
 			exit_cleanup(0);
 		}
-		if (len == 4 && strncasecmp(str, "none", 4) == 0)
+		if (len == 4 && ascii_strncasecmp(str, "none", 4) == 0)
 			len = lev = 0;
-		else if (len == 3 && strncasecmp(str, "all", 3) == 0)
+		else if (len == 3 && ascii_strncasecmp(str, "all", 3) == 0)
 			len = 0;
 		for (j = 0; words[j].name; j++) {
 			if (!len
-			 || (len == words[j].namelen && strncasecmp(str, words[j].name, len) == 0)) {
+			 || (len == words[j].namelen && ascii_strncasecmp(str, words[j].name, len) == 0)) {
 				if (priority >= words[j].priority) {
 					words[j].priority = priority;
 					levels[j] = lev;
@@ -502,7 +507,8 @@ static void output_item_help(struct output_struct *words)
 {
 	short *levels = words == info_words ? info_levels : debug_levels;
 	const char *const*verbosity = words == info_words ? info_verbosity : debug_verbosity;
-	char buf[128], *opt, *fmt = "%-10s %s\n";
+	char buf[128], *opt;
+	static const char * const fmt = "%-10s %s\n";
 	int j;
 
 	reset_output_levels();
@@ -612,7 +618,8 @@ enum {OPT_SERVER = 1000, OPT_DAEMON, OPT_SENDER, OPT_EXCLUDE, OPT_EXCLUDE_FROM,
       OPT_USERMAP, OPT_GROUPMAP, OPT_CHOWN, OPT_BWLIMIT, OPT_STDERR,
       OPT_OLD_COMPRESS, OPT_NEW_COMPRESS, OPT_NO_COMPRESS, OPT_OLD_ARGS,
       OPT_STOP_AFTER, OPT_STOP_AT, OPT_NICE, OPT_NO_NICE,
-      OPT_STREAM_TIMEOUT, OPT_REFUSED_BASE = 9000};
+      OPT_STREAM_TIMEOUT,
+      OPT_REFUSED_BASE = 9000};
 
 static struct poptOption long_options[] = {
   /* longName, shortName, argInfo, argPtr, value, descrip, argDesc */
@@ -721,20 +728,22 @@ static struct poptOption long_options[] = {
   {"chmod",            0,  POPT_ARG_STRING, 0, OPT_CHMOD, 0, 0 },
   {"ignore-times",    'I', POPT_ARG_NONE,   &ignore_times, 0, 0, 0 },
   {"size-only",        0,  POPT_ARG_NONE,   &size_only, 0, 0, 0 },
+  {"time-only",        0,  POPT_ARG_NONE,   &time_only, 0, 0, 0 },
   {"one-file-system", 'x', POPT_ARG_NONE,   0, 'x', 0, 0 },
   {"no-one-file-system",0, POPT_ARG_VAL,    &one_file_system, 0, 0, 0 },
   {"no-x",             0,  POPT_ARG_VAL,    &one_file_system, 0, 0, 0 },
   {"update",          'u', POPT_ARG_NONE,   &update_only, 0, 0, 0 },
+  {"update-links",     0,  POPT_ARG_NONE,   &update_links, 0, 0, 0 },
   {"existing",         0,  POPT_ARG_NONE,   &ignore_non_existing, 0, 0, 0 },
   {"ignore-non-existing",0,POPT_ARG_NONE,   &ignore_non_existing, 0, 0, 0 },
+  {"ignore-non-existing-directory",0,POPT_ARG_NONE,&ignore_non_existing_dirs, 0, 0, 0 },
   {"ignore-existing",  0,  POPT_ARG_NONE,   &ignore_existing, 0, 0, 0 },
   {"max-size",         0,  POPT_ARG_STRING, &max_size_arg, OPT_MAX_SIZE, 0, 0 },
   {"min-size",         0,  POPT_ARG_STRING, &min_size_arg, OPT_MIN_SIZE, 0, 0 },
   {"max-alloc",        0,  POPT_ARG_STRING, &max_alloc_arg, 0, 0, 0 },
-  {"stream-source",    0,  POPT_ARG_VAL,    &stream_source_mode, 1, 0, 0 },
-  {"stream-max-size",  0,  POPT_ARG_STRING, &stream_max_size_arg, 0, 0, 0 },
+  {"stream-source",    0,  POPT_ARG_NONE,   &stream_source, 0, 0, 0 },
+  {"stream-size",      0,  POPT_ARG_STRING, &stream_size_arg, 0, 0, 0 },
   {"stream-timeout",   0,  POPT_ARG_INT,    &stream_timeout, OPT_STREAM_TIMEOUT, 0, 0 },
-  {"stream-pipe-sz",   0,  POPT_ARG_STRING, &stream_pipe_sz_arg, 0, 0, 0 },
   {"sparse",          'S', POPT_ARG_VAL,    &sparse_files, 1, 0, 0 },
   {"no-sparse",        0,  POPT_ARG_VAL,    &sparse_files, 0, 0, 0 },
   {"no-S",             0,  POPT_ARG_VAL,    &sparse_files, 0, 0, 0 },
@@ -808,6 +817,7 @@ static struct poptOption long_options[] = {
   {"no-prune-empty-dirs",0,POPT_ARG_VAL,    &prune_empty_dirs, 0, 0, 0 },
   {"no-m",             0,  POPT_ARG_VAL,    &prune_empty_dirs, 0, 0, 0 },
   {"log-file",         0,  POPT_ARG_STRING, &logfile_name, 0, 0, 0 },
+  {"rrsync-log-file",  0,  POPT_ARG_STRING | POPT_ARGFLAG_DOC_HIDDEN, &rrsync_logfile_name, 0, 0, 0 },
   {"log-file-format",  0,  POPT_ARG_STRING, &logfile_format, 0, 0, 0 },
   {"out-format",       0,  POPT_ARG_STRING, &stdout_format, 0, 0, 0 },
   {"log-format",       0,  POPT_ARG_STRING, &stdout_format, 0, 0, 0 }, /* DEPRECATED */
@@ -1044,7 +1054,8 @@ static void parse_one_refuse_match(int negated, const char *ref, const struct po
  **/
 static void set_refuse_options(void)
 {
-	struct poptOption *op, *list_end = NULL;
+	struct poptOption *op;
+	const struct poptOption *list_end = NULL;
 	char *cp, *ref = lp_refuse_options(module_id);
 	int negated;
 
@@ -1192,21 +1203,56 @@ static int count_args(const char **argv)
  * so this keeps every accepted size representable as a positive ssize_t. */
 #define SIZE_ARG_MAX ((ssize_t)(SIZE_MAX / 2))
 
+static const char *size_fraction_start(const char *point)
+{
+	if (*point == '.')
+		return point + 1;
+#if defined CONFIG_LOCALE && defined HAVE_LOCALE_H
+	const char *decimal = localeconv()->decimal_point;
+	size_t len = strlen(decimal);
+
+	if (len && strncmp(point, decimal, len) == 0)
+		return point + len;
+#endif
+	if (*point == ',' && get_decimal_point() == ',')
+		return point + 1;
+	return point;
+}
+
+static size_t scale_size_fraction(const char *start, const char *end, size_t unit)
+{
+	size_t fraction = 0;
+	size_t tens = unit / 10, ones = unit % 10;
+
+	/* Fold right to left and round down to bytes. Split the multiplier
+	 * before multiplying so even the largest unit cannot overflow. */
+	while (end > start) {
+		unsigned int digit = *--end - '0';
+		fraction = tens * digit + fraction / 10 + (ones * digit + fraction % 10) / 10;
+	}
+	return fraction;
+}
+
 /* If the size_arg is an invalid string or the value is < min_value, an error
  * is put into err_buf & the return is -1.  Note that this parser does NOT
  * support negative numbers, so a min_value < 0 doesn't make any sense. */
 static ssize_t parse_size_arg(const char *size_arg, char def_suf, const char *opt_name,
 			      ssize_t min_value, ssize_t max_value, BOOL unlimited_0)
 {
-	int reps, mult, len;
+	int reps, mult, len, adjustment = 0;
 	const char *arg, *err = "invalid", *min_max = NULL;
-	ssize_t limit = -1, size = 1;
+	const char *whole_end, *fraction, *number_end;
+	ssize_t limit = -1;
 	ssize_t size_max = max_value >= 0 ? max_value : SIZE_ARG_MAX;
-	double dsize;
+	size_t unit = 1, whole = 0, size, fraction_bytes, allowed, whole_limit;
 
-	for (arg = size_arg; isDigit(arg); arg++) {}
-	if (*arg == '.' || *arg == get_decimal_point()) /* backward compatibility: always allow '.' */
-		for (arg++; isDigit(arg); arg++) {}
+	for (whole_end = size_arg; ascii_is_digit((uchar)*whole_end); whole_end++) {}
+	fraction = size_fraction_start(whole_end);
+	for (number_end = fraction; ascii_is_digit((uchar)*number_end); number_end++) {}
+	if (whole_end == size_arg && number_end == fraction)
+		goto failure;
+
+	arg = number_end;
 	switch (*arg && *arg != '+' && *arg != '-' ? *arg++ : def_suf) {
 	case 'b': case 'B':
 		reps = 0;
@@ -1233,58 +1279,57 @@ static ssize_t parse_size_arg(const char *size_arg, char def_suf, const char *op
 		mult = 1000, arg++;
 	else if (!*arg || *arg == '+' || *arg == '-')
 		mult = 1024;
-	else if (strncasecmp(arg, "ib", 2) == 0)
+	else if (ascii_strncasecmp(arg, "ib", 2) == 0)
 		mult = 1024, arg += 2;
 	else
 		goto failure;
 	while (reps--) {
-		if (size > size_max / mult) {
-			err = "too large";
-			min_max = "max";
-			limit = max_value;
-			goto failure;
-		}
-		size *= mult;
+		if (unit > SIZE_MAX / (size_t)mult)
+			goto too_large;
+		unit *= mult;
 	}
-	errno = 0;
-	dsize = strtod(size_arg, NULL);
-	if (errno == ERANGE || dsize < 0 || dsize > (double)size_max / size
-	 || (max_value < 0 && dsize >= (double)size_max / size)) {
-		err = "too large";
-		min_max = "max";
-		limit = max_value;
-		goto failure;
-	}
-	size = (ssize_t)(dsize * size);
-	if ((*arg == '+' || *arg == '-') && arg[1] == '1' && arg != size_arg) {
-		if (*arg == '+') {
-			if (size == size_max) {
-				err = "too large";
-				min_max = "max";
-				limit = max_value;
-				goto failure;
-			}
-			size++;
-		} else
-			size--;
+	if ((*arg == '+' || *arg == '-') && arg[1] == '1') {
+		adjustment = *arg == '+' ? 1 : -1;
 		arg += 2;
 	}
 	if (*arg)
 		goto failure;
-	if (size < 0 || (max_value >= 0 && size > max_value)) {
-		err = "too large";
-		min_max = "max";
-		limit = max_value;
-		goto failure;
+
+	allowed = (size_t)size_max + (adjustment < 0);
+	whole_limit = allowed / unit;
+	for (arg = size_arg; arg < whole_end; arg++) {
+		unsigned int digit = *arg - '0';
+		if (whole > whole_limit / 10
+		 || (whole == whole_limit / 10 && digit > whole_limit % 10))
+			goto too_large;
+		whole = whole * 10 + digit;
 	}
-	if (size < min_value && (!unlimited_0 || size != 0)) {
+	size = whole * unit;
+	fraction_bytes = scale_size_fraction(fraction, number_end, unit);
+	if (fraction_bytes > allowed - size)
+		goto too_large;
+	size += fraction_bytes;
+	if (adjustment < 0) {
+		if (!size)
+			goto too_large;
+		size--;
+	} else if (adjustment > 0) {
+		if (size == (size_t)size_max)
+			goto too_large;
+		size++;
+	}
+	if (size < (size_t)min_value && (!unlimited_0 || size != 0)) {
 		err = "too small";
 		min_max = "min";
 		limit = min_value;
 		goto failure;
 	}
-	return size;
+	return (ssize_t)size;
 
+too_large:
+	err = "too large";
+	min_max = "max";
+	limit = max_value;
 failure:
 	len = snprintf(err_buf, sizeof err_buf - 1, "--%s=%s is %s", opt_name, size_arg, err);
 	if (min_max && limit >= 0 && len < (int)sizeof err_buf - 10) {
@@ -1491,6 +1536,56 @@ char *alt_dest_opt(int type)
 	default:
 		NOISY_DEATH("Unknown alt_dest_opt type");
 	}
+}
+
+static BOOL check_stream_options(int argc)
+{
+	const char *err;
+
+	if (!stream_source) {
+		if (!stream_size_arg && !stream_timeout_given)
+			return True;
+		err = "--stream-size and --stream-timeout require --stream-source";
+	} else if (am_server || am_daemon || argc != 2) {
+		err = "--stream-source requires one local source and one local destination";
+#ifndef SUPPORT_STREAM_SOURCE
+	} else {
+		err = "--stream-source is not supported on this platform";
+#else
+	} else if (!stream_size_arg) {
+		err = "--stream-source requires --stream-size";
+	} else if (stream_timeout <= 0 || stream_timeout > INT_MAX / 1000) {
+		err = "--stream-source requires a positive --stream-timeout within the supported range";
+	} else if (protocol_version < 31) {
+		err = "--stream-source requires protocol 31 or newer";
+	} else if (inplace || append_mode || keep_partial || partial_dir || delay_updates
+		|| tmpdir || write_devices || make_backups || backup_dir || mkpath_dest_arg) {
+		err = "--stream-source requires a same-directory temporary file without partials or backups";
+	} else if (delete_mode || delete_before || delete_during || delete_after || delete_excluded || force_delete
+		|| remove_source_files || missing_args || read_batch || write_batch) {
+		err = "--stream-source cannot be combined with deletions, missing-arg handling or batch mode";
+	} else if (dry_run || list_only || always_checksum || size_only || time_only || update_only || update_links
+		|| ignore_existing || ignore_non_existing || ignore_non_existing_dirs
+		|| min_size >= 0 || max_size >= 0 || filter_list.head || cvs_exclude || prune_empty_dirs || xfer_dirs >= 4) {
+		err = "--stream-source cannot be combined with transfer selection, listing or dry-run options";
+	} else if (relative_paths > 0 || files_from || basis_dir[0] || fuzzy_basis
+		|| remote_option_cnt || copy_as || copy_links || copy_dirlinks || copy_unsafe_links
+		|| copy_devices || insecure_links || confine_root || open_noatime
+		|| am_root < 0 || preserve_acls || preserve_xattrs || chmod_modes
+		|| io_timeout || stop_at_utime) {
+		err = "--stream-source does not support alternate paths, extended metadata or other timeout options";
+	} else {
+		/* Leave room for the matcher to advance beyond the last byte. */
+		stream_size = parse_size_arg(stream_size_arg, 'b', "stream-size", 0,
+					     SIZE_ARG_MAX - MAX_MAP_SIZE, False);
+		if (stream_size < 0)
+			return False;
+		ignore_times = 1;
+		return True;
+#endif
+	}
+	snprintf(err_buf, sizeof err_buf, "%s.\n", err);
+	return False;
 }
 
 /**
@@ -1871,17 +1966,19 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 			break;
 
 		case OPT_BWLIMIT: {
-			ssize_t size = parse_size_arg(bwlimit_arg, 'K', "bwlimit", 512, -1, True);
+			size_t rate_max = INT_MAX;
+			ssize_t bytes_max = SIZE_ARG_MAX;
+			ssize_t size;
+
+			if (rate_max <= (size_t)(bytes_max - 511) / 1024)
+				bytes_max = (ssize_t)(rate_max * 1024 + 511);
+			size = parse_size_arg(bwlimit_arg, 'K', "bwlimit", 512, bytes_max, True);
 			if (size < 0)
 				goto cleanup;
 			bwlimit_arg = strdup(do_big_num(size, 0, NULL));
-			bwlimit = (size + 512) / 1024;
+			bwlimit = (int)(size / 1024 + (size % 1024 >= 512));
 			break;
 		}
-
-		case OPT_STREAM_TIMEOUT:
-			stream_timeout_seen = 1;
-			break;
 
 		case OPT_APPEND:
 			if (am_server)
@@ -2059,6 +2156,10 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 			break;
 		}
 
+		case OPT_STREAM_TIMEOUT:
+			stream_timeout_given = 1;
+			break;
+
 #ifdef HAVE_MKTIME
 		case OPT_STOP_AT:
 			arg = poptGetOptArg(pc);
@@ -2124,17 +2225,10 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 		ssize_t size = parse_size_arg(max_alloc_arg, 'B', "max-alloc", 1024*1024, -1, True);
 		if (size < 0)
 			goto cleanup;
-		max_alloc = size;
+		/* Pass zero through to the peer so each build applies its own ceiling. */
+		max_alloc_arg = strdup(do_big_num(size, 0, NULL));
+		max_alloc = size ? (size_t)size : (size_t)SIZE_ARG_MAX;
 	}
-	/* A 0 value means "as large as this build allows".  We resolve it to the
-	 * same ceiling parse_size_arg() enforces, so that --max-alloc=0 is exactly
-	 * the largest value a user could also have typed, and never a limit that
-	 * only the 0 spelling can reach.  Note that max_alloc_arg is forwarded to
-	 * the peer un-normalized (see server_options()), which is what lets each
-	 * side resolve 0 against its own SIZE_MAX -- a 64-bit client and a 32-bit
-	 * daemon each get their own ceiling from the one portable spelling. */
-	if (!max_alloc)
-		max_alloc = SIZE_ARG_MAX;
 
 	if (old_style_args < 0) {
 		if (!am_server && protect_args <= 0 && (arg = getenv("RSYNC_OLD_ARGS")) != NULL && *arg) {
@@ -2165,7 +2259,8 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 		}
 	}
 
-	if (checksum_choice && strcasecmp(checksum_choice, "auto") != 0 && strcasecmp(checksum_choice, "auto,auto") != 0) {
+	if (checksum_choice && ascii_strcasecmp(checksum_choice, "auto") != 0
+	 && ascii_strcasecmp(checksum_choice, "auto,auto") != 0) {
 		/* Call this early to verify the args and figure out if we need to force
 		 * --whole-file. Note that the parse function will get called again later,
 		 * just in case an "auto" choice needs to know the protocol_version. */
@@ -2181,7 +2276,7 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 
 	if (!compress_choice && do_compression > 1)
 		compress_choice = "zlibx";
-	if (compress_choice && strcasecmp(compress_choice, "auto") != 0)
+	if (compress_choice && ascii_strcasecmp(compress_choice, "auto") != 0)
 		parse_compress_choice(0); /* Twiddles do_compression and can possibly NULL-out compress_choice. */
 	else
 		compress_choice = NULL;
@@ -2205,20 +2300,18 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 
 #ifdef HAVE_SETVBUF
 	if (outbuf_mode && !am_server) {
-		int mode = *(uchar *)outbuf_mode;
-		if (islower(mode))
-			mode = toupper(mode);
+		int mode = ascii_lower(*(uchar *)outbuf_mode);
 		fflush(stdout); /* Just in case... */
 		switch (mode) {
-		case 'N': /* None */
-		case 'U': /* Unbuffered */
+		case 'n': /* None */
+		case 'u': /* Unbuffered */
 			mode = _IONBF;
 			break;
-		case 'L': /* Line */
+		case 'l': /* Line */
 			mode = _IOLBF;
 			break;
-		case 'B': /* Block */
-		case 'F': /* Full */
+		case 'b': /* Block */
+		case 'f': /* Full */
 			mode = _IOFBF;
 			break;
 		default:
@@ -2264,6 +2357,8 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 		protect_args = orig_protect_args;
 
 	if (protect_args == 1 && am_server) {
+		if (!check_stream_options(0))
+			goto cleanup;
 		poptFreeContext(pc);
 		return 1;
 	}
@@ -2275,6 +2370,8 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 	 * make a copy of the array and then do an immediate cleanup. */
 	argv = poptGetArgs(pc);
 	argc = count_args(argv);
+	if (!check_stream_options(argc))
+		goto cleanup;
 	if (!argc) {
 		*argv_p = empty_argv;
 		*argc_p = 0;
@@ -2356,6 +2453,19 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 		snprintf(err_buf, sizeof err_buf,
 			"--delay-symlinks cannot be used with --hard-links\n");
 		goto cleanup;
+	}
+	if (time_only) {
+		const char *conflict = always_checksum ? "--checksum"
+		    : ignore_times ? "--ignore-times"
+		    : preserve_hard_links ? "--hard-links"
+		    : append_mode ? "--append"
+		    : remove_source_files == 1 ? "--remove-source-files"
+		    : remove_source_files ? "--remove-sent-files" : NULL;
+		if (conflict) {
+			snprintf(err_buf, sizeof err_buf,
+				"--time-only cannot be combined with %s\n", conflict);
+			goto cleanup;
+		}
 	}
 	if (delay_symlinks && basis_dir_cnt) {
 		snprintf(err_buf, sizeof err_buf,
@@ -2596,6 +2706,15 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 	if (stdout_format_has_i || log_format_has(stdout_format, 'o'))
 		stdout_format_has_o_or_i = 1;
 
+	if (rrsync_logfile_name) {
+		if (!am_server || am_daemon || confine_rootlen <= 1
+		 || *rrsync_logfile_name != '/' || logfile_name || logfile_format) {
+			snprintf(err_buf, sizeof err_buf, "invalid restricted server log configuration\n");
+			return 0;
+		}
+		logfile_name = rrsync_logfile_name;
+	}
+
 	if (logfile_name && !am_daemon) {
 		if (!logfile_format) {
 			logfile_format = "%i %n%L";
@@ -2686,7 +2805,7 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 	if (files_from) {
 		char *h, *p;
 		int q = 0;
-		if (argc > 2 || (!am_daemon && !am_server && argc == 1)) {
+		if (argc > 2) {
 			usage(FERROR);
 			exit_cleanup(RERR_SYNTAX);
 		}
@@ -2740,77 +2859,6 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 				goto cleanup;
 			}
 		}
-	}
-	if (stream_source_mode) {
-		if (am_daemon || am_server) {
-			snprintf(err_buf, sizeof err_buf,
-				"--stream-source cannot be used in server or daemon mode\n");
-			goto cleanup;
-		}
-		if (!stream_max_size_arg) {
-			snprintf(err_buf, sizeof err_buf,
-				"--stream-source requires a positive --stream-max-size\n");
-			goto cleanup;
-		}
-		if ((stream_max_size = parse_size_arg(stream_max_size_arg, 'b', "stream-max-size", 1, -1, False)) < 0)
-			goto cleanup;
-
-		if (stream_timeout <= 0)
-			stream_timeout = 0;
-
-		if (!stream_pipe_sz_arg)
-			stream_pipe_sz = DEFAULT_STREAM_PIPE_SZ;
-		else {
-			ssize_t sz = parse_size_arg(stream_pipe_sz_arg, 'b', "stream-pipe-sz",
-						    MIN_STREAM_PIPE_SZ, MAX_STREAM_PIPE_SZ, False);
-			if (sz < 0)
-				goto cleanup;
-			stream_pipe_sz = (int)sz;
-		}
-		if (recurse || xfer_dirs > 1) {
-			snprintf(err_buf, sizeof err_buf,
-				"--stream-source cannot be used with --recursive (-r), --archive (-a), or --dirs (-d)\n");
-			goto cleanup;
-		}
-		if (append_mode) {
-			snprintf(err_buf, sizeof err_buf,
-				"--stream-source cannot be used with --append\n");
-			goto cleanup;
-		}
-		if (always_checksum) {
-			snprintf(err_buf, sizeof err_buf,
-				"--stream-source cannot be used with --checksum (-c)\n");
-			goto cleanup;
-		}
-		if (size_only || max_size_arg || min_size_arg || fuzzy_basis || preallocate_files) {
-			snprintf(err_buf, sizeof err_buf,
-				"--stream-source cannot be used with file-size-dependent options (--size-only, --max-size, --min-size, --fuzzy, --preallocate)\n");
-			goto cleanup;
-		}
-		if (files_from) {
-			snprintf(err_buf, sizeof err_buf,
-				"--stream-source cannot be used with --files-from\n");
-			goto cleanup;
-		}
-		if (remove_source_files) {
-			snprintf(err_buf, sizeof err_buf,
-				"--stream-source cannot be used with --remove-%s-files\n",
-				remove_source_files == 1 ? "source" : "sent");
-			goto cleanup;
-		}
-		if (write_batch || read_batch) {
-			snprintf(err_buf, sizeof err_buf,
-				"--stream-source cannot be used with batch mode\n");
-			goto cleanup;
-		}
-		ignore_times = 1;
-		update_only = 0;
-		preserve_specials = 0;
-		preserve_devices = 0;
-	} else if (stream_max_size_arg || stream_pipe_sz_arg || stream_timeout_seen) {
-		snprintf(err_buf, sizeof err_buf,
-			"stream option(s) cannot be used without --stream-source\n");
-		goto cleanup;
 	}
 
 	if (trust_sender || am_server || read_batch)
@@ -3198,7 +3246,7 @@ void server_options(char **args, int *argc_p)
 		ADD_SERVER_ARG("--ignore-missing-args");
 
 	if (modify_window_set && am_sender) {
-		char *fmt = modify_window < 0 ? "-@%d" : "--modify-window=%d";
+		const char *fmt = modify_window < 0 ? "-@%d" : "--modify-window=%d";
 		if (asprintf(&arg, fmt, modify_window) < 0)
 			goto oom;
 		ADD_SERVER_ARG(arg);
@@ -3256,6 +3304,11 @@ void server_options(char **args, int *argc_p)
 		/* Backward compatibility: send --existing, not --ignore-non-existing. */
 		if (ignore_non_existing)
 			ADD_SERVER_ARG("--existing");
+
+		if (ignore_non_existing_dirs)
+			ADD_SERVER_ARG("--ignore-non-existing-directory");
+		if (update_links)
+			ADD_SERVER_ARG("--update-links");
 
 		if (tmpdir) {
 			ADD_SERVER_ARG("--temp-dir");
@@ -3466,7 +3519,7 @@ char *check_for_hostspec(char *s, char **host_ptr, int *port_ptr)
 {
 	char *path;
 
-	if (port_ptr && strncasecmp(URL_PREFIX, s, strlen(URL_PREFIX)) == 0) {
+	if (port_ptr && ascii_strncasecmp(URL_PREFIX, s, strlen(URL_PREFIX)) == 0) {
 		*host_ptr = parse_hostspec(s + strlen(URL_PREFIX), &path, port_ptr);
 		if (*host_ptr) {
 			if (!*port_ptr)

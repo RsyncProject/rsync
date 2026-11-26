@@ -26,11 +26,6 @@
 #define RSYNC_RSH_ENV "RSYNC_RSH"
 #define RSYNC_RSH_IO_ENV "RSYNC_RSH_IO"
 
-#define DEFAULT_STREAM_TIMEOUT 30
-#define DEFAULT_STREAM_PIPE_SZ (1024 * 1024)
-#define MIN_STREAM_PIPE_SZ (64 * 1024)
-#define MAX_STREAM_PIPE_SZ (16 * 1024 * 1024)
-
 #define RSYNC_NAME "rsync"
 /* RSYNCD_SYSCONF is now set in config.h */
 #define RSYNCD_USERCONF "rsyncd.conf"
@@ -230,6 +225,7 @@
 #define ATTRS_ACCURATE_TIME	(1<<2)
 #define ATTRS_SKIP_ATIME	(1<<3)
 #define ATTRS_SKIP_CRTIME	(1<<5)
+#define ATTRS_REQUIRE_SUCCESS	(1<<6)
 
 #define MSG_FLUSH	2
 #define FULL_FLUSH	1
@@ -430,6 +426,13 @@ enum delret {
 /* Exercise the O_DIRECTORY portability path on build hosts that provide it. */
 #ifdef RSYNC_TEST_NO_O_DIRECTORY
 #undef O_DIRECTORY
+#endif
+
+#if defined __linux__ && !defined __ANDROID__ && !defined RSYNC_TEST_NO_AT_FDCWD \
+ && defined O_PATH && defined O_DIRECTORY && defined O_NOFOLLOW && O_CLOEXEC \
+ && defined HAVE_CLOCK_GETTIME && defined CLOCK_MONOTONIC && defined HAVE_FSTATFS \
+ && defined HAVE_SYS_VFS_H && defined HAVE_LINUX_MAGIC_H
+#define SUPPORT_STREAM_SOURCE
 #endif
 
 #ifdef HAVE_SYS_IOCTL_H
@@ -840,11 +843,13 @@ struct ht_int64_node {
 
 #if defined __STDC_VERSION__ && __STDC_VERSION__ >= 199901L
 #define USE_FLEXIBLE_ARRAY 1
-#define SIZE_T_FMT_MOD "z" /* printf supports %zd */
+#define SIZE_T_FMT_MOD "z" /* printf has a size_t length modifier */
 #define SIZE_T_FMT_CAST size_t
+#define SSIZE_T_FMT_CAST ssize_t
 #else
-#define SIZE_T_FMT_MOD "l" /* printf supports %ld */
-#define SIZE_T_FMT_CAST long
+#define SIZE_T_FMT_MOD "l"
+#define SIZE_T_FMT_CAST unsigned long
+#define SSIZE_T_FMT_CAST long
 #endif
 
 union file_extras {
@@ -1045,6 +1050,10 @@ struct map_struct {
 	int32 def_window_size;	/* Default window size			*/
 	int fd;			/* File Descriptor			*/
 	int status;		/* first errno from read errors		*/
+#ifdef SUPPORT_STREAM_SOURCE
+	OFF_T stream_keep;	/* First byte the matcher may revisit	*/
+	int stream_timeout;	/* Non-zero only on the FIFO input map	*/
+#endif
 };
 
 #define sum2_at(s, i)	((s)->sum2_array + ((size_t)(i) * xfer_sum_len))
@@ -1239,6 +1248,11 @@ typedef struct {
 
 #define NSTR_CHECKSUM 0
 #define NSTR_COMPRESS 1
+
+#define NNI_BUILTIN (1<<0)
+#define NNI_EVP (1<<1)
+#define NNI_EVP_OK (1<<2)
+#define NNI_EXPLICIT_ONLY (1<<3)
 
 struct name_num_item {
 	int num, flags;

@@ -45,6 +45,7 @@ extern int am_daemon;
 extern int inc_recurse;
 extern int blocking_io;
 extern int always_checksum;
+extern int time_only;
 extern int remove_source_files;
 extern int output_needs_newline;
 extern int called_from_signal_handler;
@@ -74,6 +75,8 @@ extern unsigned int curr_dir_len;
 extern int module_id;
 extern int rsync_port;
 extern int whole_file;
+extern int stream_source;
+extern struct name_num_item *xfer_sum_nni;
 extern int read_batch;
 extern int write_batch;
 extern int batch_fd;
@@ -95,7 +98,6 @@ extern int default_af_hint;
 extern int stdout_format_has_i;
 extern int trust_sender_filter;
 extern int trust_sender_args;
-extern int stream_source_mode;
 extern struct stats stats;
 extern char *stdout_format;
 extern char *logfile_format;
@@ -254,6 +256,7 @@ void read_del_stats(int f)
 static void become_copy_as_user()
 {
 	char *gname;
+	const struct passwd *pw = NULL;
 	uid_t uid;
 	gid_t gid;
 
@@ -277,7 +280,6 @@ static void become_copy_as_user()
 			exit_cleanup(RERR_SYNTAX);
 		}
 	} else {
-		struct passwd *pw;
 		if ((pw = getpwuid(uid)) == NULL) {
 			rsyserr(FERROR, errno, "getpwuid failed");
 			exit_cleanup(RERR_SYNTAX);
@@ -296,7 +298,7 @@ static void become_copy_as_user()
 	}
 #endif
 #ifdef HAVE_INITGROUPS
-	if (!gname && initgroups(copy_as, gid) < 0) {
+	if (!gname && initgroups(pw->pw_name, gid) < 0) {
 		rsyserr(FERROR, errno, "initgroups failed");
 		exit_cleanup(RERR_SYNTAX);
 	}
@@ -497,7 +499,7 @@ static void show_malloc_stats(void)
 
 #define PRINT_ALLOC_NUM(title, descr, num) \
 	rprintf(FINFO, "  %-11s%10" SIZE_T_FMT_MOD "d   (" descr ")\n", \
-		title ":", (SIZE_T_FMT_CAST)(num));
+		title ":", (SSIZE_T_FMT_CAST)(num));
 
 	PRINT_ALLOC_NUM("arena", "bytes from sbrk", mi.arena);
 	PRINT_ALLOC_NUM("ordblks", "chunks not in use", mi.ordblks);
@@ -807,6 +809,11 @@ static char *get_local_name(struct file_list *flist, char *dest_path)
 	 * of a single non-directory or the user has requested one via a
 	 * destination path ending in a slash, create one and use mode 1. */
 	if (file_total > 1 || trailing_slash) {
+		if (stream_source) {
+			rprintf(FERROR, "--stream-source requires an existing destination directory: %s\n",
+				full_fname(dest_path));
+			exit_cleanup(RERR_FILESELECT);
+		}
 		if (trailing_slash)
 			*cp = '\0'; /* Lop off the final slash (if any). */
 
@@ -954,7 +961,7 @@ static void read_final_goodbye(int f_in, int f_out)
 
 static void do_server_sender(int f_in, int f_out, int argc, char *argv[])
 {
-	struct file_list *flist;
+	const struct file_list *flist;
 	char *dir;
 
 	if (DEBUG_GTE(SEND, 1))
@@ -1056,6 +1063,7 @@ static int do_recv(int f_in, int f_out, char *local_name)
 		if (backup_dir_len > 1)
 			backup_dir_buf[backup_dir_len-1] = '/';
 	}
+	init_backup_access(False);
 
 	if (tmpdir) {
 		STRUCT_STAT st;
@@ -1344,7 +1352,7 @@ void start_server(int f_in, int f_out, int argc, char *argv[])
  * for rsyncd, remote-shell, and local connections. */
 int client_run(int f_in, int f_out, pid_t pid, int argc, char *argv[])
 {
-	struct file_list *flist = NULL;
+	struct file_list *flist;
 	int exit_code = 0, exit_code2 = 0;
 	char *local_name = NULL;
 
@@ -1357,6 +1365,10 @@ int client_run(int f_in, int f_out, pid_t pid, int argc, char *argv[])
 
 	io_set_sock_fds(f_in, f_out);
 	setup_protocol(f_out,f_in);
+	if (stream_source && xfer_sum_nni->num == CSUM_NONE) {
+		rprintf(FERROR, "--stream-source requires a transfer checksum\n");
+		exit_cleanup(RERR_SYNTAX);
+	}
 
 	/* We set our stderr file handle to blocking because ssh might have
 	 * set it to non-blocking.  This can be particularly troublesome if
@@ -1477,16 +1489,16 @@ static int start_client(int argc, char *argv[])
 	int ret;
 	pid_t pid;
 
+	if (stream_source && (!argv[0][0] || !argv[1][0])) {
+		rprintf(FERROR, "--stream-source requires non-empty source and destination arguments\n");
+		exit_cleanup(RERR_SYNTAX);
+	}
+
 	if (!read_batch) { /* for read_batch, NO source is specified */
 		char *path = check_for_hostspec(argv[0], &shell_machine, &rsync_port);
 		if (path) { /* source is remote */
 			char *dummy_host;
 			int dummy_port = 0;
-			if (stream_source_mode) {
-				rprintf(FERROR,
-					"--stream-source cannot be used with a remote source\n");
-				exit_cleanup(RERR_SYNTAX);
-			}
 			*argv = path;
 			remote_argv = argv;
 			remote_argc = argc;
@@ -1556,10 +1568,19 @@ static int start_client(int argc, char *argv[])
 		rsync_port = 0;
 	}
 
+	if (stream_source && (!local_server || !am_sender)) {
+		rprintf(FERROR, "--stream-source requires a local source and destination\n");
+		exit_cleanup(RERR_SYNTAX);
+	}
+
 	/* A local transfer doesn't unbackslash anything, so leave the args alone. */
 	if (local_server) {
 		old_style_args = 2;
 		trust_sender_args = trust_sender_filter = 1;
+	}
+	if (time_only && am_sender && !local_server) {
+		rprintf(FERROR, "--time-only requires a local receiver or a remote source\n");
+		exit_cleanup(RERR_SYNTAX);
 	}
 
 	if (!rsync_port && remote_argc && !**remote_argv) /* Turn an empty arg into a dot dir. */
@@ -1569,10 +1590,6 @@ static int start_client(int argc, char *argv[])
 		char *dummy_host;
 		int dummy_port = rsync_port;
 		int i;
-		if (stream_source_mode && argc > 1) {
-            rprintf(FERROR, "--stream-source cannot be used with multiple sources\n");
-            exit_cleanup(RERR_SYNTAX);
-        }
 		if (!argv[0][0])
 			goto invalid_empty;
 		/* For local source, extra source args must not have hostspec. */
@@ -1734,8 +1751,10 @@ static void siginfo_handler(UNUSED(int val))
 }
 #endif
 
-void remember_children(UNUSED(int val))
+static void remember_children(UNUSED(int val))
 {
+	int saved_errno = errno;
+
 #ifdef WNOHANG
 	int cnt, status;
 	pid_t pid;
@@ -1756,6 +1775,26 @@ void remember_children(UNUSED(int val))
 	}
 #endif
 #ifndef HAVE_SIGACTION
+	signal(SIGCHLD, remember_children);
+#endif
+	errno = saved_errno;
+}
+
+void install_child_exit_handler(void)
+{
+#ifdef HAVE_SIGACTION
+	struct sigaction action = {0};
+
+	action.sa_handler = remember_children;
+	action.sa_flags = SA_NOCLDSTOP;
+	sigemptyset(&action.sa_mask);
+#ifdef SA_RESTART
+	/* Child exit is not cancellation. Stdio may discard buffered output
+	 * when a flush fails, so restart the underlying syscall instead. */
+	action.sa_flags |= SA_RESTART;
+#endif
+	sigaction(SIGCHLD, &action, NULL);
+#else
 	signal(SIGCHLD, remember_children);
 #endif
 }
@@ -1862,12 +1901,13 @@ int main(int argc,char *argv[])
 	sigset_t sigmask;
 
 	sigemptyset(&sigmask);
+	sigaddset(&sigmask, SIGCHLD);
 # endif
 	sigact.sa_flags = SA_NOCLDSTOP;
 #endif
 	SIGACTMASK(SIGUSR1, sigusr1_handler);
 	SIGACTMASK(SIGUSR2, sigusr2_handler);
-	SIGACTMASK(SIGCHLD, remember_children);
+	install_child_exit_handler();
 #ifdef MAINTAINER_MODE
 	SIGACTMASK(SIGSEGV, rsync_panic_handler);
 	SIGACTMASK(SIGFPE, rsync_panic_handler);

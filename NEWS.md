@@ -1,3 +1,71 @@
+# NEWS for rsync 4.0.0 (UNRELEASED)
+
+## Enhancements
+
+- Add local FIFO transfers on supported Linux builds with `--stream-source`.
+  Require an exact byte count and EOF before replacing a regular destination.
+- Accept `TCP_CONGESTION=NAME` in socket options on supported Linux builds.
+  Distinguish unknown names, unavailable options and malformed values.
+- Add `--update-links` to skip newer destination symlinks independently
+  of `--update`.
+- Allow daemon modules to apply PAM account policy after rsync authentication.
+  Both build-time support and the module setting are disabled by default.
+- Let rrsync administrators require a server-side transfer log outside the
+  restricted directory with `-log FILE`. Refuse transfers when the log cannot
+  be opened and report later log write failures.
+- Reduce directory lookups when linking unchanged regular files with non-daemon
+  `--link-dest` transfers. Reuse checked receiver and basis directories.
+- Reuse checked directories for ordinary scans and file reads beneath a
+  verified sender root. Avoid a redundant directory probe for sender file
+  reads. Set close-on-exec at open time where supported.
+- Avoid redundant stats when creating children of a fresh receiver directory.
+- Try an exact `--link-dest` match without a destination stat in new
+  incremental directories. Use the normal lookup path if the link fails.
+- Keep the checked root of a single absolute alternate destination open
+  across directories in ordinary non-daemon transfers. Reuse checked parents
+  for rechecks and delta reads.
+- Added SHA-3 (FIPS 202) transfer checksum choices `sha3-256`,
+  `sha3-384` and `sha3-512` for builds with OpenSSL SHA-3 support.
+  Default negotiation is unchanged. Select SHA-3 with
+  `--checksum-choice` or include it in both peers' `RSYNC_CHECKSUM_LIST`.
+
+- Added the opt-in SHA-256 transfer checksum `sha256` for builds with OpenSSL
+  SHA-256 support. Default negotiation is unchanged.
+
+## Bug fixes
+
+- Fixed `-X` transfers of user xattrs on NetBSD by using the native BSD
+  extended attribute interface. Retain the requested modification time when
+  writing fake-super metadata. Refuse to grow an existing xattr on NetBSD
+  because FFS can corrupt other attributes during that operation.
+- Fixed silent loss of xattrs on Cygwin when the name list did not fit the
+  initial buffer.
+- Report buffered diagnostic and logfile write failures instead of returning
+  success after dropping output.
+- Preserve directories and their requested attributes in `--backup-dir`
+  when removing them during a deletion pass. Leave the original directory
+  in place if its backup fails.
+- Treat xattr copy errors as file-copy failures. Refuse an in-place delta
+  update before changing its destination when copying the backup fails to
+  write, copy xattrs or close.
+- Send keepalives during file-list checksumming on multiplexed streams.
+  Client uploads using protocols below 30 cannot send these keepalives.
+
+## 3.5 maintenance line
+
+Release notes for compatible fixes and incremental improvements are maintained
+in the [stable/3.5 NEWS](https://github.com/RsyncProject/rsync/blob/stable/3.5/NEWS.md).
+
+### Pending 3.5.3 backports
+
+- Reduce repeated basis-directory traversal in non-daemon `--link-dest`
+  transfers (#1180).
+- Fix locale-dependent option and daemon keyword matching and parse fractional
+  sizes exactly.
+- Preserve complete logfile records and escape undecodable bytes (#1162).
+- Add receiver-side `--time-only` for archives that preserve a source file's
+  modification time while storing its data in another form (#719).
+
 # NEWS for rsync 3.5.2 (4 Nov 2026)
 
 ## Changes in this version:

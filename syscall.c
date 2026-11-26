@@ -46,6 +46,10 @@
 #ifdef __linux__
 #include <sys/syscall.h>	/* SYS_fchmodat2 / SYS_fallocate raw-syscall wrappers */
 #endif
+#ifdef SUPPORT_STREAM_SOURCE
+#include <linux/magic.h>
+#include <sys/vfs.h>
+#endif
 
 #include "ifuncs.h"
 
@@ -65,6 +69,7 @@ extern int copy_unsafe_links;
 extern int copy_dirlinks;
 extern int am_daemon;
 extern int am_chrooted;
+extern int munge_symlinks;
 extern int insecure_links;
 extern int module_id;
 extern unsigned int module_dirlen;
@@ -77,13 +82,12 @@ extern char curr_dir[MAXPATHLEN];	/* defined below; fwd-declared for the seed */
 extern int operator_path_resolve;	/* defined below; fwd-declared for the exclude check */
 extern int filesfrom_owner_walk_override;	/* defined below; used by files-from implied dirs */
 
-/* A directory fd used only for pathname traversal, fchdir(), or as *at()
- * authority does not need read permission on Linux.  Keep the portable
- * O_RDONLY fallback for systems without O_PATH. */
+/* A traversal descriptor does not need directory read permission when
+ * configure found a flag which preserves later search-permission checks. */
 static int directory_traverse_flags(void)
 {
-#if defined O_PATH && defined O_DIRECTORY
-	return O_PATH | O_DIRECTORY;
+#if defined SEARCH_ONLY_DIRFD_FLAG && defined O_DIRECTORY
+	return SEARCH_ONLY_DIRFD_FLAG | O_DIRECTORY;
 #elif defined O_DIRECTORY
 	return O_RDONLY | O_DIRECTORY;
 #else
@@ -212,6 +216,28 @@ static const char *fd_pin_tail(const char *p)
         return NULL;
     s += 3;
     return (*s == '\0' || *s == '/') ? s : NULL;
+}
+
+/* Ensure link target is prefixed when munge_symlinks is enabled.
+ * Returns the pointer to the target to use (either lnk itself or buf).
+ * On overflow, sets errno to ENAMETOOLONG and returns NULL. */
+static const char *munge_symlink_target(const char *lnk, char *buf, size_t buflen)
+{
+	if (munge_symlinks) {
+		size_t lnk_len = strlen(lnk);
+
+		/* Use < so exact matches of SYMLINK_PREFIX are not double-munged */
+		if (lnk_len < SYMLINK_PREFIX_LEN
+		 || strncmp(lnk, SYMLINK_PREFIX, SYMLINK_PREFIX_LEN) != 0) {
+			if (lnk_len + SYMLINK_PREFIX_LEN >= buflen) {
+				errno = ENAMETOOLONG;
+				return NULL;
+			}
+			snprintf(buf, buflen, "%s%s", SYMLINK_PREFIX, lnk);
+			return buf;
+		}
+	}
+	return lnk;
 }
 
 /* An EXACT pin entry, such as "/proc/self/fd/7" or "/dev/fd/7", whose target is
@@ -405,6 +431,30 @@ static int ona_open_absolute_root(char *remaining, char *abspath, size_t abspath
 }
 #endif
 
+#if defined AT_FDCWD && defined O_NOFOLLOW && defined O_DIRECTORY
+static int open_operator_leaf(int dfd, const char *name, int flags, mode_t mode)
+{
+	int fd = openat(dfd, name, flags | O_NOFOLLOW, mode);
+
+	/* macOS can report ENOENT if another opener won a non-exclusive
+	 * create. Try the existing entry without another create or lookup
+	 * of the parent path. */
+	if (fd < 0 && errno == ENOENT && (flags & O_CREAT) && !(flags & O_EXCL))
+		fd = openat(dfd, name, (flags & ~O_CREAT) | O_NOFOLLOW, mode);
+	return fd;
+}
+
+/* rrsync starts the server in DIR, so its cwd pins DIR even if it is renamed. */
+static int is_restricted_directory(int fd, const STRUCT_STAT *restricted)
+{
+	STRUCT_STAT st;
+
+	if (fstat(fd, &st) < 0)
+		return -1;
+	return st.st_dev == restricted->st_dev && st.st_ino == restricted->st_ino;
+}
+#endif
+
 /* Open an operator-supplied path, refusing to traverse any symlink (parent or
  * leaf) not owned by uid 0 or our euid.  A trusted-owned symlink (e.g. root's
  * /var/log -> /data/log) is still followed; an untrusted one fails ELOOP.
@@ -420,8 +470,10 @@ static int ona_open_absolute_root(char *remaining, char *abspath, size_t abspath
  * unavailable. */
 /* Core walk.  When out_abs is non-NULL and the path resolves to a directory
  * (O_DIRECTORY), the resolved absolute path is copied there -- owner_walk_parent
- * uses it to filter-check the (otherwise unchecked) leaf basename. */
-static int ona_open(const char *path, int flags, mode_t mode, char *out_abs, size_t out_cap)
+ * uses it to filter-check the (otherwise unchecked) leaf basename.  A non-NULL
+ * restricted root excludes that directory from the walk for a required log. */
+static int ona_open(const char *path, int flags, mode_t mode, char *out_abs, size_t out_cap,
+		    const STRUCT_STAT *restricted)
 {
 #if defined AT_FDCWD && defined O_NOFOLLOW && defined O_DIRECTORY
 	const int dir_traverse_flags = directory_traverse_flags() | O_CLOEXEC;
@@ -432,7 +484,7 @@ static int ona_open(const char *path, int flags, mode_t mode, char *out_abs, siz
 
 	/* Opted out (local --insecure-links, or a daemon module with "insecure
 	 * links = yes"): restore the legacy symlink-following open. */
-	if (symlink_optout_allowed())
+	if (symlink_optout_allowed() && !restricted)
 		return open(path, flags, mode);
 
 	const uid_t trusted_uid = geteuid();
@@ -502,6 +554,10 @@ static int ona_open(const char *path, int flags, mode_t mode, char *out_abs, siz
 		memmove(remaining, p, strlen(p) + 1);
 #endif
 		is_anchored = 1;
+	} else if (restricted) {
+		/* A required log must start from an opened absolute root. */
+		errno = EINVAL;
+		return -1;
 	}
 
 	int loops = 40;	/* SYMLOOP_MAX-ish; breaks symlink cycles. Counts symlink
@@ -511,6 +567,14 @@ static int ona_open(const char *path, int flags, mode_t mode, char *out_abs, siz
 	int saved_errno = 0;
 
 	while (*remaining) {
+		if (restricted) {
+			int enters_root = is_restricted_directory(dfd, restricted);
+			if (enters_root != 0) {
+				saved_errno = enters_root < 0 ? errno : EPERM;
+				goto out;
+			}
+		}
+
 		/* Peel one component off the front of `remaining`. */
 		char *slash = strchr(remaining, '/');
 		size_t comp_len = slash ? (size_t)(slash - remaining) : strlen(remaining);
@@ -522,31 +586,48 @@ static int ona_open(const char *path, int flags, mode_t mode, char *out_abs, siz
 		memcpy(comp, remaining, comp_len);
 		comp[comp_len] = '\0';
 		int is_last = (slash == NULL);
+		int next = -1;
+		mode_t comp_mode;
 
 		/* Inspect this component without following symlinks. */
 		STRUCT_STAT lst;
 		if (fstatat(dfd, comp, &lst, AT_SYMLINK_NOFOLLOW) < 0) {
+			int stat_errno = errno;
+			/* Android mount containers can be traversable even when getattr
+			 * reports ENOENT.  A directory fd still supplies the required type
+			 * and no-follow guarantees. */
+			if (stat_errno == ENOENT && !is_last) {
+				next = openat(dfd, comp, dir_traverse_flags | O_NOFOLLOW);
+				if (next < 0) {
+					saved_errno = errno;
+					goto out;
+				}
+				comp_mode = S_IFDIR; /* enforced by the open flags */
+			}
 			/* The leaf may not exist yet (O_CREAT case). Allow it
 			 * and openat with O_NOFOLLOW so a race-planted leaf
 			 * symlink at this instant is still refused. */
-			if (is_last && errno == ENOENT && (flags & O_CREAT)) {
+			else if (is_last && stat_errno == ENOENT && (flags & O_CREAT)) {
 				if (abspath_step(abspath, sizeof abspath, comp, comp_len) < 0) {
 					saved_errno = errno;
 					goto out;
 				}
-				if (!pin_transit && abspath_outside_confinement(abspath, 1)) {
+				if (!restricted && !pin_transit && abspath_outside_confinement(abspath, 1)) {
 					saved_errno = ELOOP;
 					goto out;
 				}
-				retfd = openat(dfd, comp, flags | O_NOFOLLOW, mode);
+				retfd = open_operator_leaf(dfd, comp, flags, mode);
 				saved_errno = errno;
 				goto out;
 			}
-			saved_errno = errno;
-			goto out;
-		}
+			else {
+				saved_errno = stat_errno;
+				goto out;
+			}
+		} else
+			comp_mode = lst.st_mode;
 
-		if (S_ISLNK(lst.st_mode)) {
+		if (S_ISLNK(comp_mode)) {
 			/* Symlink: untrusted owner is refused; trusted owner is followed
 			 * via readlinkat + splice.  In a user namespace the /proc/self,
 			 * /dev/fd and /dev/std* symlinks may report the overflow uid, so
@@ -660,15 +741,19 @@ static int ona_open(const char *path, int flags, mode_t mode, char *out_abs, siz
 
 		/* Non-symlink. */
 		if (is_last) {
+			if (restricted && !S_ISREG(comp_mode)) {
+				saved_errno = EINVAL;
+				goto out;
+			}
 			if (abspath_step(abspath, sizeof abspath, comp, comp_len) < 0) {
 				saved_errno = errno;
 				goto out;
 			}
-			if (!pin_transit && abspath_outside_confinement(abspath, 1)) {
+			if (!restricted && !pin_transit && abspath_outside_confinement(abspath, 1)) {
 				saved_errno = ELOOP;
 				goto out;
 			}
-			retfd = openat(dfd, comp, flags | O_NOFOLLOW, mode);
+			retfd = open_operator_leaf(dfd, comp, flags, mode);
 			saved_errno = errno;
 			/* Resolved leaf dir (O_DIRECTORY): hand its path back so
 			 * owner_walk_parent can filter-check the operation's leaf. */
@@ -679,23 +764,27 @@ static int ona_open(const char *path, int flags, mode_t mode, char *out_abs, siz
 			goto out;
 		}
 
-		if (!S_ISDIR(lst.st_mode)) {
+		if (!S_ISDIR(comp_mode)) {
 			saved_errno = ENOTDIR;
 			goto out;
 		}
 		/* track the resolved path so a target outside the module is refused */
 		if (abspath_step(abspath, sizeof abspath, comp, comp_len) < 0) {
 			saved_errno = errno;
+			if (next >= 0) close(next);
 			goto out;
 		}
-		if (!pin_transit && abspath_outside_confinement(abspath, 0)) {
+		if (!restricted && !pin_transit && abspath_outside_confinement(abspath, 0)) {
 			saved_errno = ELOOP;
+			if (next >= 0) close(next);
 			goto out;
 		}
-		int next = openat(dfd, comp, dir_traverse_flags | O_NOFOLLOW);
 		if (next < 0) {
-			saved_errno = errno;
-			goto out;
+			next = openat(dfd, comp, dir_traverse_flags | O_NOFOLLOW);
+			if (next < 0) {
+				saved_errno = errno;
+				goto out;
+			}
 		}
 		if (dfd_owns) close(dfd);
 		dfd = next;
@@ -716,7 +805,7 @@ static int ona_open(const char *path, int flags, mode_t mode, char *out_abs, siz
 	 * an O_PATH fd is sufficient for traversal and fchdir but not operations
 	 * such as fchmod. */
 	if (flags & O_DIRECTORY) {
-		if (!pin_transit && abspath_outside_confinement(abspath, 1)) {
+		if (!restricted && !pin_transit && abspath_outside_confinement(abspath, 1)) {
 			saved_errno = ELOOP;
 			goto out;
 		}
@@ -737,21 +826,59 @@ out:
 #else
 	/* Pre-AT_FDCWD / no O_NOFOLLOW systems: best-effort fallback. */
 	(void)out_abs; (void)out_cap;
+	if (restricted) {
+		errno = ENOTSUP;
+		return -1;
+	}
 	return open(path, flags, mode);
 #endif
 }
 
 int open_no_attacker_symlinks(const char *path, int flags, mode_t mode)
 {
-	return ona_open(path, flags, mode, NULL, 0);
+	return ona_open(path, flags, mode, NULL, 0, NULL);
+}
+
+int open_rrsync_logfile(const char *path)
+{
+#if defined AT_FDCWD && defined O_NOFOLLOW && defined O_DIRECTORY
+	STRUCT_STAT restricted, log_stat;
+	char cwd[MAXPATHLEN];
+	int fd;
+
+	if (!path || *path != '/' || !confine_root || confine_rootlen <= 1
+	 || !getcwd(cwd, sizeof cwd) || strcmp(cwd, confine_root) != 0) {
+		errno = EINVAL;
+		return -1;
+	}
+	if (fstatat(AT_FDCWD, ".", &restricted, 0) < 0)
+		return -1;
+	fd = ona_open(path, O_WRONLY | O_APPEND | O_CREAT | O_NONBLOCK | O_NOCTTY | O_CLOEXEC,
+		      0600, NULL, 0, &restricted);
+	if (fd < 0)
+		return -1;
+	if (fstat(fd, &log_stat) == 0) {
+		if (S_ISREG(log_stat.st_mode))
+			return fd;
+		errno = EINVAL;
+	}
+	int saved_errno = errno;
+	close(fd);
+	errno = saved_errno;
+	return -1;
+#else
+	(void)path;
+	errno = ENOTSUP;
+	return -1;
+#endif
 }
 
 /* Open a directory for traversal or as *at()/fchdir() authority.  Unlike an
  * O_RDONLY directory endpoint, this accepts a searchable but unreadable
- * directory on Linux. */
+ * directory when the kernel provides a safe search-only descriptor. */
 int open_no_attacker_symlinks_dirfd(const char *path)
 {
-	return ona_open(path, directory_traverse_flags(), 0, NULL, 0);
+	return ona_open(path, directory_traverse_flags(), 0, NULL, 0, NULL);
 }
 
 /* When set, the do_*_at() wrappers resolve their path as an OPERATOR-supplied
@@ -770,17 +897,19 @@ int filesfrom_owner_walk_override = 0;
 /* For an operator-supplied path: open its parent directory via the ownership
  * walk (handles absolute and relative paths) and point *bname at the final
  * component.  Returns the dirfd (caller closes) or -1 with errno set. */
-int owner_walk_parent(const char *path, const char **bname)
+static int owner_walk_parent_with_length(const char *path, const char **bname,
+					 size_t *resolved_len)
 {
 	const char *slash = strrchr(path, '/');
 	char dir[MAXPATHLEN], pabs[MAXPATHLEN];
 	size_t dlen;
 	int dfd;
+	int flags = directory_traverse_flags() | (resolved_len ? O_CLOEXEC : 0);
 
 	*bname = slash ? slash + 1 : path;
 	pabs[0] = '\0';
 	if (!slash)
-		dfd = ona_open(".", directory_traverse_flags(), 0, pabs, sizeof pabs);
+		dfd = ona_open(".", flags, 0, pabs, sizeof pabs, NULL);
 	else {
 		dlen = slash == path ? 1 : (size_t)(slash - path); /* "/x" -> parent "/" */
 		if (dlen >= sizeof dir) {
@@ -789,7 +918,7 @@ int owner_walk_parent(const char *path, const char **bname)
 		}
 		memcpy(dir, path, dlen);
 		dir[dlen] = '\0';
-		dfd = ona_open(dir, directory_traverse_flags(), 0, pabs, sizeof pabs);
+		dfd = ona_open(dir, flags, 0, pabs, sizeof pabs, NULL);
 	}
 	if (dfd < 0)
 		return -1;
@@ -803,7 +932,230 @@ int owner_walk_parent(const char *path, const char **bname)
 			return -1;
 		}
 	}
+	if (resolved_len)
+		*resolved_len = strlen(pabs);
 	return dfd;
+}
+
+int owner_walk_parent(const char *path, const char **bname)
+{
+	return owner_walk_parent_with_length(path, bname, NULL);
+}
+
+/* Keep the current basis parent and its neighbour. The generator and
+ * receiver each own a separate cache for non-daemon basis paths. */
+struct basis_parent_entry {
+	int fd;
+	size_t path_len;
+	size_t resolved_len;
+	char path[MAXPATHLEN];
+};
+static struct basis_parent_entry basis_parents[2] = {{.fd = -1}, {.fd = -1}};
+static int basis_parent_victim;
+#ifndef __CYGWIN__
+static struct basis_parent_entry checked_basis_root = {.fd = -1};
+static int basis_root_attempted;
+#endif
+
+/* The root replaces one parent slot instead of increasing the cache's
+ * descriptor budget. */
+static int basis_parent_slots(void)
+{
+#ifndef __CYGWIN__
+	if (checked_basis_root.fd >= 0)
+		return 1;
+#endif
+	return 2;
+}
+
+void reset_basis_parent_cache(void)
+{
+	int i;
+	for (i = 0; i < 2; i++) {
+		if (basis_parents[i].fd >= 0)
+			close(basis_parents[i].fd);
+		basis_parents[i].fd = -1;
+	}
+	basis_parent_victim = 0;
+#ifndef __CYGWIN__
+	if (checked_basis_root.fd >= 0)
+		close(checked_basis_root.fd);
+	checked_basis_root.fd = -1;
+	basis_root_attempted = 0;
+#endif
+}
+
+static int basis_leaf_fits(size_t parent_len, const char *leaf)
+{
+	return parent_len + (parent_len != 1) + strlen(leaf) < MAXPATHLEN;
+}
+
+static int basis_fd_cacheable(int fd)
+{
+	int flags;
+
+	if (O_CLOEXEC)
+		return 1;
+	flags = fcntl(fd, F_GETFD);
+	return flags >= 0 && fcntl(fd, F_SETFD, flags | FD_CLOEXEC) >= 0;
+}
+
+static void store_basis_directory(struct basis_parent_entry *entry, int fd,
+				  const char *path, size_t len, size_t resolved_len)
+{
+	if (entry->fd >= 0)
+		close(entry->fd);
+	entry->fd = fd;
+	entry->path_len = len;
+	entry->resolved_len = resolved_len;
+	memcpy(entry->path, path, len);
+}
+
+#ifndef __CYGWIN__
+/* Ownership only needs checking when a component is a symlink.
+ * Move through ordinary directories or fall back to the complete walk. */
+static int open_plain_basis_descendant(const struct basis_parent_entry *prefix,
+				       const char *path, size_t path_len, const char *leaf,
+				       size_t *resolved_len)
+{
+	char suffix[MAXPATHLEN], *name;
+	size_t len, new_len;
+	int fd = prefix->fd;
+
+	if (fd < 0 || prefix->path_len >= path_len || path[prefix->path_len] != '/'
+	 || memcmp(path, prefix->path, prefix->path_len) != 0)
+		return -1;
+	len = path_len - prefix->path_len - 1;
+	new_len = prefix->resolved_len + (prefix->resolved_len != 1) + len;
+	if (!basis_leaf_fits(new_len, leaf))
+		return -1;
+	memcpy(suffix, path + prefix->path_len + 1, len);
+	suffix[len] = '\0';
+	for (name = suffix; name;) {
+		char *slash = strchr(name, '/');
+		int next;
+
+		if (slash)
+			*slash = '\0';
+		if (!*name || strcmp(name, ".") == 0 || strcmp(name, "..") == 0)
+			goto failed;
+		next = openat(fd, name, directory_traverse_flags() | O_CLOEXEC | O_NOFOLLOW);
+		if (next < 0)
+			goto failed;
+		if (fd != prefix->fd)
+			close(fd);
+		fd = next;
+		name = slash ? slash + 1 : NULL;
+	}
+	*resolved_len = new_len;
+	return fd;
+
+  failed:
+	if (fd != prefix->fd) {
+		int e = errno;
+		close(fd);
+		errno = e;
+	}
+	return -1;
+}
+
+/* Establish the root only after a full parent walk succeeded. A failed
+ * optional pin must not change the result or add retries to later lookups. */
+static void retain_basis_root(const char *basis, const char *path, size_t path_len)
+{
+	char resolved[MAXPATHLEN];
+	size_t len;
+	int fd;
+
+	if (basis_root_attempted || !basis || *basis != '/')
+		return;
+	len = strlen(basis);
+	while (len && basis[len - 1] == '/')
+		len--;
+	if (len >= path_len || path[len] != '/' || memcmp(path, basis, len) != 0)
+		return;
+	basis_root_attempted = 1;
+	if (basis_parents[0].fd >= 0 && basis_parents[1].fd >= 0)
+		return;
+	resolved[0] = '\0';
+	fd = ona_open(basis, directory_traverse_flags() | O_CLOEXEC, 0, resolved, sizeof resolved, NULL);
+	if (fd < 0)
+		return;
+	if (*resolved && basis_fd_cacheable(fd))
+		store_basis_directory(&checked_basis_root, fd, basis, len, strlen(resolved));
+	else
+		close(fd);
+}
+#endif
+
+/* A cached fd is borrowed until the next basis lookup or reset. If the
+ * directory cannot be cached, return an owned fd from the same walk. */
+int cached_basis_parent_fd(const char *basis, const char *path, const char **leaf, int *owned)
+{
+	const char *slash = strrchr(path, '/');
+	size_t len, resolved_len = 0;
+	int fd = -1, i, slots = basis_parent_slots();
+	int victim = basis_parent_victim % slots;
+	struct basis_parent_entry *entry;
+
+	*owned = 1;
+	if (*path != '/' || am_daemon || confine_root || !secure_relpath_active())
+		return owner_walk_parent(path, leaf);
+	*leaf = slash + 1;
+	len = (size_t)(slash - path);
+	if (len >= MAXPATHLEN)
+		return owner_walk_parent(path, leaf);
+	for (i = 0; i < slots; i++) {
+		entry = &basis_parents[i];
+		if (entry->fd < 0 || entry->path_len != len || memcmp(entry->path, path, len) != 0)
+			continue;
+		if (!basis_leaf_fits(entry->resolved_len, *leaf)) {
+			errno = ENAMETOOLONG;
+			return -1;
+		}
+		basis_parent_victim = (i + 1) % slots;
+		*owned = 0;
+		return entry->fd;
+	}
+#ifndef __CYGWIN__
+	for (i = 0; i < slots; i++) {
+		fd = open_plain_basis_descendant(&basis_parents[i], path, len, *leaf, &resolved_len);
+		if (fd >= 0) {
+			/* Keep the common parent for the next sibling. */
+			victim = (i + 1) % slots;
+			break;
+		}
+	}
+	if (fd < 0)
+		fd = open_plain_basis_descendant(&checked_basis_root, path, len, *leaf, &resolved_len);
+#else
+	(void)basis;
+#endif
+	if (fd < 0)
+		fd = owner_walk_parent_with_length(path, leaf, &resolved_len);
+	if (fd < 0) {
+		if (errno != EMFILE && errno != ENFILE)
+			return -1;
+		reset_basis_parent_cache();
+		return owner_walk_parent(path, leaf);
+	}
+	if (!resolved_len || !basis_fd_cacheable(fd))
+		return fd;
+	store_basis_directory(&basis_parents[victim], fd, path, len, resolved_len);
+#ifndef __CYGWIN__
+	{
+		int e = errno;
+		retain_basis_root(basis, path, len);
+		errno = e;
+	}
+#endif
+	basis_parent_victim = (victim + 1) % basis_parent_slots();
+	*owned = 0;
+	return fd;
+}
+#else
+void reset_basis_parent_cache(void)
+{
 }
 #endif
 
@@ -933,6 +1285,11 @@ int do_symlink(const char *lnk, const char *path)
 	RETURN_ERROR_IF_NULL(lnk);
 	RETURN_ERROR_IF_NULL(path);
 
+	char munged[MAXPATHLEN];
+	lnk = munge_symlink_target(lnk, munged, sizeof munged);
+	if (!lnk)
+		return -1;
+
 #if defined NO_SYMLINK_XATTRS || defined NO_SYMLINK_USER_XATTRS
 	/* For --fake-super, we create a normal file with mode 0600
 	 * and write the lnk into it. */
@@ -975,6 +1332,7 @@ int do_symlink_at(const char *lnk, const char *path)
 #ifdef AT_FDCWD
 	extern int am_daemon, am_chrooted;
 	char dirpath[MAXPATHLEN];
+	char munged[MAXPATHLEN];
 	const char *bname;
 	const char *slash;
 	int dfd = AT_FDCWD, ret, e;
@@ -983,6 +1341,10 @@ int do_symlink_at(const char *lnk, const char *path)
 
 	if (dry_run) return 0;
 	RETURN_ERROR_IF_RO_OR_LO;
+
+	lnk = munge_symlink_target(lnk, munged, sizeof munged);
+	if (!lnk)
+		return -1;
 
 #if defined O_NOFOLLOW && defined O_DIRECTORY
 	if (operator_path_resolve) {
@@ -1052,7 +1414,6 @@ int do_symlink_at(const char *lnk, const char *path)
 		return ret;
 	}
 #endif
-
 	ret = symlinkat(lnk, dfd, bname);
 	e = errno;
 	if (owns) close(dfd);
@@ -1142,7 +1503,10 @@ int do_link(const char *old_path, const char *new_path)
   symbolic-link old_path). Only available on systems with linkat();
   pre-AT_FDCWD systems fall through to do_link().
 */
-int do_link_at(const char *old_path, const char *new_path)
+/* Non-negative parent fds are borrowed from walks that satisfy the
+ * operator-path policy. Only the basename is used on each held side. */
+int do_link_at_from(int old_parent_fd, const char *old_path,
+		    int new_parent_fd, const char *new_path)
 {
 #if defined AT_FDCWD && defined HAVE_LINKAT
 	extern int am_daemon, am_chrooted;
@@ -1169,23 +1533,36 @@ int do_link_at(const char *old_path, const char *new_path)
 	if (operator_path_resolve) {
 		if (symlink_optout_allowed())
 			return do_link(old_path, new_path);
-		old_dfd = owner_walk_parent(old_path, &old_bname);
-		if (old_dfd < 0)
-			return -1;
-		new_dfd = owner_walk_parent(new_path, &new_bname);
-		if (new_dfd < 0) {
-			e = errno;
-			close(old_dfd);
-			errno = e;
-			return -1;
+		if (old_parent_fd >= 0) {
+			old_slash = strrchr(old_path, '/');
+			old_bname = old_slash ? old_slash + 1 : old_path;
+			old_dfd = old_parent_fd;
+		} else {
+			old_dfd = owner_walk_parent(old_path, &old_bname);
+			if (old_dfd < 0)
+				return -1;
+			old_owns = True;
 		}
-		ret = linkat(old_dfd, old_bname, new_dfd, new_bname, 0);
-		e = errno;
-		close(new_dfd);
-		close(old_dfd);
-		errno = e;
-		return ret;
+		if (new_parent_fd >= 0) {
+			new_slash = strrchr(new_path, '/');
+			new_bname = new_slash ? new_slash + 1 : new_path;
+			new_dfd = new_parent_fd;
+		} else {
+			new_dfd = owner_walk_parent(new_path, &new_bname);
+			if (new_dfd < 0) {
+				e = errno;
+				if (old_owns)
+					close(old_dfd);
+				errno = e;
+				return -1;
+			}
+			new_owns = True;
+		}
+		goto link_parents;
 	}
+#else
+	(void)old_parent_fd;
+	(void)new_parent_fd;
 #endif
 
 	old_slash = strrchr(old_path, '/');
@@ -1272,6 +1649,9 @@ int do_link_at(const char *old_path, const char *new_path)
 		new_bname = new_path;
 	}
 
+#if defined O_NOFOLLOW && defined O_DIRECTORY
+  link_parents:
+#endif
 	ret = linkat(old_dfd, old_bname, new_dfd, new_bname, 0);
 	e = errno;
 	if (new_owns)
@@ -1281,8 +1661,15 @@ int do_link_at(const char *old_path, const char *new_path)
 	errno = e;
 	return ret;
 #else
+	(void)old_parent_fd;
+	(void)new_parent_fd;
 	return do_link(old_path, new_path);
 #endif
+}
+
+int do_link_at(const char *old_path, const char *new_path)
+{
+	return do_link_at_from(-1, old_path, -1, new_path);
 }
 #endif
 
@@ -1771,7 +2158,13 @@ int do_open_at(const char *pathname, int flags, mode_t mode)
 }
 
 #ifdef HAVE_CHMOD
-int do_chmod(const char *path, mode_t mode)
+enum chmod_policy {
+	CHMOD_LEGACY,
+	CHMOD_REQUIRED,
+	CHMOD_INHERITED
+};
+
+static int chmod_path(const char *path, mode_t mode, enum chmod_policy policy)
 {
 	static int switch_step = 0;
 	int code;
@@ -1806,6 +2199,8 @@ int do_chmod(const char *path, mode_t mode)
 				code = 1;
 # elif defined AT_FDCWD && defined AT_SYMLINK_NOFOLLOW
 			code = fchmodat(AT_FDCWD, path, mode & CHMOD_BITS, AT_SYMLINK_NOFOLLOW);
+			if (code < 0 && (errno == ENOTSUP || errno == EOPNOTSUPP || errno == ENOSYS))
+				code = 1;
 # else
 			code = 1;
 # endif
@@ -1813,9 +2208,24 @@ int do_chmod(const char *path, mode_t mode)
 			code = chmod(path, mode & CHMOD_BITS); /* DISCOURAGED FUNCTION */
 		break;
 	}
-	if (code != 0 && (preserve_perms || preserve_executability))
-		return code;
-	return 0;
+	if (policy == CHMOD_LEGACY && !preserve_perms && !preserve_executability)
+		return 0;
+	return code;
+}
+
+int do_chmod(const char *path, mode_t mode)
+{
+	return chmod_path(path, mode, CHMOD_LEGACY);
+}
+
+/* A pinned inode separates a mode refusal from a failed pathname lookup. */
+static int chmod_inode(int fd, mode_t mode, enum chmod_policy policy)
+{
+	int ret = fchmod(fd, mode);
+
+	if (ret < 0 && policy == CHMOD_INHERITED && (errno == EACCES || errno == EPERM))
+		return 1;
+	return ret;
 }
 
 /* chmod `name` relative to dfd without following a final-component symlink.
@@ -1839,8 +2249,9 @@ int do_chmod(const char *path, mode_t mode)
  * dir that becomes a FIFO is still opened.  O_NOFOLLOW rejects symlinks, not
  * type changes.  Constraining the open to the observed type would close that;
  * it is not done here. */
-static int do_fchmodat_nofollow(int dfd, const char *name, mode_t mode)
+static int do_fchmodat_nofollow(int dfd, const char *name, mode_t mode, enum chmod_policy policy)
 {
+	(void)policy;
 #if defined AT_FDCWD && defined AT_SYMLINK_NOFOLLOW
 	mode &= CHMOD_BITS;
 # ifdef O_NOFOLLOW
@@ -1897,7 +2308,7 @@ static int do_fchmodat_nofollow(int dfd, const char *name, mode_t mode)
 #  endif
 			fd = openat(dfd, name, oflags);
 			if (fd >= 0) {
-				int r = fchmod(fd, mode), e = errno;
+				int r = chmod_inode(fd, mode, policy), e = errno;
 				close(fd);
 				errno = e;
 				return r;
@@ -1932,7 +2343,8 @@ static int do_fchmodat_nofollow(int dfd, const char *name, mode_t mode)
 		int r = syscall(SYS_fchmodat2, dfd, name, (unsigned int)mode, AT_SYMLINK_NOFOLLOW);
 		if (r == 0)
 			return 0;
-		if (errno != ENOSYS && errno != EPERM && errno != EOPNOTSUPP)
+		if (errno != ENOSYS && errno != EOPNOTSUPP
+		 && (errno != EPERM || policy != CHMOD_LEGACY))
 			return r;
 	}
 #  endif
@@ -1966,18 +2378,11 @@ static int do_fchmodat_nofollow(int dfd, const char *name, mode_t mode)
   components is then either followed within the tree (legitimate dir-symlinks
   still work) or rejected (escape attempts fail).
 
-  Final-component handling matches do_chmod(): fchmodat() with flag 0
-  follows a symlink at the final component, which is the same behaviour as
-  chmod() and matches every current call site (the file being chmod'd is
-  one the receiver itself just created or transferred). For the rare case
-  where the caller wants to chmod a symlink-as-an-object (S_ISLNK in the
-  mode bits), we fall through to do_chmod() which has portability code for
-  that case.
-
-  Falls back to do_chmod() for absolute paths and for paths with no parent
-  component, where there is nothing to protect against.
+  With a held parent, change the leaf's mode without following a symlink.
+  Use the platform's link-mode handling when changing a symlink itself.
+  The pathname fallback retains the caller's mode-update policy.
 */
-int do_chmod_at(const char *fname, mode_t mode)
+static int chmod_at_path(const char *fname, mode_t mode, enum chmod_policy policy)
 {
 #ifdef AT_FDCWD
 	extern int am_daemon, am_chrooted;
@@ -1998,11 +2403,11 @@ int do_chmod_at(const char *fname, mode_t mode)
 	 * S_ISLNK(mode) still needs do_chmod()'s lchmod()/setattrlist() handling. */
 	if (operator_path_resolve && fname && *fname && !S_ISLNK(mode)) {
 		if (symlink_optout_allowed())
-			return do_chmod(fname, mode);
+			return chmod_path(fname, mode, policy);
 		dfd = owner_walk_parent(fname, &bname);
 		if (dfd < 0)
 			return -1;
-		ret = do_fchmodat_nofollow(dfd, bname, mode);
+		ret = do_fchmodat_nofollow(dfd, bname, mode, policy);
 		e = errno;
 		close(dfd);
 		errno = e;
@@ -2010,21 +2415,15 @@ int do_chmod_at(const char *fname, mode_t mode)
 	}
 #endif
 
-	/* Only the daemon-without-chroot case is exposed to the symlink-
-	 * race attack: a chroot already confines the receiver, and a
-	 * non-daemon rsync runs with the user's own authority so a
-	 * symlink they planted can only redirect to files they could
-	 * already access.  Everywhere else, fall through to plain
-	 * do_chmod() to avoid the dirfd-open overhead on every call. */
 	if (!secure_relpath_active())
-		return do_chmod(fname, mode);
+		return chmod_path(fname, mode, policy);
 
 	if (!fname || !*fname || *fname == '/' || S_ISLNK(mode))
-		return do_chmod(fname, mode);
+		return chmod_path(fname, mode, policy);
 
 	slash = strrchr(fname, '/');
 	if (!slash)
-		return do_chmod(fname, mode);
+		return chmod_path(fname, mode, policy);
 
 	dlen = slash - fname;
 	if (dlen >= sizeof dirpath) {
@@ -2039,14 +2438,19 @@ int do_chmod_at(const char *fname, mode_t mode)
 	if (dfd < 0)
 		return -1;
 
-	ret = do_fchmodat_nofollow(dfd, bname, mode);
+	ret = do_fchmodat_nofollow(dfd, bname, mode, policy);
 	e = errno;
 	close(dfd);
 	errno = e;
 	return ret;
 #else
-	return do_chmod(fname, mode);
+	return chmod_path(fname, mode, policy);
 #endif
+}
+
+int do_chmod_at(const char *fname, mode_t mode)
+{
+	return chmod_at_path(fname, mode, CHMOD_LEGACY);
 }
 #endif
 
@@ -2930,6 +3334,74 @@ int do_open_nofollow(const char *pathname, int flags)
 	return fd;
 }
 
+#ifdef SUPPORT_STREAM_SOURCE
+static BOOL same_stream_inode(const STRUCT_STAT *a, const STRUCT_STAT *b)
+{
+	return a->st_dev == b->st_dev && a->st_ino == b->st_ino
+	    && (a->st_mode & S_IFMT) == (b->st_mode & S_IFMT);
+}
+
+/* Reopen the checked inode rather than resolving its name a second time. */
+int reopen_stream_file(int pin, STRUCT_STAT *st, int flags)
+{
+	char entry[32];
+	STRUCT_STAT opened;
+	struct statfs fs;
+	int dfd, fd = -1, saved_errno;
+
+	dfd = open("/proc/self/fd", O_PATH | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC);
+	if (dfd < 0)
+		return -1;
+	if (fstatfs(dfd, &fs) < 0)
+		goto done;
+	if (fs.f_type != PROC_SUPER_MAGIC) {
+		errno = ENOTSUP;
+		goto done;
+	}
+	snprintf(entry, sizeof entry, "%d", pin);
+	if (fstatat(dfd, entry, &opened, 0) < 0)
+		goto done;
+	if (!same_stream_inode(st, &opened)) {
+		errno = ESTALE;
+		goto done;
+	}
+	fd = openat(dfd, entry, O_RDONLY | O_CLOEXEC | flags);
+	if (fd >= 0) {
+		int err = do_fstat(fd, &opened) < 0 ? errno : !same_stream_inode(st, &opened) ? ESTALE : 0;
+		if (err) {
+			close(fd);
+			fd = -1;
+			errno = err;
+		} else
+			*st = opened;
+	}
+  done:
+	saved_errno = errno;
+	close(dfd);
+	errno = saved_errno;
+	return fd;
+}
+
+int open_stream_basis(const char *path, STRUCT_STAT *st)
+{
+	int pin = do_open_nofollow(path, O_PATH | O_CLOEXEC);
+	int fd = -1, saved_errno;
+
+	if (pin < 0)
+		return -1;
+	if (do_fstat(pin, st) == 0) {
+		if (S_ISREG(st->st_mode))
+			fd = reopen_stream_file(pin, st, 0);
+		else
+			errno = EINVAL;
+	}
+	saved_errno = errno;
+	close(pin);
+	errno = saved_errno;
+	return fd;
+}
+#endif
+
 /*
   open a file relative to a base directory. The basedir can be NULL,
   in which case the current working directory is used. The relpath
@@ -3089,7 +3561,7 @@ static int ds_take(struct dirstack *ds)
 {
 	if (ds->top > 0)
 		return ds->fds[ds->top--];
-	return openat(ds->fds[0], ".", directory_traverse_flags());
+	return openat(ds->fds[0], ".", directory_traverse_flags() | O_CLOEXEC);
 }
 
 static int ds_walk_path(struct dirstack *ds, char *path, int *hops);
@@ -3114,7 +3586,7 @@ static int ds_descend(struct dirstack *ds, const char *part, int *hops)
 		return 0;
 	}
 
-	int fd = openat(ds_cur(ds), part, directory_traverse_flags() | O_NOFOLLOW);
+	int fd = openat(ds_cur(ds), part, directory_traverse_flags() | O_NOFOLLOW | O_CLOEXEC);
 	if (fd != -1) {					/* a real subdirectory */
 		if (ds_push(ds, fd) < 0)
 			return -1;
@@ -3185,6 +3657,21 @@ static int ds_walk_path(struct dirstack *ds, char *path, int *hops)
 	return 0;
 }
 
+/* Preserve the distinction between a file leaf and a directory. */
+static int open_confined_file_leaf(int dfd, const char *name, int flags, mode_t mode)
+{
+	int fd = openat(dfd, name, directory_traverse_flags() | O_NOFOLLOW);
+
+	if (fd < 0) {
+		if (errno == ENOTDIR || errno == ENOENT)
+			return openat(dfd, name, flags | O_NOFOLLOW, mode);
+		return -1;
+	}
+	close(fd);
+	errno = EISDIR;
+	return -1;
+}
+
 /* Walk `relpath` confined beneath the borrowed anchor dirfd (which may be
  * AT_FDCWD) and return the opened leaf fd, or -1.  Does NOT close `anchor_fd` --
  * the caller owns it.  Shared by secure_relative_open() (which first resolves a
@@ -3253,16 +3740,7 @@ static int secure_walk_at(int anchor_fd, const char *anchor_abspath,
 		if (is_last && !(flags & O_DIRECTORY)) {
 			if (check_abspath_leaf(ds.abspath, part) < 0)
 				goto cleanup;
-			int next_fd = openat(ds_cur(&ds), part,
-					     directory_traverse_flags() | O_NOFOLLOW);
-			if (next_fd == -1 && (errno == ENOTDIR || errno == ENOENT)) {
-				retfd = openat(ds_cur(&ds), part, flags | O_NOFOLLOW, mode);
-				goto cleanup;
-			}
-			if (next_fd == -1)
-				goto cleanup;
-			close(next_fd);
-			errno = EISDIR;
+			retfd = open_confined_file_leaf(ds_cur(&ds), part, flags, mode);
 			goto cleanup;
 		}
 
@@ -3673,7 +4151,7 @@ int secure_mkstemp(char *template, mode_t perms, int operator_path)
 }
 
 /*
-  varient of do_open/do_open_nofollow which does do_open() if the
+  variant of do_open/do_open_nofollow which does do_open() if the
   copy_links or copy_unsafe_links options are set and does
   do_open_nofollow() otherwise
 
@@ -3778,10 +4256,10 @@ int open_dir_secure(const char *dirname)
  * common component prefix -- popping only the divergent tail and descending the
  * new tail.  Each directory is then opened once while we are inside its subtree.
  *
- * The chain is relative to the process cwd (for a NULL anchor), so change_dir()
- * drops it on any real chdir; it otherwise persists across flist chunks (the
- * pinned fds stay valid, and a raced/replaced ancestor resolves to the original
- * inode the fd holds -- the held-dirfd race-safety property, not a hazard).
+ * A cwd-backed chain is dropped by change_dir(). A supplied anchor fd is
+ * borrowed and its owner must reset the chain before closing it. The cache
+ * otherwise persists across flist chunks, holding the same directory inodes
+ * even if they are renamed.
  * Each component is resolved with ds_descend(), which follows in-tree directory
  * symlinks exactly as secure_relative_open() does; only the resolved dir fd is
  * kept (intermediate symlink-target fds are closed -- sound, since an open
@@ -3789,50 +4267,66 @@ int open_dir_secure(const char *dirname)
 #if defined AT_FDCWD && defined O_NOFOLLOW && defined O_DIRECTORY
 #define DPC_MAXDEPTH 64
 static const char *dpc_anchor = (const char *)-2;
-static int dpc_base = -1;			/* opened anchor dir (owned), or -1 */
+static int dpc_anchor_fd = -1;			/* borrowed anchor, or -1 for a path */
+static int dpc_base = -1;
 static int dpc_fd[DPC_MAXDEPTH];		/* dpc_fd[i] = dir after components 0..i */
 static char dpc_name[DPC_MAXDEPTH][256];	/* textual component names */
 static int dpc_depth = 0;
+static int dpc_plain_depth = 0;		/* prefix reached without following any symlink */
+static char dpc_dirpath[MAXPATHLEN];
+static int dpc_dirpath_valid;
 
 void reset_dir_fd_cache(void)
 {
 	while (dpc_depth > 0)
 		close(dpc_fd[--dpc_depth]);
-	if (dpc_base >= 0)
+	dpc_plain_depth = 0;
+	dpc_dirpath_valid = 0;
+	if (dpc_base >= 0 && dpc_anchor_fd < 0)
 		close(dpc_base);
 	dpc_base = -1;
 	dpc_anchor = (const char *)-2;
+	dpc_anchor_fd = -1;
 }
 
-/* Resolve directory `dirpath` beneath `anchor` (NULL = cwd, else an absolute
- * trusted root), reusing the held ancestor stack.  Returns a BORROWED dirfd
+/* Resolve dirpath beneath the supplied anchor fd or a trusted path
+ * (NULL = cwd), reusing the held ancestor stack. Returns a BORROWED dirfd
  * owned by the cache (do NOT close), or -1 (errno preserved for a real open
  * error, errno==0 for an uncacheable path -- "..", too deep/long, or a relative
  * non-cwd anchor) so the caller can fall back to secure_relative_open(). */
-static int dpc_dir_fd(const char *anchor, const char *dirpath)
+static int dpc_dir_fd(const char *anchor, int anchor_fd, const char *dirpath)
 {
 	char copy[MAXPATHLEN];
 	char *comps[DPC_MAXDEPTH];
 	char *sv = NULL;
 	int nc = 0, p, i;
+	size_t len;
 
 	if (anchor && anchor[0] != '/') { errno = 0; return -1; }
 	if (!dirpath)
 		dirpath = "";
 	if (dirpath[0] == '/') { errno = 0; return -1; }
 
-	if (anchor != dpc_anchor || dpc_base < 0) {
-		int fl;
+	if (anchor != dpc_anchor || anchor_fd != dpc_anchor_fd || dpc_base < 0) {
 		reset_dir_fd_cache();
-		dpc_base = open_anchor_dirfd(anchor ? anchor : ".");
-		if (dpc_base < 0)
-			return -1;
-		if ((fl = fcntl(dpc_base, F_GETFD)) >= 0)
-			fcntl(dpc_base, F_SETFD, fl | FD_CLOEXEC);
+		if (anchor_fd >= 0)
+			dpc_base = anchor_fd;
+		else {
+			int fl;
+			dpc_base = open_anchor_dirfd(anchor ? anchor : ".");
+			if (dpc_base < 0)
+				return -1;
+			if ((fl = fcntl(dpc_base, F_GETFD)) >= 0)
+				fcntl(dpc_base, F_SETFD, fl | FD_CLOEXEC);
+		}
 		dpc_anchor = anchor;
-	}
+		dpc_anchor_fd = anchor_fd;
+	} else if (dpc_dirpath_valid && strcmp(dpc_dirpath, dirpath) == 0)
+		return dpc_depth > 0 ? dpc_fd[dpc_depth-1] : dpc_base;
 
-	if (strlcpy(copy, dirpath, sizeof copy) >= sizeof copy) { errno = ENAMETOOLONG; return -1; }
+	dpc_dirpath_valid = 0;
+	len = strlcpy(copy, dirpath, sizeof copy);
+	if (len >= sizeof copy) { errno = ENAMETOOLONG; return -1; }
 	for (char *c = strtok_r(copy, "/", &sv); c; c = strtok_r(NULL, "/", &sv)) {
 		if (c[0] == '.' && c[1] == '\0')
 			continue;					/* "." */
@@ -3855,6 +4349,8 @@ static int dpc_dir_fd(const char *anchor, const char *dirpath)
 		;
 	while (dpc_depth > p)
 		close(dpc_fd[--dpc_depth]);
+	if (dpc_plain_depth > p)
+		dpc_plain_depth = p;
 
 	/* Descend the new tail, holding each resolved component. */
 	for (i = p; i < nc; i++) {
@@ -3874,12 +4370,16 @@ static int dpc_dir_fd(const char *anchor, const char *dirpath)
 		ds_free(&ds);				/* closes intermediate symlink fds, not afd */
 		if (fd < 0)
 			return -1;
-		if ((fl = fcntl(fd, F_GETFD)) >= 0)
+		if (!O_CLOEXEC && (fl = fcntl(fd, F_GETFD)) >= 0)
 			fcntl(fd, F_SETFD, fl | FD_CLOEXEC);
 		strlcpy(dpc_name[dpc_depth], comps[i], sizeof dpc_name[0]);
 		dpc_fd[dpc_depth++] = fd;
+		if (dpc_plain_depth == i && hops == SECURE_OPEN_MAXSYMLINKS)
+			dpc_plain_depth++;
 	}
 
+	memcpy(dpc_dirpath, dirpath, len + 1);
+	dpc_dirpath_valid = 1;
 	return nc > 0 ? dpc_fd[dpc_depth-1] : dpc_base;
 }
 
@@ -3887,13 +4387,13 @@ static int dpc_dir_fd(const char *anchor, const char *dirpath)
  * confine unconditionally).  Borrowed fd; -1 => caller uses the full walk. */
 int held_dir_path_fd(const char *anchor, const char *dirpath)
 {
-	return dpc_dir_fd(anchor, dirpath);
+	return dpc_dir_fd(anchor, -1, dirpath);
 }
 
 int get_dir_fd(const char *dirname)
 {
 	if (!secure_relpath_active()) { errno = 0; return -1; }
-	return dpc_dir_fd(NULL, dirname);
+	return dpc_dir_fd(NULL, -1, dirname);
 }
 #else
 void reset_dir_fd_cache(void)
@@ -3913,6 +4413,55 @@ int get_dir_fd(const char *dirname)
 	return -1;
 }
 #endif
+
+/* Open beneath a verified sender root. Reuse only plain directories; a path
+ * that follows symlinks needs the full walk's hop budget and confinement. */
+int open_sender_root_entry(int root_fd, const char *relpath, int flags)
+{
+#if defined AT_FDCWD && defined O_NOFOLLOW && defined O_DIRECTORY && !defined __CYGWIN__
+	char dir[MAXPATHLEN];
+	const char *dirpath = relpath, *leaf = NULL;
+	int dfd;
+
+	if (am_daemon || confine_root || root_fd < 0 || !relpath || *relpath == '/'
+	 || (flags & O_ACCMODE) != O_RDONLY || (flags & O_CREAT))
+		goto full_walk;
+	if (flags & O_DIRECTORY) {
+		/* O_NOFOLLOW on a directory leaf has different search requirements. */
+		if (flags & O_NOFOLLOW)
+			goto full_walk;
+	} else {
+		const char *slash = strrchr(relpath, '/');
+		size_t len = slash ? (size_t)(slash - relpath) : 0;
+		leaf = slash ? slash + 1 : relpath;
+		if (len >= sizeof dir || !*leaf || strcmp(leaf, ".") == 0 || strcmp(leaf, "..") == 0)
+			goto full_walk;
+		memcpy(dir, relpath, len);
+		dir[len] = '\0';
+		dirpath = dir;
+	}
+	dfd = dpc_dir_fd(NULL, root_fd, dirpath);
+	if (dfd >= 0 && dpc_plain_depth == dpc_depth) {
+#ifdef O_NOATIME
+		if (open_noatime)
+			flags |= O_NOATIME;
+#endif
+		if (leaf) {
+			/* The sender fstats this fd and refuses a directory leaf. */
+			int fd = openat(dfd, leaf, flags | O_NOFOLLOW, 0);
+			if (fd < 0 && errno == ENOENT)
+				return open_confined_file_leaf(dfd, leaf, flags, 0);
+			return fd;
+		}
+		return openat(dfd, ".", flags | O_NOFOLLOW, 0);
+	}
+  full_walk:
+	/* Do not hold a second chain of descriptors during the full walk. */
+	if (dpc_anchor_fd >= 0)
+		reset_dir_fd_cache();
+#endif
+	return secure_relative_open_at(root_fd, relpath, flags, 0);
+}
 
 /* Return the cached current-directory fd iff `path` lives directly in the
  * entry's own directory (file->dirname) -- the common case for held-dirfd
@@ -3936,6 +4485,24 @@ int held_dfd_for(const char *path, const struct file_struct *file)
 	if (strlen(dn) != plen || memcmp(path, dn, plen) != 0)
 		return -1;
 	return get_dir_fd(file ? file->dirname : NULL);
+}
+
+/* No symlink means the receiver's checked directory also satisfies an
+ * unconfined ownership walk. A symlink needs that walk's own policy. */
+int held_plain_dfd_for(const char *path, const struct file_struct *file)
+{
+#if defined AT_FDCWD && defined O_NOFOLLOW && defined O_DIRECTORY && !defined __CYGWIN__
+	int fd;
+
+	if (am_daemon || confine_root || strlen(path) >= MAXPATHLEN - 1)
+		return -1;
+	fd = held_dfd_for(path, file);
+	if (fd >= 0 && dpc_plain_depth == dpc_depth)
+		return fd;
+#else
+	(void)path; (void)file;
+#endif
+	return -1;
 }
 
 int do_unlink_atfd(int dfd, const char *name, int flags)
@@ -3965,21 +4532,41 @@ int do_mkdir_atfd(int dfd, const char *name, mode_t mode)
 }
 
 #ifdef HAVE_CHMOD
-int do_chmod_atfd(int dfd, const char *name, mode_t mode)
+static int chmod_at_dirfd(int dfd, const char *name, mode_t mode, enum chmod_policy policy)
 {
 #ifdef AT_FDCWD
 	if (dry_run) return 0;
 	RETURN_ERROR_IF_RO_OR_LO;
-	/* Do not follow a final-component symlink (closes the leaf race; the
-	 * held parent dfd already confines the ancestors).  A symlink-as-object
-	 * (S_ISLNK(mode)) is still handled by the caller via the full-path
-	 * do_chmod() lchmod/setattrlist code, exactly as do_chmod_at() does. */
-	return do_fchmodat_nofollow(dfd, name, mode);
+	/* The held directory confines the parent. Do not follow the leaf. */
+	return do_fchmodat_nofollow(dfd, name, mode, policy);
 #else
 	(void)dfd; (void)name; (void)mode;
+	(void)policy;
 	errno = ENOSYS;
 	return -1;
 #endif
+}
+
+int do_chmod_atfd(int dfd, const char *name, mode_t mode)
+{
+	return chmod_at_dirfd(dfd, name, mode, CHMOD_LEGACY);
+}
+
+/* Final mode updates report applied (0), skipped (1) or failed (-1).
+ * Pathname errors cannot be classified as refusals on a pinned inode. */
+int do_chmod_attrs(const char *fname, mode_t mode, int fd, int dfd,
+		   const char *leaf, BOOL best_effort)
+{
+	enum chmod_policy policy = best_effort ? CHMOD_INHERITED : CHMOD_REQUIRED;
+
+	if (fd >= 0) {
+		if (dry_run) return 0;
+		RETURN_ERROR_IF_RO_OR_LO;
+		return chmod_inode(fd, mode, policy);
+	}
+	if (dfd >= 0 && !S_ISLNK(mode))
+		return chmod_at_dirfd(dfd, leaf, mode, policy);
+	return chmod_at_path(fname, mode, policy);
 }
 #endif
 
@@ -3996,24 +4583,13 @@ int do_lchown_atfd(int dfd, const char *name, uid_t owner, gid_t group)
 #endif
 }
 
-/* Mode/owner on an already-open fd (no path, no symlink to follow): the
- * race-free way to set metadata on a cross-tree operator-path leaf that was
- * pinned with O_NOFOLLOW.  See set_file_attrs(). */
+/* Set ownership on an already-open fd without resolving a pathname again. */
 int do_fchown(int fd, uid_t owner, gid_t group)
 {
 	if (dry_run) return 0;
 	RETURN_ERROR_IF_RO_OR_LO;
 	return fchown(fd, owner, group);
 }
-
-#ifdef HAVE_CHMOD
-int do_fchmod(int fd, mode_t mode)
-{
-	if (dry_run) return 0;
-	RETURN_ERROR_IF_RO_OR_LO;
-	return fchmod(fd, mode);
-}
-#endif
 
 #ifdef HAVE_FUTIMENS
 /* Set times on an already-open fd (the race-free counterpart for a pinned
@@ -4092,8 +4668,14 @@ int do_open_atfd(int dfd, const char *name, int flags, mode_t mode)
 int do_symlink_atfd(const char *lnk, int dfd, const char *name)
 {
 #ifdef AT_FDCWD
+	char munged[MAXPATHLEN];
+
 	if (dry_run) return 0;
 	RETURN_ERROR_IF_RO_OR_LO;
+
+	lnk = munge_symlink_target(lnk, munged, sizeof munged);
+	if (!lnk)
+		return -1;
 
 #if defined NO_SYMLINK_XATTRS || defined NO_SYMLINK_USER_XATTRS
 	/* --fake-super: store the link target in a regular placeholder file,

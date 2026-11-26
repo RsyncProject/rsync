@@ -112,7 +112,7 @@ Handling IPv6 on old machines
 
 
 Other IPv6 stuff
-  
+
   Implement suggestions from http://www.kame.net/newsletter/19980604/
   and ftp://ftp.iij.ad.jp/pub/RFC/rfc2553.txt
 
@@ -290,7 +290,7 @@ Log child death on signal
 
 
 verbose output					David Stein	2001/12/20
-  
+
   At end of transfer, show how many files were or were not transferred
   correctly.
 
@@ -333,7 +333,7 @@ Use generic zlib						2002/02/25
   Perhaps don't use our own zlib.
 
   Advantages:
-   
+
     - will automatically be up to date with bugfixes in zlib
 
     - can leave it out for small rsync on e.g. recovery disks
@@ -514,4 +514,3 @@ reverse rsync over HTTP Range
     http://zsync.moria.org.uk/
 
                       --          --
-
