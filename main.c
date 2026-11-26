@@ -46,6 +46,7 @@ extern int inc_recurse;
 extern int blocking_io;
 extern int always_checksum;
 extern int time_only;
+extern struct chmod_mode_struct *dest_chmod_modes;
 extern int remove_source_files;
 extern int output_needs_newline;
 extern int called_from_signal_handler;
@@ -101,6 +102,7 @@ extern char *stdout_format;
 extern char *logfile_format;
 extern char *placement_log;
 extern char *filesfrom_host;
+extern char *skip_dir_marker;
 extern char *partial_dir;
 extern char *rsync_path;
 extern char *shell_cmd;
@@ -1566,6 +1568,11 @@ static int start_client(int argc, char *argv[])
 		exit_cleanup(RERR_SYNTAX);
 	}
 
+	if (skip_dir_marker && (!local_server || argc != 1)) {
+		rprintf(FERROR, "--skip-dir-with requires a local copy with one source directory\n");
+		exit_cleanup(RERR_SYNTAX);
+	}
+
 	/* A local transfer doesn't unbackslash anything, so leave the args alone. */
 	if (local_server) {
 		old_style_args = 2;
@@ -1573,6 +1580,10 @@ static int start_client(int argc, char *argv[])
 	}
 	if (time_only && am_sender && !local_server) {
 		rprintf(FERROR, "--time-only requires a local receiver or a remote source\n");
+		exit_cleanup(RERR_SYNTAX);
+	}
+	if (dest_chmod_modes && am_sender && !local_server) {
+		rprintf(FERROR, "--chmod-dest must be set on the receiver; use -M for a remote-shell receiver\n");
 		exit_cleanup(RERR_SYNTAX);
 	}
 

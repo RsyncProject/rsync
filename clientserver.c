@@ -774,7 +774,8 @@ static struct passwd *want_all_groups(int f_out, uid_t uid)
 }
 #endif
 
-static int rsync_module(int f_in, int f_out, int i, const char *addr, const char *host)
+static int rsync_module(int f_in, int f_out, int i, const char *addr, const char *host,
+			BOOL named_unix)
 {
 	int argc;
 	char **argv, **orig_argv, **orig_early_argv, *module_chdir;
@@ -808,7 +809,7 @@ static int rsync_module(int f_in, int f_out, int i, const char *addr, const char
 	set_env_str("RSYNC_HOST_NAME", host);
 	set_env_str("RSYNC_HOST_ADDR", addr);
 
-	if (!allow_access(addr, &host, i)) {
+	if (!allow_access(addr, &host, i, named_unix)) {
 		rprintf(FLOG, "rsync denied on module %s from %s (%s)\n",
 			name, host, addr);
 		if (!lp_list(i))
@@ -1465,7 +1466,7 @@ static int load_config(int globals_only)
 /* this is called when a connection is established to a client
    and we want to start talking. The setup of the system is done from
    here */
-int start_daemon(int f_in, int f_out)
+static int start_daemon_session(int f_in, int f_out, BOOL named_unix)
 {
 	char line[1024];
 	const char *addr, *host;
@@ -1498,6 +1499,8 @@ int start_daemon(int f_in, int f_out)
 	if (lp_proxy_protocol()) {
 		if (!proxy_peer_allowed(f_in) || !read_proxy_protocol_header(f_in))
 			return -1;
+		/* Module rules apply to the forwarded client, not the proxy transport. */
+		named_unix = False;
 	}
 
 	/* Do reverse DNS lookup before chroot/setuid. The result is cached,
@@ -1629,7 +1632,12 @@ int start_daemon(int f_in, int f_out)
 
 	install_child_exit_handler();
 
-	return rsync_module(f_in, f_out, i, addr, host);
+	return rsync_module(f_in, f_out, i, addr, host, named_unix);
+}
+
+int start_daemon(int f_in, int f_out)
+{
+	return start_daemon_session(f_in, f_out, False);
 }
 
 static void create_pid_file(void)
@@ -1804,13 +1812,14 @@ static void become_daemon(void)
  * supply a connected Unix stream whose local endpoint has a name. Other
  * launchers may use an unnamed local socket for process I/O, which must not
  * select inetd mode. */
-static int is_inetd_socket(int fd)
+static int is_inetd_socket(int fd, BOOL *named_unix)
 {
 	int type;
 	struct sockaddr_storage peer = {0};
 	socklen_t type_len = sizeof type;
 	socklen_t peer_len = sizeof peer;
 
+	*named_unix = False;
 	if (getsockopt(fd, SOL_SOCKET, SO_TYPE, (char *)&type, &type_len) != 0
 	 || type != SOCK_STREAM
 	 || getpeername(fd, (struct sockaddr *)&peer, &peer_len) != 0)
@@ -1840,8 +1849,10 @@ static int is_inetd_socket(int fd)
 		if (path_len > sizeof local_un->sun_path)
 			path_len = sizeof local_un->sun_path;
 		for (i = 0; i < path_len; i++) {
-			if (local_un->sun_path[i] != '\0')
+			if (local_un->sun_path[i] != '\0') {
+				*named_unix = True;
 				return 1;
+			}
 		}
 		return 0;
 	}
@@ -1852,7 +1863,9 @@ static int is_inetd_socket(int fd)
 
 int daemon_main(void)
 {
-	if (is_inetd_socket(STDIN_FILENO)) {
+	BOOL named_unix;
+
+	if (is_inetd_socket(STDIN_FILENO, &named_unix)) {
 		int i;
 
 		/* we are running via inetd - close off stdout and
@@ -1863,7 +1876,7 @@ int daemon_main(void)
 			open("/dev/null", O_RDWR);
 		}
 
-		return start_daemon(STDIN_FILENO, STDIN_FILENO);
+		return start_daemon_session(STDIN_FILENO, STDIN_FILENO, named_unix);
 	}
 
 	if (!load_config(1)) {
