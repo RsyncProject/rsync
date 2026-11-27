@@ -47,14 +47,13 @@ static char ipaddr_buf[100];
 
 #define GET_SOCKADDR_FAMILY(ss) ((struct sockaddr*)ss)->sa_family
 
-static void client_sockaddr(int fd, struct sockaddr_storage *ss, socklen_t *ss_len);
 static int check_name(const char *ipaddr, const struct sockaddr_storage *ss, char *name_buf, size_t name_buf_size);
 static int valid_ipaddr(const char *s, int allow_scope);
 
 /* Return the IP addr of the client as a string. */
 char *client_addr(int fd)
 {
-	struct sockaddr_storage ss;
+	struct sockaddr_storage ss = {0};
 	socklen_t length = sizeof ss;
 
 	if (*ipaddr_buf)
@@ -77,8 +76,11 @@ char *client_addr(int fd)
 			return ipaddr_buf;
 	}
 
-	client_sockaddr(fd, &ss, &length);
-	getnameinfo((struct sockaddr *)&ss, length, ipaddr_buf, sizeof ipaddr_buf, NULL, 0, NI_NUMERICHOST);
+	if (getpeername(fd, (struct sockaddr *)&ss, &length) != 0) {
+		rsyserr(FLOG, errno, "getpeername on fd%d failed", fd);
+		exit_cleanup(RERR_SOCKETIO);
+	}
+	remember_client_addr(&ss, length);
 
 	return ipaddr_buf;
 }
@@ -310,22 +312,9 @@ int read_proxy_protocol_header(int fd)
 }
 
 
-/**
- * Get the sockaddr for the client.
- *
- * If it comes in as an ipv4 address mapped into IPv6 format then we
- * convert it back to a regular IPv4.
- **/
-static void client_sockaddr(int fd, struct sockaddr_storage *ss, socklen_t *ss_len)
+/* Cache the numeric address and preserve IPv4 matching on dual-stack sockets. */
+char *remember_client_addr(struct sockaddr_storage *ss, socklen_t ss_len)
 {
-	memset(ss, 0, sizeof *ss);
-
-	if (getpeername(fd, (struct sockaddr *) ss, ss_len)) {
-		/* FIXME: Can we really not continue? */
-		rsyserr(FLOG, errno, "getpeername on fd%d failed", fd);
-		exit_cleanup(RERR_SOCKETIO);
-	}
-
 #ifdef INET6
 	if (GET_SOCKADDR_FAMILY(ss) == AF_INET6
 	 && IN6_IS_ADDR_V4MAPPED(&((struct sockaddr_in6 *)ss)->sin6_addr)) {
@@ -342,9 +331,9 @@ static void client_sockaddr(int fd, struct sockaddr_storage *ss, socklen_t *ss_l
 		sin = (struct sockaddr_in *)ss;
 		memset(sin, 0, sizeof *sin);
 		sin->sin_family = AF_INET;
-		*ss_len = sizeof (struct sockaddr_in);
+		ss_len = sizeof (struct sockaddr_in);
 #ifdef HAVE_SOCKADDR_IN_LEN
-		sin->sin_len = *ss_len;
+		sin->sin_len = ss_len;
 #endif
 		sin->sin_port = sin6.sin6_port;
 
@@ -354,6 +343,9 @@ static void client_sockaddr(int fd, struct sockaddr_storage *ss, socklen_t *ss_l
 		memcpy(&sin->sin_addr, &sin6.sin6_addr.s6_addr[12], sizeof sin->sin_addr);
 	}
 #endif
+	if (getnameinfo((struct sockaddr *)ss, ss_len, ipaddr_buf, sizeof ipaddr_buf, NULL, 0, NI_NUMERICHOST) != 0)
+		return NULL;
+	return ipaddr_buf;
 }
 
 

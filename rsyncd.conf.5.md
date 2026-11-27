@@ -319,11 +319,17 @@ in the values of parameters.  See that section for details.
 
 0.  `proxy protocol hosts`
 
-    This global parameter lists the socket peer IP addresses that are allowed
+    This global parameter lists the socket peer addresses that are allowed
     to supply a `proxy protocol` header.  The syntax is the same token format
     used by `hosts allow`.  When `proxy protocol = true`, this list must match
     the direct peer before rsync trusts the forwarded client address.
-    The `unix:` module access rule is not available for proxy trust.
+    PROXY headers require a connected IP stream or a filesystem-named Unix
+    stream socket. For a filesystem-named Unix socket, only `unix:` and `*`
+    match. Restrict access to its containing directory to trusted proxy
+    processes. Any process that can connect can supply a forwarded address.
+    Abstract and unnamed Unix sockets are refused even with `*` configured.
+    This does not change how `unix:` matches in module access rules when the
+    proxy protocol is disabled.
 
 0.  `name converter`
 
