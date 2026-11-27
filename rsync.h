@@ -860,6 +860,13 @@ union file_extras64 {
 #endif
 };
 
+struct budget_dir_identity {
+	dev_t device;
+	ino_t inode;
+	time_t changed;
+	BOOL recorded;
+};
+
 struct file_struct {
 	const char *dirname;	/* The dir info inside the transfer */
 	time_t modtime;		/* When the item was last modified */
@@ -893,6 +900,7 @@ extern int file_sum_extra_cnt;
 #define EXTRA_LEN (sizeof (union file_extras))
 #define DEV_EXTRA_CNT 2
 #define DIRNODE_EXTRA_CNT 3
+#define BUDGET_DIR_EXTRA_CNT ((sizeof (struct budget_dir_identity) + EXTRA_LEN - 1) / EXTRA_LEN)
 #define EXTRA64_CNT ((sizeof (union file_extras64) + EXTRA_LEN - 1) / EXTRA_LEN)
 #define SUM_EXTRA_CNT file_sum_extra_cnt
 
@@ -952,6 +960,10 @@ extern int file_sum_extra_cnt;
 #define F_DIR_DEFACL(f) OPT_EXTRA(f, START_BUMP(f))->unum /* receiver dirs */
 #define F_DIR_DEV_P(f) (&OPT_EXTRA(f, START_BUMP(f) + ACL_BUMP(f) \
 				+ DEV_EXTRA_CNT - 1)->unum) /* receiver dirs */
+/* The budget identity follows the optional receiver device field. Copy it
+ * with memcpy because the storage may only have int32 alignment. */
+#define F_DIR_BUDGET_ID_P(f,one_fs) OPT_EXTRA(f, START_BUMP(f) + ACL_BUMP(f) \
+				+ ((one_fs) ? DEV_EXTRA_CNT : 0) + BUDGET_DIR_EXTRA_CNT - 1)
 
 /* This optional item might follow an F_HL_*() item. */
 #define F_RDEV_P(f) (&OPT_EXTRA(f, START_BUMP(f) + HLINK_BUMP(f) + DEV_EXTRA_CNT - 1)->unum)

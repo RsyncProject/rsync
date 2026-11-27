@@ -1,6 +1,7 @@
 #define _GNU_SOURCE
 #include <dlfcn.h>
 #include <fcntl.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
@@ -13,11 +14,14 @@ static void change_placeholder(int result, int dfd, const char *name)
 	const char *path = getenv("RSYNC_TEST_BUDGET_PLACEHOLDER");
 	const char *marker = getenv("RSYNC_TEST_BUDGET_CHANGED");
 	const char *replace = getenv("RSYNC_TEST_BUDGET_REPLACE");
+	const char *trigger = getenv("RSYNC_TEST_BUDGET_TRIGGER");
+	const char *directory = getenv("RSYNC_TEST_BUDGET_DIRECTORY");
 	struct stat made, target;
 	int fd;
 
 	if (changed || result < 0 || !path || !marker || !replace
-	 || fstatat(dfd, name, &made, AT_SYMLINK_NOFOLLOW) < 0 || lstat(path, &target) < 0
+	 || fstatat(dfd, name, &made, AT_SYMLINK_NOFOLLOW) < 0
+	 || lstat(trigger ? trigger : path, &target) < 0
 	 || made.st_dev != target.st_dev || made.st_ino != target.st_ino || !S_ISDIR(target.st_mode))
 		return;
 	changed = 1;
@@ -33,6 +37,9 @@ static void change_placeholder(int result, int dfd, const char *name)
 			return;
 		}
 		close(fd);
+	} else if (strcmp(replace, "directory") == 0) {
+		if (!directory || rename(directory, path) < 0)
+			return;
 	}
 	fd = open(marker, O_WRONLY | O_CREAT | O_EXCL, 0600);
 	if (fd >= 0)

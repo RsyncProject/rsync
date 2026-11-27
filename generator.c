@@ -1720,7 +1720,25 @@ static BOOL create_incremental_dir(char *fname, struct file_struct *file)
 	if (gen_entry_mkdir(fname, file, mode) < 0)
 		return False;
 	file->flags |= FLAG_DIR_CREATED;
+	if (file_transfer_budget >= 0 && !dry_run) {
+		STRUCT_STAT st;
+		if (gen_entry_stat(fname, file, &st, 0) == 0 && S_ISDIR(st.st_mode)) {
+			struct budget_dir_identity id = { st.st_dev, st.st_ino, st.st_ctime, True };
+			memcpy(F_DIR_BUDGET_ID_P(file, one_file_system), &id, sizeof id);
+		}
+	}
 	return True;
+}
+
+static BOOL budget_placeholder_matches(const struct file_struct *file, const STRUCT_STAT *st)
+{
+	struct budget_dir_identity id;
+
+	if (!S_ISDIR(st->st_mode))
+		return False;
+	memcpy(&id, F_DIR_BUDGET_ID_P(file, one_file_system), sizeof id);
+	return id.recorded && id.device == st->st_dev && id.inode == st->st_ino
+	    && id.changed == st->st_ctime;
 }
 
 static BOOL incremental_parent_created(void)
@@ -1994,15 +2012,13 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 	(void)replacing_hlink;
 #endif
 	if (budget_refused && !budget_redo) {
-		/* An incremental placeholder may already have been created.
-		 * Finish its metadata without admitting any of its contents. */
-		if (is_dir > 0 && file->flags & FLAG_DIR_CREATED)
-			finishing_budget_dir = True;
-		else {
-			if (is_dir)
-				file->flags |= FLAG_MISSING_DIR;
+		/* No contents will be scheduled and a surviving placeholder is
+		 * finished here, so these directories need no later touch-up. */
+		if (is_dir)
+			file->flags |= FLAG_MISSING_DIR;
+		if (is_dir <= 0 || !(file->flags & FLAG_DIR_CREATED))
 			return;
-		}
+		finishing_budget_dir = True;
 	}
 
 	if (DEBUG_GTE(GENR, 1))
@@ -2149,11 +2165,8 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 		stat_errno = errno;
 	}
 
-	/* Finish only a placeholder that still exists as a directory. */
-	if (finishing_budget_dir && (statret != 0 || !S_ISDIR(sx.st.st_mode))) {
-		file->flags |= FLAG_MISSING_DIR;
+	if (finishing_budget_dir && (statret != 0 || !budget_placeholder_matches(file, &sx.st)))
 		goto cleanup;
-	}
 
 	if (missing_args == 2 && file->mode == 0) {
 		if (filter_list.head && check_filter(&filter_list, FINFO, fname, is_dir) < 0)
