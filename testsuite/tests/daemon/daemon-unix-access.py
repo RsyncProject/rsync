@@ -14,15 +14,17 @@ from harness.rsync import rsync_argv, under_valgrind
 
 
 @contextmanager
-def daemon_connection(listener, config):
+def daemon_connection(listener, config, *, remote_shell=False):
     timeout = 15 if under_valgrind() else 5
+    args = ('--server', '--daemon', f'--config={config}', '.') if remote_shell else (
+        '--daemon', '--no-detach', f'--config={config}')
     with socket.socket(listener.family, socket.SOCK_STREAM) as client:
         client.settimeout(timeout)
         client.connect(listener.getsockname())
         conn, _ = listener.accept()
         with conn:
             proc = subprocess.Popen(
-                rsync_argv('--daemon', '--no-detach', f'--config={config}'),
+                rsync_argv(*args),
                 stdin=conn, stdout=conn, stderr=subprocess.DEVNULL)
         try:
             yield client, proc
@@ -36,8 +38,9 @@ def daemon_connection(listener, config):
                 test_fail('daemon did not exit after the client disconnected')
 
 
-def module_reply(listener, config, module, forwarded=False):
-    with daemon_connection(listener, config) as (client, _), client.makefile('rwb', buffering=0) as stream:
+def module_reply(listener, config, module, forwarded=False, *, remote_shell=False):
+    with daemon_connection(listener, config, remote_shell=remote_shell) as (client, _), \
+            client.makefile('rwb', buffering=0) as stream:
         if forwarded:
             stream.write(b'PROXY TCP4 127.0.0.1 127.0.0.1 43210 873\r\n')
         greeting = stream.readline()
@@ -47,9 +50,9 @@ def module_reply(listener, config, module, forwarded=False):
         return stream.readline()
 
 
-def check_proxy_refused(listener, config, log, label, reason):
+def check_proxy_refused(listener, config, log, label, reason, *, remote_shell=False):
     offset = log.stat().st_size if log.exists() else 0
-    with daemon_connection(listener, config) as (client, proc):
+    with daemon_connection(listener, config, remote_shell=remote_shell) as (client, proc):
         try:
             data = client.recv(1)
         except ConnectionResetError:
@@ -58,7 +61,7 @@ def check_proxy_refused(listener, config, log, label, reason):
             test_fail(f'{label}: waited for a PROXY header instead of refusing the peer')
         if data:
             test_fail(f'{label}: unexpected output before the peer was trusted: {data!r}')
-    if proc.returncode == 0 or not log.is_file():
+    if proc.returncode <= 0 or not log.is_file():
         test_fail(f'{label}: daemon did not report a refusal')
     with log.open('rb') as stream:
         stream.seek(offset)
@@ -88,6 +91,8 @@ def test(context: TestContext):
     proxy = write_daemon_conf(modules, {**proxied, 'proxy protocol hosts': '*'}, name='proxy.conf')
     unix_proxy = write_daemon_conf(modules, {**proxied, 'proxy protocol hosts': 'unix:'},
                                   name='unix-proxy.conf')
+    tcp_proxy = write_daemon_conf(modules, {**proxied, 'proxy protocol hosts': '127.0.0.1'},
+                                 name='tcp-proxy.conf')
     undetermined_proxy = write_daemon_conf(modules, {**proxied, 'proxy protocol hosts': 'undetermined'},
                                           name='undetermined-proxy.conf')
     untrusted = b'proxy protocol rejected from untrusted peer'
@@ -124,12 +129,17 @@ def test(context: TestContext):
             for config, label in ((unix_proxy, 'abstract Unix proxy'), (proxy, 'abstract Unix wildcard')):
                 check_proxy_refused(listener, config, log, label,
                                     b'proxy protocol rejected from abstract Unix socket')
+            check_proxy_refused(listener, proxy, log, 'abstract Unix on the remote-shell entry point',
+                                b'proxy protocol rejected from abstract Unix socket', remote_shell=True)
 
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as listener:
         listener.bind(('127.0.0.1', 0))
         listener.listen(1)
         check(listener, direct, 'TCP', named_unix=False)
         check_proxy_refused(listener, unix_proxy, log, 'Unix proxy rule on TCP', untrusted)
+        reply = module_reply(listener, tcp_proxy, 'allow-ip', forwarded=True, remote_shell=True)
+        if not reply.startswith(b'@RSYNCD: OK'):
+            test_fail(f'TCP proxy on the remote-shell entry point: unexpected reply {reply!r}')
 
 
 if __name__ == '__main__':
