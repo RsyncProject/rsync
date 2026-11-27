@@ -2145,10 +2145,13 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 #endif
 
 		case OPT_STOP_AFTER: {
+			char *end;
 			long val;
 			arg = poptGetOptArg(pc);
 			stop_at_utime = time(NULL);
-			if ((val = atol(arg) * 60) <= 0 || LONG_MAX - val < stop_at_utime || (long)(time_t)val != val) {
+			val = strtol(arg, &end, 10);
+			if (end == arg || *end || val <= 0 || val > LONG_MAX / 60
+			 || LONG_MAX - (val *= 60) < stop_at_utime || (long)(time_t)val != val) {
 				snprintf(err_buf, sizeof err_buf, "invalid --stop-after value: %s\n", arg);
 				goto cleanup;
 			}

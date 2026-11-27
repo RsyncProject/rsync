@@ -32,4 +32,16 @@ run_rsync('-a', '--stop-after=60', f'{src}/', f'{TODIR}/')
 for rel in rels:
     assert_same(TODIR / rel, src / rel, label=f'--stop-after {rel}')
 
+for opt in (
+    '--stop-after=2h',
+    '--stop-after=1.5',
+    '--stop-after=307445734561825861',
+):
+    rmtree(TODIR)
+    proc = run_rsync('-a', opt, f'{src}/', f'{TODIR}/',
+                     check=False, capture_output=True)
+    if proc.returncode == 0 or 'invalid --stop-after value' not in proc.stderr:
+        test_fail(f"{opt} was not rejected cleanly "
+                  f"(rc={proc.returncode}, stderr={proc.stderr!r})")
+
 print("stop-time: --stop-at future/past and --stop-after verified")
