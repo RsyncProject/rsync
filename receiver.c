@@ -46,6 +46,8 @@ extern int preserve_xattrs;
 extern int crtimes_ndx;
 extern int do_fsync;
 extern int basis_dir_cnt;
+extern int per_dir_basis;
+extern int per_dir_basis_root_fd;
 extern int make_backups;
 extern int cleanup_got_literal;
 extern int remove_source_files;
@@ -871,6 +873,7 @@ int recv_files(int f_in, int f_out, char *local_name, int placement_fd)
 
 	while (1) {
 		const char *basedir = NULL;
+		int per_dir_basis_ndx = -1;
 
 		cleanup_disable();
 
@@ -1061,7 +1064,8 @@ int recv_files(int f_in, int f_out, char *local_name, int placement_fd)
 				fnamecmp = xname;
 				break;
 			default:
-				if (fnamecmp_type > FNAMECMP_FUZZY && fnamecmp_type-FNAMECMP_FUZZY <= basis_dir_cnt) {
+				if (!per_dir_basis && fnamecmp_type > FNAMECMP_FUZZY
+				 && fnamecmp_type-FNAMECMP_FUZZY <= basis_dir_cnt) {
 					fnamecmp_type -= FNAMECMP_FUZZY + 1;
 					if (file->dirname) {
 						pathjoin(fnamecmpbuf, sizeof fnamecmpbuf, basis_dir[fnamecmp_type], file->dirname);
@@ -1075,6 +1079,9 @@ int recv_files(int f_in, int f_out, char *local_name, int placement_fd)
 						"invalid basis_dir index: %d.\n",
 						fnamecmp_type);
 					exit_cleanup(RERR_PROTOCOL);
+				} else if (per_dir_basis) {
+					per_dir_basis_ndx = fnamecmp_type;
+					fnamecmp = fname;
 				} else {
 					basedir = basis_dir[fnamecmp_type];
 					fnamecmp = fname;
@@ -1106,7 +1113,21 @@ int recv_files(int f_in, int f_out, char *local_name, int placement_fd)
 		 * planted one avoids both an escape and a basis-content info-leak.
 		 * Otherwise use secure_basis_open, which also tolerates an operator-
 		 * trusted absolute fnamecmp (e.g. an absolute --partial-dir basis). */
-		{
+		if (per_dir_basis_ndx >= 0) {
+			fd1 = open_per_dir_basis(per_dir_basis_root_fd, basis_dir[per_dir_basis_ndx],
+						 fname, fnamecmpbuf, &st);
+			if (fd1 < 0 || st.st_size <= 0) {
+				int e = fd1 < 0 ? errno : EIO;
+				if (fd1 >= 0)
+					close(fd1);
+				rsyserr(FERROR_XFER, e, "cannot read per-directory delta basis for %s", fname);
+				discard_receive_data(f_in, file);
+				if (inc_recurse)
+					send_msg_int(MSG_NO_SEND, ndx);
+				continue;
+			}
+			fnamecmp = fnamecmpbuf;
+		} else {
 			int bdfd;
 			BOOL backup_basis = fnamecmp_type == FNAMECMP_BACKUP && inplace && make_backups > 0;
 
@@ -1197,7 +1218,7 @@ int recv_files(int f_in, int f_out, char *local_name, int placement_fd)
 		if (fd1 == -1) {
 			st.st_mode = 0;
 			st.st_size = 0;
-		} else if (do_fstat(fd1,&st) != 0) {
+		} else if (per_dir_basis_ndx < 0 && do_fstat(fd1,&st) != 0) {
 			rsyserr(FERROR_XFER, errno, "fstat %s failed",
 				full_fname(fnamecmp));
 			discard_receive_data(f_in, file);
@@ -1234,7 +1255,8 @@ int recv_files(int f_in, int f_out, char *local_name, int placement_fd)
 		/* If we're not preserving permissions, change the file-list's
 		 * mode based on the local permissions and some heuristics. */
 		if (!preserve_perms) {
-			int exists = fd1 != -1;
+			/* A per-directory basis is not an existing destination. */
+			int exists = fd1 != -1 && per_dir_basis_ndx < 0;
 #ifdef SUPPORT_ACLS
 			const char *dn = file->dirname ? file->dirname : ".";
 			if (parent_dirname != dn

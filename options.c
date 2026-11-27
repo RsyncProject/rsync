@@ -215,6 +215,7 @@ char *groupmap = NULL;
 int rsync_port = 0;
 int alt_dest_type = 0;
 int basis_dir_cnt = 0;
+int per_dir_basis = 0;
 
 #define DEFAULT_MAX_ALLOC (1024L * 1024 * 1024)
 size_t max_alloc = DEFAULT_MAX_ALLOC;
@@ -610,6 +611,7 @@ void negate_output_levels(void)
 
 enum {OPT_SERVER = 1000, OPT_DAEMON, OPT_SENDER, OPT_EXCLUDE, OPT_EXCLUDE_FROM,
       OPT_FILTER, OPT_COMPARE_DEST, OPT_COPY_DEST, OPT_LINK_DEST, OPT_HELP,
+      OPT_COMPARE_DEST_PER_DIR, OPT_COPY_DEST_PER_DIR,
       OPT_INCLUDE, OPT_INCLUDE_FROM, OPT_MODIFY_WINDOW, OPT_MIN_SIZE, OPT_CHMOD,
       OPT_READ_BATCH, OPT_WRITE_BATCH, OPT_ONLY_WRITE_BATCH, OPT_MAX_SIZE,
       OPT_NO_D, OPT_APPEND, OPT_NO_ICONV, OPT_INFO, OPT_DEBUG, OPT_BLOCK_SIZE,
@@ -784,6 +786,8 @@ static struct poptOption long_options[] = {
   {"compare-dest",     0,  POPT_ARG_STRING, 0, OPT_COMPARE_DEST, 0, 0 },
   {"copy-dest",        0,  POPT_ARG_STRING, 0, OPT_COPY_DEST, 0, 0 },
   {"link-dest",        0,  POPT_ARG_STRING, 0, OPT_LINK_DEST, 0, 0 },
+  {"compare-dest-per-dir",0,POPT_ARG_STRING,0, OPT_COMPARE_DEST_PER_DIR, 0, 0 },
+  {"copy-dest-per-dir",0,  POPT_ARG_STRING, 0, OPT_COPY_DEST_PER_DIR, 0, 0 },
   {"fuzzy",           'y', POPT_ARG_NONE,   0, 'y', 0, 0 },
   {"no-fuzzy",         0,  POPT_ARG_VAL,    &fuzzy_basis, 0, 0, 0 },
   {"no-y",             0,  POPT_ARG_VAL,    &fuzzy_basis, 0, 0, 0 },
@@ -1526,14 +1530,32 @@ char *alt_dest_opt(int type)
 
 	switch (type) {
 	case COMPARE_DEST:
-		return "--compare-dest";
+		return per_dir_basis ? "--compare-dest-per-dir" : "--compare-dest";
 	case COPY_DEST:
-		return "--copy-dest";
+		return per_dir_basis ? "--copy-dest-per-dir" : "--copy-dest";
 	case LINK_DEST:
 		return "--link-dest";
 	default:
 		NOISY_DEATH("Unknown alt_dest_opt type");
 	}
+}
+
+/* Only leading parent components can refer to directories absent in a dry run. */
+static int valid_per_dir_basis(const char *path)
+{
+	if (!*path || strlen(path) >= MAXPATHLEN)
+		return 0;
+	while (strncmp(path, "../", 3) == 0)
+		path += 3;
+	if (!*path || strcmp(path, "..") == 0 || strcmp(path, ".") == 0)
+		return 1;
+	do {
+		size_t len = strcspn(path, "/");
+		if (!len || (path[0] == '.' && (len == 1 || (len == 2 && path[1] == '.'))))
+			return 0;
+		path += len;
+	} while (*path && *++path);
+	return 1;
 }
 
 /**
@@ -1940,13 +1962,21 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 			goto set_dest_dir;
 
 		case OPT_COPY_DEST:
+		case OPT_COPY_DEST_PER_DIR:
 			want_dest_type = COPY_DEST;
 			goto set_dest_dir;
 
 		case OPT_COMPARE_DEST:
+		case OPT_COMPARE_DEST_PER_DIR:
 			want_dest_type = COMPARE_DEST;
 
-		set_dest_dir:
+		set_dest_dir: {
+			int want_per_dir = opt == OPT_COMPARE_DEST_PER_DIR || opt == OPT_COPY_DEST_PER_DIR;
+			if (basis_dir_cnt && per_dir_basis != want_per_dir) {
+				snprintf(err_buf, sizeof err_buf,
+					"per-dir alternate destinations cannot be combined with rooted alternate destinations\n");
+				goto cleanup;
+			}
 			if (alt_dest_type && alt_dest_type != want_dest_type) {
 				snprintf(err_buf, sizeof err_buf,
 					"ERROR: the %s option conflicts with the %s option\n",
@@ -1954,6 +1984,7 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 				goto cleanup;
 			}
 			alt_dest_type = want_dest_type;
+			per_dir_basis = want_per_dir;
 
 			if (basis_dir_cnt >= MAX_BASIS_DIRS) {
 				snprintf(err_buf, sizeof err_buf,
@@ -1961,10 +1992,18 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 					MAX_BASIS_DIRS, alt_dest_opt(0));
 				goto cleanup;
 			}
-			/* We defer sanitizing this arg until we know what
+			arg = poptGetOptArg(pc);
+			if (per_dir_basis && !valid_per_dir_basis(arg)) {
+				snprintf(err_buf, sizeof err_buf,
+					"%s requires a bounded relative directory with parent components only at the start\n",
+					alt_dest_opt(0));
+				goto cleanup;
+			}
+			/* We defer sanitising a rooted arg until we know what
 			 * our destination directory is going to be. */
-			basis_dir[basis_dir_cnt++] = (char *)poptGetOptArg(pc);
+			basis_dir[basis_dir_cnt++] = (char *)arg;
 			break;
+		}
 
 		case OPT_CHMOD:
 		case OPT_CHMOD_DEST: {
@@ -2313,6 +2352,11 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 	if (orig_protect_args == 2 && am_server)
 		protect_args = orig_protect_args;
 
+	if (per_dir_basis && (am_server || am_daemon)) {
+		snprintf(err_buf, sizeof err_buf, "%s requires a local transfer\n", alt_dest_opt(0));
+		goto cleanup;
+	}
+
 	/* A forked local receiver inherits the log when it reparses -M options. */
 	if (placement_log && (am_daemon || (am_server && !local_server))) {
 		snprintf(err_buf, sizeof err_buf, "--placement-log requires a local receiver\n");
@@ -2340,6 +2384,19 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 	argv = *argv_p;
 	poptFreeContext(pc);
 	pc = NULL;
+
+	if (per_dir_basis) {
+#if !defined AT_FDCWD || !defined O_NOFOLLOW || !defined O_DIRECTORY || defined __CYGWIN__
+		snprintf(err_buf, sizeof err_buf, "%s requires pinned directory descriptors\n",
+			alt_dest_opt(0));
+		goto cleanup;
+#endif
+		if (batch_name || protocol_version < 29) {
+			snprintf(err_buf, sizeof err_buf, "%s requires protocol 29 or newer without batch mode\n",
+				alt_dest_opt(0));
+			goto cleanup;
+		}
+	}
 
 #ifndef SUPPORT_LINKS
 	if (preserve_links && !am_sender) {
@@ -2779,6 +2836,30 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 				goto cleanup;
 			}
 			keep_partial = 1;
+		}
+	}
+
+	if (per_dir_basis) {
+		const char *conflict = remote_option_cnt ? "--remote-option"
+		    : list_only ? "--list-only"
+		    : always_checksum ? "--checksum"
+		    : fuzzy_basis ? "--fuzzy"
+		    : preserve_hard_links ? "--hard-links"
+		    : preserve_acls ? "--acls"
+		    : preserve_xattrs ? "--xattrs"
+		    : preserve_crtimes ? "--crtimes"
+		    : am_root < 0 ? "--fake-super"
+		    : insecure_links ? "--insecure-links"
+		    : keep_dirlinks ? "--keep-dirlinks"
+		    : delete_mode || missing_args == 2 || force_delete ? "deletion options"
+		    : remove_source_files ? "--remove-source-files"
+		    : inplace ? "in-place updates"
+		    : keep_partial ? "partial or delayed updates"
+		    : NULL;
+		if (conflict) {
+			snprintf(err_buf, sizeof err_buf, "%s cannot be combined with %s\n",
+				alt_dest_opt(0), conflict);
+			goto cleanup;
 		}
 	}
 

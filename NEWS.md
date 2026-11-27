@@ -33,6 +33,9 @@
 - Keep the checked root of a single absolute alternate destination open
   across directories in ordinary non-daemon transfers. Reuse checked parents
   for rechecks and delta reads.
+- Add `--compare-dest-per-dir` and `--copy-dest-per-dir` to reuse missing
+  regular files' bases within an existing local destination tree. The rooted
+  alternate destination options are unchanged.
 - Added SHA-3 (FIPS 202) transfer checksum choices `sha3-256`,
   `sha3-384` and `sha3-512` for builds with OpenSSL SHA-3 support.
   Default negotiation is unchanged. Select SHA-3 with

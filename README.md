@@ -25,6 +25,10 @@ options.  To get a complete list of supported options type:
 
 See the [manpage][0] for more detailed information.
 
+For local transfers to an existing directory, `--compare-dest-per-dir` and
+`--copy-dest-per-dir` can use files in that tree as bases for missing regular
+files. The [option reference](rsync.1.md#options) describes their limits.
+
 [0]: https://download.samba.org/pub/rsync/rsync.1
 
 BUILDING AND INSTALLING

@@ -93,6 +93,7 @@ extern BOOL want_progress_now;
 extern BOOL shutting_down;
 extern int backup_dir_len;
 extern int basis_dir_cnt;
+extern int per_dir_basis;
 extern int default_af_hint;
 extern int stdout_format_has_i;
 extern int trust_sender_filter;
@@ -121,6 +122,7 @@ gid_t our_gid;
 int am_receiver = 0;  /* Only set to 1 after the receiver/generator fork. */
 int am_generator = 0; /* Only set to 1 after the receiver/generator fork. */
 int local_server = 0;
+int per_dir_basis_root_fd = -1;
 int daemon_connection = 0; /* 0 = no daemon, 1 = daemon via remote shell, -1 = daemon via socket */
 mode_t orig_umask = 0;
 int batch_gen_fd = -1;
@@ -702,6 +704,14 @@ static char *dot_dir_or_error()
 	exit_cleanup(RERR_SYNTAX);
 }
 
+static void require_per_dir_basis_directory(int statret, const STRUCT_STAT *st)
+{
+	if (statret < 0 || !S_ISDIR(st->st_mode)) {
+		rprintf(FERROR, "%s requires an existing destination directory\n", alt_dest_opt(0));
+		exit_cleanup(RERR_SYNTAX);
+	}
+}
+
 /* The receiving side operates in one of two modes:
  *
  * 1. it receives any number of files into a destination directory,
@@ -758,6 +768,9 @@ static char *get_local_name(struct file_list *flist, char *dest_path)
 	cp = strrchr(dest_path, '/');
 	trailing_slash = cp && !cp[1];
 
+	if (per_dir_basis)
+		require_per_dir_basis_directory(statret, &st);
+
 	if (mkpath_dest_arg && statret < 0 && (cp || file_total > 1)) {
 		int save_errno = errno;
 		int ret = make_path(dest_path, file_total > 1 && !trailing_slash ? 0 : MKP_DROP_NAME);
@@ -783,6 +796,14 @@ static char *get_local_name(struct file_list *flist, char *dest_path)
 				rsyserr(FERROR, errno, "change_dir#1 %s failed",
 					full_fname(dest_path));
 				exit_cleanup(RERR_FILESELECT);
+			}
+			if (per_dir_basis) {
+				/* The receiver and generator inherit the selected directory. */
+				per_dir_basis_root_fd = secure_relative_dirfd(NULL, ".");
+				if (per_dir_basis_root_fd < 0) {
+					rsyserr(FERROR, errno, "cannot open the per-directory basis root");
+					exit_cleanup(RERR_FILESELECT);
+				}
 			}
 			filesystem_dev = st.st_dev; /* ensures --force works right w/-x */
 			return NULL;
@@ -886,6 +907,9 @@ static void check_alt_basis_dirs(void)
 	STRUCT_STAT st;
 	char *slash = strrchr(curr_dir, '/');
 	int j;
+
+	if (per_dir_basis)
+		return;
 
 	for (j = 0; j < basis_dir_cnt; j++) {
 		char *bdir = basis_dir[j];
@@ -1111,6 +1135,10 @@ static int do_recv(int f_in, int f_out, char *local_name)
 		io_start_multiplex_out(f_out);
 
 		recv_files(f_in, f_out, local_name, placement_fd);
+		if (per_dir_basis_root_fd >= 0) {
+			close(per_dir_basis_root_fd);
+			per_dir_basis_root_fd = -1;
+		}
 		io_flush(FULL_FLUSH);
 		handle_stats(f_in);
 
@@ -1178,6 +1206,10 @@ static int do_recv(int f_in, int f_out, char *local_name)
 #endif
 
 	generate_files(f_out, local_name);
+	if (per_dir_basis_root_fd >= 0) {
+		close(per_dir_basis_root_fd);
+		per_dir_basis_root_fd = -1;
+	}
 
 	handle_stats(-1);
 	io_flush(FULL_FLUSH);
@@ -1589,6 +1621,15 @@ static int start_client(int argc, char *argv[])
 
 	if (!rsync_port && remote_argc && !**remote_argv) /* Turn an empty arg into a dot dir. */
 		*remote_argv = ".";
+
+	if (per_dir_basis) {
+		STRUCT_STAT st;
+		if (!local_server) {
+			rprintf(FERROR, "%s requires a local transfer\n", alt_dest_opt(0));
+			exit_cleanup(RERR_SYNTAX);
+		}
+		require_per_dir_basis_directory(do_stat(*remote_argv, &st), &st);
+	}
 
 	if (am_sender) {
 		char *dummy_host;

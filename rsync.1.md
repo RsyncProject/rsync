@@ -641,6 +641,8 @@ has its own detailed description later in this manpage.
 --compare-dest=DIR       also compare destination files relative to DIR
 --copy-dest=DIR          ... and include copies of unchanged files
 --link-dest=DIR          hardlink to files in DIR when unchanged
+--compare-dest-per-dir=DIR  compare missing files against a per-directory basis
+--copy-dest-per-dir=DIR  ... and include independent copies of unchanged files
 --compress, -z           compress file data during the transfer
 --compress-choice=STR    choose the compression algorithm (aka --zc)
 --compress-level=NUM     explicitly set compression level (aka --zl)
@@ -3066,6 +3068,49 @@ sign) if you want the local shell to expand it.
 
     If _DIR_ is a relative path, it is relative to the destination directory.
     See also [`--compare-dest`](#opt) and [`--link-dest`](#opt).
+
+0.  `--compare-dest-per-dir=DIR`
+
+    For a regular file missing at the destination, look for a readable regular
+    file with the same basename in _DIR_, relative to the file's containing
+    directory. For example, `--compare-dest-per-dir=..` considers
+    `dest/show/episode` for `dest/show/season/episode`. An unchanged match is
+    omitted. If the contents match but the preserved attributes differ, a
+    local copy is made and the source attributes are applied. With delta
+    transfers enabled, a candidate with different contents may serve as the
+    delta basis. This does not change the default permissions for a new file.
+    If the receiver cannot open the selected basis, it reports an error for
+    that file and does not install it.
+
+    _DIR_ must be relative. It may start with one or more `..` components
+    followed by ordinary directory names. The containing directory is derived
+    from the destination entry's path, even when it has not yet been created
+    in a dry run. A path that would rise above the destination root has no
+    basis. Candidate paths are resolved below that root. Unavailable or
+    non-regular candidates are omitted. Inspection errors such as a path
+    exceeding the supported length are reported.
+
+    Up to 20 directories may be specified. Rsync checks them in option order
+    and prefers an unchanged match over a candidate requiring attribute or
+    data changes. Per-directory bases cannot be mixed with rooted alternate
+    destinations or with a different alternate destination mode.
+
+    This option and `--copy-dest-per-dir` require a local transfer to an
+    existing destination directory and protocol 29 or newer. They are not
+    supported on Cygwin or builds without pinned directory descriptors. They
+    cannot be combined with batch mode, listing, remote options, deletion,
+    source removal, in-place updates, partial or delayed updates, fuzzy
+    matching, checksum matching, source hard-link preservation, fake-super,
+    ACLs, extended attributes, creation times, `--keep-dirlinks`,
+    `--insecure-links` or `--delay-symlinks`. The candidates are part of the
+    live destination tree rather than an immutable snapshot.
+
+0.  `--copy-dest-per-dir=DIR`
+
+    Behaves like [`--compare-dest-per-dir`](#opt) but also makes an independent
+    local copy when the candidate's contents and preserved attributes match.
+    There is no per-directory hard-link mode. The rooted
+    [`--link-dest`](#opt) option is unchanged.
 
 0.  `--link-dest=DIR`
 
