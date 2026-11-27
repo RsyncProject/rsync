@@ -48,6 +48,7 @@ extern int use_qsort;
 extern int xfer_dirs;
 extern int filesfrom_fd;
 extern char *files_from;
+extern char *skip_dir_marker;
 extern int one_file_system;
 extern int copy_devices;
 extern int copy_dirlinks;
@@ -1630,6 +1631,38 @@ static struct file_struct *recv_file_entry(int f, struct file_list *flist, int x
 	return file;
 }
 
+#if defined HAVE_DIRFD && defined AT_FDCWD && defined AT_SYMLINK_NOFOLLOW
+static DIR *open_scan_directory(const char *path, BOOL sending);
+
+static BOOL skip_marked_dir(const char *path, const STRUCT_STAT *expected)
+{
+	DIR *dir = open_scan_directory(path, True);
+	STRUCT_STAT st;
+	int fd, result = -1, error;
+
+	if (dir) {
+		fd = dirfd(dir);
+		if (fd >= 0 && do_fstat(fd, &st) == 0) {
+			if (st.st_dev != expected->st_dev || st.st_ino != expected->st_ino)
+				errno = EINVAL;
+			else if (fstatat(fd, skip_dir_marker, &st, AT_SYMLINK_NOFOLLOW) == 0)
+				result = S_ISREG(st.st_mode);
+			else if (errno == ENOENT)
+				result = 0;
+		}
+		error = errno;
+		closedir(dir);
+		if (result >= 0)
+			return result != 0;
+	} else
+		error = errno;
+
+	io_error |= IOERR_GENERAL;
+	rsyserr(FERROR_XFER, error, "cannot check marker in %s", full_fname(path));
+	return True;
+}
+#endif
+
 /* Create a file_struct for a named file by reading its stat() information
  * and performing extensive checks against global options.
  *
@@ -1757,6 +1790,12 @@ struct file_struct *make_file(const char *fname, struct file_list *flist,
 	}
 
   skip_filters:
+
+#if defined HAVE_DIRFD && defined AT_FDCWD && defined AT_SYMLINK_NOFOLLOW
+	if (skip_dir_marker && am_sender && flist && S_ISDIR(st.st_mode)
+	 && !(flags & FLAG_MOUNT_DIR) && skip_marked_dir(thisname, &st))
+		return NULL;
+#endif
 
 	/* Only divert a directory in the main transfer. */
 	if (flist) {
@@ -2341,6 +2380,18 @@ static DIR *secure_opendir(const char *fbuf)
 }
 #endif
 
+static DIR *open_scan_directory(const char *path, BOOL sending)
+{
+#if defined HAVE_FDOPENDIR && defined HAVE_DIRFD
+	if (sending && !symlink_optout_allowed() && (secure_relpath_active()
+		    || !(copy_links || copy_unsafe_links || copy_dirlinks || insecure_links)))
+		return secure_opendir(path);
+#else
+	(void)sending;
+#endif
+	return opendir(path);
+}
+
 /* This function is normally called by the sender, but the receiving side also
  * calls it from get_dirlist() with f set to -1 so that we just construct the
  * file list in memory without sending it over the wire.  Also, get_dirlist()
@@ -2359,7 +2410,6 @@ static void send_directory(int f, struct file_list *flist, char *fbuf, int len,
 
 	assert(flist != NULL);
 
-#if defined HAVE_FDOPENDIR && defined HAVE_DIRFD
 	/* Confine the enumeration beneath the transfer root.  secure_opendir()
 	 * follows in-tree directory symlinks (RESOLVE_BENEATH) and refuses one that
 	 * escapes, so it serves both modes:
@@ -2375,14 +2425,7 @@ static void send_directory(int f, struct file_list *flist, char *fbuf, int len,
 	 * yes", admin-only) -- or a non-daemon --insecure-links -- uses the legacy
 	 * opendir() too, restoring the pre-hardening enumeration (re-opening the
 	 * escape; documented). */
-	if (f >= 0 && !symlink_optout_allowed() && (secure_relpath_active()
-		    || !(copy_links || copy_unsafe_links || copy_dirlinks || insecure_links)))
-		d = secure_opendir(fbuf);
-	else
-		d = opendir(fbuf);
-#else
-	d = opendir(fbuf);
-#endif
+	d = open_scan_directory(fbuf, f >= 0);
 	if (!d) {
 		if (errno == ENOENT) {
 			if (am_sender) /* Can abuse this for vanished error w/ENOENT: */
@@ -2980,6 +3023,11 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 		if (name_type != DOTDIR_NAME && st.st_mode != 0
 		 && is_excluded(fbuf, S_ISDIR(st.st_mode) != 0, ALL_FILTERS))
 			continue;
+
+		if (skip_dir_marker && !S_ISDIR(st.st_mode)) {
+			rprintf(FERROR, "--skip-dir-with requires a source directory: %s\n", full_fname(fbuf));
+			exit_cleanup(RERR_SYNTAX);
+		}
 
 		if (S_ISDIR(st.st_mode) && !xfer_dirs) {
 			rprintf(FINFO, "skipping directory %s\n", fbuf);

@@ -45,8 +45,10 @@ int fchmod(int fd, mode_t mode)
 {
 	int (*original)(int, mode_t) = dlsym(RTLD_NEXT, "fchmod");
 	const char *error = getenv("RSYNC_TEST_CHMOD_ERRNO");
+	const char *target_mode = getenv("RSYNC_TEST_CHMOD_MODE");
 
-	if (error && target_fd(fd, 0)) {
+	if (error && (!target_mode || (mode & 07777) == strtoul(target_mode, NULL, 8))
+	 && target_fd(fd, 0)) {
 		record_failure(error);
 		return -1;
 	}

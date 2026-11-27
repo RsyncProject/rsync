@@ -28,6 +28,7 @@
 
 extern int dry_run;
 extern int am_root;
+extern struct chmod_mode_struct *dest_chmod_modes;
 extern int am_sender;
 extern int am_generator;
 extern int read_only;
@@ -1322,6 +1323,8 @@ int set_stat_xattr(const char *fname, struct file_struct *file, mode_t new_mode,
 	STRUCT_STAT fst, xst;
 	dev_t rdev;
 	mode_t mode, fmode;
+	BOOL override_mode;
+	int changed = 0;
 
 	if (dry_run)
 		return 0;
@@ -1350,6 +1353,7 @@ int set_stat_xattr(const char *fname, struct file_struct *file, mode_t new_mode,
 
 	fst.st_mode &= (_S_IFMT | CHMOD_BITS);
 	fmode = new_mode & (_S_IFMT | CHMOD_BITS);
+	override_mode = dest_chmod_modes && (S_ISREG(fmode) || S_ISDIR(fmode));
 
 	if (IS_DEVICE(fmode)) {
 		uint32 *devp = F_RDEV_P(file);
@@ -1358,9 +1362,19 @@ int set_stat_xattr(const char *fname, struct file_struct *file, mode_t new_mode,
 		rdev = 0;
 
 	/* Dump the special permissions and enable full owner access. */
-	mode = (fst.st_mode & _S_IFMT) | (fmode & ACCESSPERMS)
+	mode = (fst.st_mode & _S_IFMT)
+	     | ((override_mode ? tweak_mode(fmode, dest_chmod_modes) : fmode) & ACCESSPERMS)
 	     | (S_ISDIR(fst.st_mode) ? 0700 : 0600);
-	if (fst.st_mode != mode) {
+	if (override_mode) {
+		if (fd < 0 || (fmode & _S_IFMT) != (fst.st_mode & _S_IFMT)) {
+			rsyserr(FERROR_XFER, EINVAL, "cannot set backup mode on %s", full_fname(fname));
+			return -1;
+		}
+		if (S_ISREG(fst.st_mode) && fst.st_nlink != 1) {
+			rsyserr(FERROR_XFER, EMLINK, "cannot set backup mode on a shared file %s", full_fname(fname));
+			return -1;
+		}
+	} else if (fst.st_mode != mode) {
 		if (fd >= 0)
 			fchmod(fd, mode);
 		else
@@ -1369,7 +1383,8 @@ int set_stat_xattr(const char *fname, struct file_struct *file, mode_t new_mode,
 	if (!IS_DEVICE(fst.st_mode))
 		fst.st_rdev = 0; /* just in case */
 
-	if (mode == fmode && fst.st_rdev == rdev
+	/* Keep the virtual mode until a pending physical mode change succeeds. */
+	if (mode == fmode && (!override_mode || fst.st_mode == mode) && fst.st_rdev == rdev
 	 && fst.st_uid == F_OWNER(file) && fst.st_gid == F_GROUP(file)) {
 		if (!xst.st_mode)
 			return 0;
@@ -1380,10 +1395,8 @@ int set_stat_xattr(const char *fname, struct file_struct *file, mode_t new_mode,
 				full_fname(fname));
 			return -1;
 		}
-		return 1;
-	}
-
-	if (xst.st_mode != fmode || xst.st_rdev != rdev
+		changed = 1;
+	} else if (xst.st_mode != fmode || xst.st_rdev != rdev
 	 || xst.st_uid != F_OWNER(file) || xst.st_gid != F_GROUP(file)) {
 		char buf[256];
 		int len = snprintf(buf, sizeof buf, "%o %u,%u %u:%u",
@@ -1399,10 +1412,14 @@ int set_stat_xattr(const char *fname, struct file_struct *file, mode_t new_mode,
 				XSTAT_ATTR, full_fname(fname));
 			return -1;
 		}
-		return 1;
+		changed = 1;
 	}
 
-	return 0;
+	if (override_mode && fst.st_mode != mode && fchmod(fd, mode) < 0) {
+		rsyserr(FERROR_XFER, errno, "cannot set backup mode on %s", full_fname(fname));
+		return -1;
+	}
+	return changed;
 }
 
 int x_stat(const char *fname, STRUCT_STAT *fst, STRUCT_STAT *xst)

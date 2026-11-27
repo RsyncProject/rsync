@@ -46,6 +46,7 @@ extern int inc_recurse;
 extern int blocking_io;
 extern int always_checksum;
 extern int time_only;
+extern struct chmod_mode_struct *dest_chmod_modes;
 extern OFF_T file_transfer_budget;
 extern int remove_source_files;
 extern int output_needs_newline;
@@ -93,6 +94,7 @@ extern BOOL want_progress_now;
 extern BOOL shutting_down;
 extern int backup_dir_len;
 extern int basis_dir_cnt;
+extern int per_dir_basis;
 extern int default_af_hint;
 extern int stdout_format_has_i;
 extern int trust_sender_filter;
@@ -100,7 +102,9 @@ extern int trust_sender_args;
 extern struct stats stats;
 extern char *stdout_format;
 extern char *logfile_format;
+extern char *placement_log;
 extern char *filesfrom_host;
+extern char *skip_dir_marker;
 extern char *partial_dir;
 extern char *rsync_path;
 extern char *shell_cmd;
@@ -119,6 +123,7 @@ gid_t our_gid;
 int am_receiver = 0;  /* Only set to 1 after the receiver/generator fork. */
 int am_generator = 0; /* Only set to 1 after the receiver/generator fork. */
 int local_server = 0;
+int per_dir_basis_root_fd = -1;
 int daemon_connection = 0; /* 0 = no daemon, 1 = daemon via remote shell, -1 = daemon via socket */
 mode_t orig_umask = 0;
 int batch_gen_fd = -1;
@@ -700,6 +705,14 @@ static char *dot_dir_or_error()
 	exit_cleanup(RERR_SYNTAX);
 }
 
+static void require_per_dir_basis_directory(int statret, const STRUCT_STAT *st)
+{
+	if (statret < 0 || !S_ISDIR(st->st_mode)) {
+		rprintf(FERROR, "%s requires an existing destination directory\n", alt_dest_opt(0));
+		exit_cleanup(RERR_SYNTAX);
+	}
+}
+
 /* The receiving side operates in one of two modes:
  *
  * 1. it receives any number of files into a destination directory,
@@ -756,6 +769,9 @@ static char *get_local_name(struct file_list *flist, char *dest_path)
 	cp = strrchr(dest_path, '/');
 	trailing_slash = cp && !cp[1];
 
+	if (per_dir_basis)
+		require_per_dir_basis_directory(statret, &st);
+
 	if (mkpath_dest_arg && statret < 0 && (cp || file_total > 1)) {
 		int save_errno = errno;
 		int ret = make_path(dest_path, file_total > 1 && !trailing_slash ? 0 : MKP_DROP_NAME);
@@ -781,6 +797,14 @@ static char *get_local_name(struct file_list *flist, char *dest_path)
 				rsyserr(FERROR, errno, "change_dir#1 %s failed",
 					full_fname(dest_path));
 				exit_cleanup(RERR_FILESELECT);
+			}
+			if (per_dir_basis) {
+				/* The receiver and generator inherit the selected directory. */
+				per_dir_basis_root_fd = secure_relative_dirfd(NULL, ".");
+				if (per_dir_basis_root_fd < 0) {
+					rsyserr(FERROR, errno, "cannot open the per-directory basis root");
+					exit_cleanup(RERR_FILESELECT);
+				}
 			}
 			filesystem_dev = st.st_dev; /* ensures --force works right w/-x */
 			return NULL;
@@ -884,6 +908,9 @@ static void check_alt_basis_dirs(void)
 	STRUCT_STAT st;
 	char *slash = strrchr(curr_dir, '/');
 	int j;
+
+	if (per_dir_basis)
+		return;
 
 	for (j = 0; j < basis_dir_cnt; j++) {
 		char *bdir = basis_dir[j];
@@ -1020,6 +1047,7 @@ static int do_recv(int f_in, int f_out, char *local_name)
 	int pid;
 	int exit_code = 0;
 	int error_pipe[2];
+	int placement_fd = -1;
 
 	/* The receiving side mustn't obey this, or an existing symlink that
 	 * points to an identical file won't be replaced by the referent. */
@@ -1076,6 +1104,11 @@ static int do_recv(int f_in, int f_out, char *local_name)
 		}
 	}
 
+	if (placement_log && !dry_run && (placement_fd = open_placement_log(placement_log)) < 0) {
+		rsyserr(FERROR, errno, "cannot create placement log %s", full_fname(placement_log));
+		exit_cleanup(RERR_FILEIO);
+	}
+
 	io_flush(FULL_FLUSH);
 
 	if ((pid = do_fork()) == -1) {
@@ -1102,7 +1135,11 @@ static int do_recv(int f_in, int f_out, char *local_name)
 			io_start_buffering_in(f_in);
 		io_start_multiplex_out(f_out);
 
-		recv_files(f_in, f_out, local_name);
+		recv_files(f_in, f_out, local_name, placement_fd);
+		if (per_dir_basis_root_fd >= 0) {
+			close(per_dir_basis_root_fd);
+			per_dir_basis_root_fd = -1;
+		}
 		io_flush(FULL_FLUSH);
 		handle_stats(f_in);
 
@@ -1142,6 +1179,8 @@ static int do_recv(int f_in, int f_out, char *local_name)
 		receive_sigusr2();
 	}
 
+	if (placement_fd >= 0)
+		close(placement_fd);
 	am_generator = 1;
 	implied_filter_list.head = implied_filter_list.tail = NULL;
 	flist_receiving_enabled = True;
@@ -1168,6 +1207,10 @@ static int do_recv(int f_in, int f_out, char *local_name)
 #endif
 
 	generate_files(f_out, local_name);
+	if (per_dir_basis_root_fd >= 0) {
+		close(per_dir_basis_root_fd);
+		per_dir_basis_root_fd = -1;
+	}
 
 	handle_stats(-1);
 	io_flush(FULL_FLUSH);
@@ -1553,6 +1596,16 @@ static int start_client(int argc, char *argv[])
 		rsync_port = 0;
 	}
 
+	if (placement_log && am_sender && !local_server) {
+		rprintf(FERROR, "--placement-log requires a local receiver\n");
+		exit_cleanup(RERR_SYNTAX);
+	}
+
+	if (skip_dir_marker && (!local_server || argc != 1)) {
+		rprintf(FERROR, "--skip-dir-with requires a local copy with one source directory\n");
+		exit_cleanup(RERR_SYNTAX);
+	}
+
 	/* A local transfer doesn't unbackslash anything, so leave the args alone. */
 	if (local_server) {
 		old_style_args = 2;
@@ -1566,9 +1619,22 @@ static int start_client(int argc, char *argv[])
 		rprintf(FERROR, "--time-only requires a local receiver or a remote source\n");
 		exit_cleanup(RERR_SYNTAX);
 	}
+	if (dest_chmod_modes && am_sender && !local_server) {
+		rprintf(FERROR, "--chmod-dest must be set on the receiver; use -M for a remote-shell receiver\n");
+		exit_cleanup(RERR_SYNTAX);
+	}
 
 	if (!rsync_port && remote_argc && !**remote_argv) /* Turn an empty arg into a dot dir. */
 		*remote_argv = ".";
+
+	if (per_dir_basis) {
+		STRUCT_STAT st;
+		if (!local_server) {
+			rprintf(FERROR, "%s requires a local transfer\n", alt_dest_opt(0));
+			exit_cleanup(RERR_SYNTAX);
+		}
+		require_per_dir_basis_directory(do_stat(*remote_argv, &st), &st);
+	}
 
 	if (am_sender) {
 		char *dummy_host;

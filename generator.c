@@ -90,6 +90,8 @@ extern int always_checksum;
 extern int flist_csum_len;
 extern char *partial_dir;
 extern int alt_dest_type;
+extern int per_dir_basis;
+extern int per_dir_basis_root_fd;
 extern int whole_file;
 extern int list_only;
 extern int read_batch;
@@ -999,26 +1001,15 @@ static int open_checked_basis_file(int dfd, const char *path, const STRUCT_STAT 
 }
 #endif
 
-/* Copy a selected alternate basis. A failed hard link may still hold its
- * checked source parent, so the copy need not reopen the full pathname. */
-static int copy_altdest_file(const char *src, const char *dest, struct file_struct *file,
-			     int basis_fd, const STRUCT_STAT *basis_st)
+/* A nonnegative fd_r is an owned, already checked input. */
+static int copy_basis_file(const char *src, const char *dest, struct file_struct *file,
+			   int fd_r, OFF_T len)
 {
 	char buf[MAXPATHLEN];
 	const char *copy_to, *partialptr;
 	int save_preserve_xattrs = preserve_xattrs;
-	int ok, fd_w, fd_r = -1;
+	int ok, fd_w;
 
-#if defined AT_FDCWD && defined O_NOFOLLOW && defined O_DIRECTORY
-	/* A relative basis uses the transfer-path policy when copied. */
-	if (basis_fd >= 0 && *src == '/') {
-		fd_r = open_checked_basis_file(basis_fd, src, basis_st);
-		if (fd_r < 0)
-			return -1;
-	}
-#else
-	(void)basis_fd; (void)basis_st;
-#endif
 	if (inplace) {
 		/* Let copy_file open the destination in place. */
 		fd_w = -1;
@@ -1035,7 +1026,7 @@ static int copy_altdest_file(const char *src, const char *dest, struct file_stru
 		copy_to = buf;
 	}
 	cleanup_set(copy_to, NULL, NULL, -1, -1);
-	ok = fd_r >= 0 ? copy_file_from_fd(src, fd_r, copy_to, fd_w, file->mode, -1)
+	ok = fd_r >= 0 ? copy_file_from_fd(src, fd_r, copy_to, fd_w, file->mode, len)
 		       : copy_file(src, copy_to, fd_w, file->mode);
 	if (ok < 0) {
 		if (INFO_GTE(COPY, 1)) {
@@ -1055,6 +1046,24 @@ static int copy_altdest_file(const char *src, const char *dest, struct file_stru
 	preserve_xattrs = save_preserve_xattrs;
 	cleanup_disable();
 	return ok ? 0 : -1;
+}
+
+/* A failed legacy hard link may still hold its checked source parent. */
+static int copy_altdest_file(const char *src, const char *dest, struct file_struct *file,
+			     int basis_fd, const STRUCT_STAT *basis_st)
+{
+	int fd_r = -1;
+#if defined AT_FDCWD && defined O_NOFOLLOW && defined O_DIRECTORY
+	/* A relative basis uses the transfer-path policy when copied. */
+	if (basis_fd >= 0 && *src == '/') {
+		fd_r = open_checked_basis_file(basis_fd, src, basis_st);
+		if (fd_r < 0)
+			return -1;
+	}
+#else
+	(void)basis_fd; (void)basis_st;
+#endif
+	return copy_basis_file(src, dest, file, fd_r, -1);
 }
 
 struct basis_parent {
@@ -1217,6 +1226,74 @@ enum regular_basis_match {
 	BASIS_ATTRS_DIFFER,
 	BASIS_MATCHES
 };
+
+/* Per-directory bases only apply to missing regular files. Keep the selected
+ * input open from the quick check through a local copy or delta calculation. */
+static int try_per_dir_bases(struct file_struct *file, char *fname, int ndx,
+			     char *cmpbuf, stat_x *sxp, int *basis_fd, int itemizing)
+{
+	stat_x best_sx = {0};
+	enum regular_basis_match match_level = BASIS_NOT_FOUND;
+	int best = -1, best_fd = -1, j;
+
+	for (j = 0; basis_dir[j]; j++) {
+		char path[MAXPATHLEN];
+		stat_x candidate = {0};
+		enum regular_basis_match match;
+		int fd = open_per_dir_basis(per_dir_basis_root_fd, basis_dir[j],
+					   fname, path, &candidate.st);
+		if (fd < 0) {
+			if (errno != ENOENT && errno != ENOTDIR && errno != ELOOP)
+				rsyserr(FERROR_XFER, errno, "cannot inspect per-directory basis %d for %s",
+					j + 1, fname);
+			continue;
+		}
+		if (!quick_check_ok(FT_REG, path, file, &candidate.st))
+			match = BASIS_CONTENT_DIFFERS;
+		else
+			match = unchanged_attrs(path, file, &candidate) ? BASIS_MATCHES : BASIS_ATTRS_DIFFER;
+		if (match <= match_level) {
+			close(fd);
+			continue;
+		}
+		if (best_fd >= 0)
+			close(best_fd);
+		best_fd = fd;
+		best = j;
+		best_sx.st = candidate.st;
+		strlcpy(cmpbuf, path, MAXPATHLEN);
+		match_level = match;
+		if (match == BASIS_MATCHES)
+			break;
+	}
+
+	if (best_fd < 0)
+		return -1;
+	if (match_level == BASIS_CONTENT_DIFFERS) {
+		if (!whole_file && best_sx.st.st_size > 0) {
+			sxp->st = best_sx.st;
+			*basis_fd = best_fd;
+			return FNAMECMP_BASIS_DIR_LOW + best;
+		}
+		close(best_fd);
+		return -1;
+	}
+	if (match_level == BASIS_MATCHES && alt_dest_type == COMPARE_DEST) {
+		close(best_fd);
+		if (itemizing)
+			itemize(cmpbuf, file, ndx, 0, &best_sx, 0, 0, NULL);
+		if (INFO_GTE(NAME, 2) && maybe_ATTRS_REPORT)
+			rprintf(FCLIENT, "%s is uptodate\n", fname);
+		return -2;
+	}
+	if (dry_run)
+		close(best_fd);
+	else if (copy_basis_file(cmpbuf, fname, file, best_fd, F_LENGTH(file)) < 0)
+		return -1;
+	if (itemizing)
+		itemize(cmpbuf, file, ndx, 0, &best_sx, ITEM_LOCAL_CHANGE, 0, NULL);
+	return -2;
+}
 
 static enum regular_basis_match match_regular_basis(const char *path, struct file_struct *file,
 						    stat_x *sxp, struct basis_parent *parent)
@@ -2205,7 +2282,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 		if (!preserve_perms) { /* See comment in non-dir code below. */
 			file->mode = dest_mode(file->mode, sx.st.st_mode, dflt_perms, statret == 0);
 		}
-		if (statret != 0 && basis_dir[0] != NULL) {
+		if (statret != 0 && basis_dir[0] != NULL && !per_dir_basis) {
 			int j = try_dests_non(file, fname, ndx, fnamecmpbuf, &sx, itemizing, code);
 			if (j == -2) {
 				itemizing = 0;
@@ -2325,7 +2402,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 					goto return_with_success;
 				goto cleanup;
 			}
-		} else if (basis_dir[0] != NULL) {
+		} else if (basis_dir[0] != NULL && !per_dir_basis) {
 			int j = try_dests_non(file, fname, ndx, fnamecmpbuf, &sx, itemizing, code);
 			if (j == -3) {
 				/* The destination cannot hard-link this type.  Land exactly
@@ -2415,7 +2492,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 					goto return_with_success;
 				goto cleanup;
 			}
-		} else if (basis_dir[0] != NULL) {
+		} else if (basis_dir[0] != NULL && !per_dir_basis) {
 			int j = try_dests_non(file, fname, ndx, fnamecmpbuf, &sx, itemizing, code);
 			if (j == -3) {
 				/* As above: a destination that cannot hard-link this type
@@ -2507,13 +2584,22 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 			goto cleanup;
 		statret = -1;
 		stat_errno = ENOENT;
+	} else if (per_dir_basis && statret != 0 && stat_errno == ENOENT) {
+		int j = try_per_dir_bases(file, fname, ndx, fnamecmpbuf, &sx, &fd, itemizing);
+		if (j == -2)
+			goto cleanup;
+		if (j >= 0) {
+			fnamecmp = fnamecmpbuf;
+			fnamecmp_type = j;
+			statret = 0;
+		}
 	}
 
 	/* An existing destination's timestamp takes precedence over alternate
 	 * bases. A missing destination must still use the normal basis check. */
 	dest_checks_match = time_only && statret == 0 && stype == FT_REG
 	    && destination_quick_check_ok(fname, file, &sx.st, FNAMECMP_FNAME);
-	if (!dest_checks_match && fresh_link != FRESH_LINK_NO_BASIS && basis_dir[0] != NULL
+	if (!per_dir_basis && !dest_checks_match && fresh_link != FRESH_LINK_NO_BASIS && basis_dir[0] != NULL
 	 && (statret != 0 || alt_dest_type != COPY_DEST)) {
 		int j = try_dests_reg(file, fname, ndx, fnamecmpbuf, &sx, statret == 0,
 				      itemizing, code, fresh_link);

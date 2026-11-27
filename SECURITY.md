@@ -47,6 +47,8 @@ GitHub advisories are the public record for vulnerabilities handled by the proje
 
 Peer-supplied file lists, checksums, arguments, filters, messages and metadata are untrusted. A security boundary exists whenever rsync has more filesystem or process authority than the peer or another user who can change a path it resolves. This applies to local transfers, remote-shell transfers, daemon modules and restricted `rrsync` commands.
 
+Per-directory alternate destinations are local-only. Rsync resolves their basis candidates below a held descriptor for the selected destination directory. The feature does not extend daemon or restricted-shell path access.
+
 Where the operating system supports them, rsync uses held directory descriptors and `*at()` operations to confine security-sensitive path resolution. The remaining platform limits are:
 - a platform without a usable search-only directory descriptor fails closed when safe parent traversal is unavailable;
 - nested socket creation fails closed without a confined primitive, while some special-file creation retains a path-based fallback on systems without the required `*at()` operation;
