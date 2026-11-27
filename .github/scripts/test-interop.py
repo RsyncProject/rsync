@@ -19,6 +19,7 @@ import interop_network as network
 from interop_policy import PORTS, QUARANTINE, ROLES, update_policy
 
 broker = runpy.run_path(str(Path(__file__).with_name('interop-broker.py')))
+host = runpy.run_path(str(Path(__file__).with_name('interop-host.py')))
 
 
 def controller_run():
@@ -505,6 +506,7 @@ class Network(unittest.TestCase):
         with patch.object(sys, 'argv', ['interop-broker.py', 'metadata', '--root', str(self.root)]), \
                 patch.dict(os.environ, GITHUB_OUTPUT=str(output)), patch.dict(broker['main'].__globals__,
                     find_controller=lambda **kwargs: dict(id=111),
+                    check_ci=lambda: self.fail('Duplicate controller checked endpoint liveness'),
                     Tailnet=lambda: self.fail('Duplicate controller obtained network authority')):
             self.assertEqual(broker['main'](), 0)
         self.assertEqual(output.read_text(), 'enabled=false\n')
@@ -665,6 +667,7 @@ class Network(unittest.TestCase):
                 patch.dict(os.environ, GITHUB_OUTPUT=str(output)), \
                 patch.object(ci, 'api', side_effect=[dict(run_attempt=2, status='in_progress'), jobs]), \
                 patch.dict(broker['main'].__globals__, check_ci=ci.check_ci,
+                           find_controller=lambda **kwargs: None,
                            Tailnet=lambda: self.fail('Failed cohort obtained network authority')):
             self.assertEqual(broker['main'](), 0)
         self.assertEqual(output.read_text(), 'enabled=false\n')
@@ -937,6 +940,39 @@ class Network(unittest.TestCase):
                 with self.assertRaisesRegex(network.NetworkError, 'attested'):
                     broker['recover'](self.root)
             download.assert_called_once_with('456', {name: None}, timeout=60, initial_listing=artifacts)
+
+    def test_recovery_does_not_wait_for_a_lease_that_was_not_published(self):
+        run = dict(controller_run(), status='completed', conclusion='failure')
+        upload = dict(name='Upload admission lease', status='completed', conclusion='skipped')
+        job = dict(name='Admission and cleanup', run_id=456, run_attempt=1, status='completed', steps=[upload])
+        responses = [(json.dumps(run).encode(), {}),
+                     (json.dumps(dict(total_count=1, jobs=[job])).encode(), {})]
+        with patch.dict(os.environ, INTEROP_RECOVER_RUN='456', INTEROP_RECOVER_ATTEMPT='1'), \
+                patch.object(network, 'fetch', side_effect=responses) as fetch, \
+                patch.dict(broker['recover'].__globals__,
+                           download_records=lambda *args, **kwargs: self.fail('Recovery waited for a skipped upload'),
+                           Tailnet=lambda: self.fail('Unresolved recovery obtained network authority')):
+            with self.assertRaisesRegex(network.NetworkError, 'enrolment cleanup is unresolved'):
+                broker['recover'](self.root)
+        self.assertEqual(fetch.call_count, 2)
+
+    def test_blocked_endpoint_reports_block_without_a_transfer_failure(self):
+        output = self.root / 'output'
+        with patch.object(sys, 'argv', ['interop-host.py', 'outcome', 'linux', '--root', str(self.root)]), \
+                patch.dict(os.environ, GITHUB_OUTPUT=str(output), INTEROP_BLOCKED='true'):
+            self.assertEqual(host['main'](), 0)
+        self.assertEqual(output.read_text(), 'blocked=true\n')
+
+    def test_interop_result_rejects_blocked_or_incomplete_endpoints(self):
+        jobs = {role: dict(result='success', outputs=dict(blocked='false')) for role in ROLES}
+        host['check_endpoint_jobs'](jobs)
+        for result, error in (
+            (dict(result='success', outputs=dict(blocked='true')), 'Blocked endpoints: linux'),
+            (dict(result='failure', outputs=dict(blocked='true')), 'Failed or incomplete endpoint jobs: linux'),
+            (dict(result='success', outputs={}), 'Failed or incomplete endpoint jobs: linux'),
+        ):
+            with self.subTest(result=result), self.assertRaisesRegex(network.NetworkError, error):
+                host['check_endpoint_jobs']({**jobs, 'linux': result})
 
     def test_cancelled_or_superseded_ci_aborts_rendezvous(self):
         for current in (dict(run_attempt=3), dict(run_attempt=2, conclusion='cancelled'),

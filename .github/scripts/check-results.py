@@ -3,6 +3,9 @@ import os
 import sys
 
 
+INTEROP_JOBS = {'linux', 'freebsd', 'netbsd', 'openbsd', 'macos', 'solaris', 'cygwin', 'result'}
+
+
 def check(data, expected, selections, *, versions_selected, scheduled=False):
     def require(condition, message):
         if not condition:
@@ -48,6 +51,8 @@ def check(data, expected, selections, *, versions_selected, scheduled=False):
         require(isinstance(inputs, dict) and all(type(value) is bool for value in inputs.values()),
                 f'{family}: invalid job selections')
         require(inputs.keys() <= jobs.keys(), f'{family}: unknown job selection')
+        if family == 'interoperability':
+            require(not inputs and jobs.keys() == INTEROP_JOBS, 'interoperability: incomplete job set')
         if family == 'diagnostics':
             require(inputs.get('versions') is (versions_selected == 'true'),
                     'diagnostics/versions: missing or inconsistent selection')
@@ -59,6 +64,10 @@ def check(data, expected, selections, *, versions_selected, scheduled=False):
                 require(result == 'skipped', f'{family}/{name}: expected skipped')
             else:
                 require(result == 'success', f'{family}/{name}: {result or "missing result"}')
+            if family == 'interoperability' and name != 'result':
+                endpoint = job.get('outputs')
+                require(isinstance(endpoint, dict) and endpoint.get('blocked') == 'false',
+                        f'{family}/{name}: blocked or missing endpoint outcome')
             messages.append(f'{family}/{name}: {result}')
     return messages
 

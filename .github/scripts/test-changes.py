@@ -90,6 +90,7 @@ class Changes(unittest.TestCase):
             '.github/scripts/changes.py': full_selection,
             '.github/scripts/test-changes.py': {'diagnostics'},
             '.github/scripts/check-platform.py': {'linux', 'macos', 'other', 'diagnostics'},
+            '.github/scripts/ubuntu-apt.sh': full_selection - {'macos'},
             '.github/actions/interoperability/action.yml': {'interoperability', 'diagnostics'},
             '.github/actions/interop-upload/action.yml': {'interoperability', 'diagnostics'},
         }

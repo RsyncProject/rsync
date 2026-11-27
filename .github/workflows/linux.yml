@@ -71,8 +71,8 @@ jobs:
         run: python3 -S .github/scripts/check-platform.py ubuntu --release "${{ matrix.release }}" --arch "${{ matrix.machine }}"
       - name: Install dependencies
         run: |
-          sudo apt-get update
-          sudo apt-get install acl libacl1-dev attr libattr1-dev liblz4-dev libzstd-dev libxxhash-dev libidn2-dev python3-cmarkgfm openssl openssh-server
+          sh .github/scripts/ubuntu-apt.sh update
+          sh .github/scripts/ubuntu-apt.sh install acl libacl1-dev attr libattr1-dev liblz4-dev libzstd-dev libxxhash-dev libidn2-dev python3-cmarkgfm openssl openssh-server
           sudo install -d -o root -g root -m 0755 /run/sshd
           sudo sysctl -w fs.protected_regular=2
           echo "/usr/local/bin" >>"$GITHUB_PATH"
@@ -99,7 +99,7 @@ jobs:
         run: sudo python3 -S testsuite/tools/check-ssh.py --rsync /usr/local/bin/rsync --rrsync support/rrsync
       - name: Install storage dependencies
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.release == '24.04' && matrix.arch == 'amd64' }}
-        run: sudo apt-get install -y cryptsetup-bin e2fsprogs
+        run: sh .github/scripts/ubuntu-apt.sh install -y cryptsetup-bin e2fsprogs
       - name: Storage
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.release == '24.04' && matrix.arch == 'amd64' }}
         run: sudo python3 -B -S testsuite/tools/check-storage.py --binary "$PWD/rsync" --output "$PWD/test-results/root/storage"
@@ -120,7 +120,7 @@ jobs:
         run: |
           if [ "${{ matrix.release }}" = '24.04' ] && [ "${{ matrix.arch }}" = 'amd64' ]; then
             if [ ! -r /usr/share/i18n/locales/tr_TR ]; then
-              sudo apt-get install -y locales
+              sh .github/scripts/ubuntu-apt.sh install -y locales
             fi
             LOCPATH=$(mktemp -d "$RUNNER_TEMP/rsync-locales.XXXXXXXX")
             export LOCPATH
@@ -166,7 +166,7 @@ jobs:
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.release == '24.04' && matrix.arch == 'amd64' }}
         run: |
           python3 -B -S testsuite/tools/check-daemon-pam.py --rsync "$PWD/rsync"
-          sudo apt-get install -y libpam0g-dev libpam-wrapper
+          sh .github/scripts/ubuntu-apt.sh install -y libpam0g-dev libpam-wrapper
           pam_build=$(mktemp -d "$RUNNER_TEMP/rsync-pam.XXXXXXXX")
           git archive HEAD | tar -x -C "$pam_build"
           cd "$pam_build"

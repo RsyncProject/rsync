@@ -18,13 +18,15 @@ Recipient and enrolment waits allow 30 minutes without a newly observed endpoint
 
 We publish each phase result before waiting at the barrier, which keeps a failed endpoint available until its peers finish the current phase. Each verification step requires its barrier to have succeeded. It checks CI liveness again without downloading the same completion artefacts. We block later phases but still run local cleanup. A missing, failed or incomplete endpoint result fails the final check.
 
-Blocked endpoint jobs fail after uploading their blocked record and attempting local cleanup. Qualification after a shared startup failure requires a full CI attempt. A failed-job rerun can leave successful endpoints from an earlier attempt, whose records remain ineligible.
+Blocked endpoints upload a non-passing record and still attempt local cleanup. The result job fails the interop check for any blocked endpoint, missing result or failed transfer. Use **Re-run all jobs** after a shared startup failure. A failed-job rerun can leave successful endpoints from an earlier attempt whose records remain ineligible.
 
 GitHub API errors report explicit rate-limit signals without logging response bodies. An ordinary HTTP 403 remains a refusal and is not retried.
 
 ## Authentication
 
 The Network controller runs trusted default-branch code through a `workflow_run` listener and ignores CI runs that did not select the endpoint workflow. We configure the dedicated test tailnet outside this repository. The controller identity needs write access to `auth_keys`, `policy_file`, `devices:core` and `devices:posture_attributes`. We restrict enrolment to `tag:quarantine`.
+
+GitHub can start more than one controller workflow for a CI attempt. Only the controller registered to that attempt provisions it. Later controllers stop at identity validation before checking endpoint liveness or obtaining network authority.
 
 The broker waits for every enrolment recipient and checks CI and endpoint liveness before obtaining Tailscale authority. It rechecks liveness before requesting keys and publishing enrolment. A startup timeout before that point does not create tailnet resources. Transfer receipt verification checks the trusted workflow and live CI state without requesting a Tailnet credential.
 
@@ -59,5 +61,7 @@ We always try to revoke the cohort grant, remove its devices and revoke its enro
 Keys created before enrolment delivery can be revoked from the local journal without an admission lease. An interrupted request with an unknown key ID or enrolment delivered without a lease requires reconciliation.
 
 We attest the admission lease before granting access. A failed or cancelled controller triggers the cleanup workflow. We first check whether cleanup already succeeded. Otherwise we verify the lease bytes, repository, controller workflow, signing commit, source reference and run attempt before changing the tailnet.
+
+If the controller tried to issue enrolment keys and explicitly skipped publishing the admission lease, recovery reports the unresolved enrolment instead of waiting for a lease that was never published.
 
 If automated cleanup fails, we use the attested `interoperability-lease-attempt-N` artefact from the controller run to identify the cohort. We remove only the recorded grant, keys and devices while each device's node ID still matches. Without an attested lease, we compare the `interoperability-ready-PLATFORM-attempt-N` artefacts with quarantined node IDs before making any change. A hostname alone is not enough to delete a device.

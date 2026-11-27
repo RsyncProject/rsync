@@ -191,6 +191,10 @@ def recover(root):
                 and issuance[0].get('conclusion') == 'skipped'):
             print('Controller did not issue enrolment keys')
             return
+        uploads = [step for step in job.get('steps', []) if step.get('name') == 'Upload admission lease']
+        if (len(uploads) == 1 and uploads[0].get('status') == 'completed'
+                and uploads[0].get('conclusion') == 'skipped'):
+            raise NetworkError('Controller did not publish an admission lease; enrolment cleanup is unresolved')
     body, _ = fetch('https://api.github.com/repos/RsyncProject/rsync/actions/runs/' + run_id + '/artifacts?per_page=100',
                     os.environ['GH_TOKEN'], operation='Read recovery artifacts')
     listing = decode(body)
@@ -233,6 +237,8 @@ def main():
             bind(load(root, 'context'))
         try:
             state = identity()
+            if args.phase == 'metadata' and find_controller(exclude=os.environ['GITHUB_RUN_ID']) is not None:
+                raise NotSelected('A controller is already registered for this CI attempt')
             if args.phase in ('metadata', 'prepare', 'admit'):
                 check_ci()
         except (NotSelected, PeerUnavailable) as error:
@@ -244,12 +250,6 @@ def main():
             print(str(error))
             return 0
         if args.phase == 'metadata':
-            if find_controller(exclude=os.environ['GITHUB_RUN_ID']) is not None:
-                if os.environ.get('GITHUB_OUTPUT'):
-                    with open(os.environ['GITHUB_OUTPUT'], 'a') as stream:
-                        stream.write('enabled=false\n')
-                print('A controller is already registered for this CI attempt')
-                return 0
             save(root, 'context', head_sha=source()['head_sha'])
             if os.environ.get('GITHUB_OUTPUT'):
                 with open(os.environ['GITHUB_OUTPUT'], 'a') as stream:

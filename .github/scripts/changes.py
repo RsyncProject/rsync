@@ -106,6 +106,9 @@ def script(selected, name):
         enable(selected, 'linux', 'diagnostics')
     elif name == 'install-cygwin.ps1':
         enable(selected, 'other', 'diagnostics')
+    elif name == 'ubuntu-apt.sh':
+        enable(selected, 'linux', 'bsd', 'other', 'android', 'archive', 'diagnostics', 'versions',
+               'valgrind', 'interoperability', 'asan', 'coverage', 'static_analysis')
     else:
         raise ValueError('Unclassified changed path: ' + repr('.github/scripts/' + name))
 
