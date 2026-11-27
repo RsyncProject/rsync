@@ -24,8 +24,8 @@ jobs:
           persist-credentials: false
       - name: Install dependencies
         run: |
-          sudo apt-get update
-          sudo apt-get install -y gcc make openssl openssh-server acl attr libacl1-dev libattr1-dev liblz4-dev libzstd-dev libxxhash-dev libidn2-dev
+          sh .github/scripts/ubuntu-apt.sh update
+          sh .github/scripts/ubuntu-apt.sh install -y gcc make openssl openssh-server acl attr libacl1-dev libattr1-dev liblz4-dev libzstd-dev libxxhash-dev libidn2-dev
           sudo install -d -o root -g root -m 0755 /run/sshd
       - name: Configure
         run: ./configure --disable-md2man
@@ -48,7 +48,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Prepare VM host
-        run: sudo apt-get update && sudo apt-get install -y qemu-utils qemu-system-x86 ovmf
+        run: sh .github/scripts/ubuntu-apt.sh update && sh .github/scripts/ubuntu-apt.sh install -y qemu-utils qemu-system-x86 ovmf
       - name: Configure and build
         uses: vmactions/freebsd-vm@c46abacb49f09938ca4e1702d15d836285d694cc # v1.5.9
         with:
@@ -75,7 +75,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Prepare VM host
-        run: sudo apt-get update && sudo apt-get install -y autoconf automake qemu-utils qemu-system-x86 ovmf
+        run: sh .github/scripts/ubuntu-apt.sh update && sh .github/scripts/ubuntu-apt.sh install -y autoconf automake qemu-utils qemu-system-x86 ovmf
       - name: Prepare source
         run: ./prepare-source
       - name: Configure and build
@@ -115,7 +115,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Prepare VM host
-        run: sudo apt-get update && sudo apt-get install -y qemu-utils qemu-system-x86 ovmf
+        run: sh .github/scripts/ubuntu-apt.sh update && sh .github/scripts/ubuntu-apt.sh install -y qemu-utils qemu-system-x86 ovmf
       - name: Configure and build
         uses: vmactions/openbsd-vm@f1ca8bc8ecc5b6ef7218e5b914836e067e1546d3 # v1.4.9
         with:
@@ -178,7 +178,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Prepare VM host
-        run: sudo apt-get update && sudo apt-get install -y qemu-utils qemu-system-x86 ovmf
+        run: sh .github/scripts/ubuntu-apt.sh update && sh .github/scripts/ubuntu-apt.sh install -y qemu-utils qemu-system-x86 ovmf
       - name: Configure and build
         uses: vmactions/solaris-vm@87d3c436511cef802cd1637f86f73b1a97715c8c # v1.4.1
         with:

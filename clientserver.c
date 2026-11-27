@@ -1429,13 +1429,23 @@ static void send_listing(int fd)
 		io_printf(fd,"@RSYNCD: EXIT\n");
 }
 
-static int proxy_peer_allowed(int fd, BOOL named_unix)
+enum daemon_socket {
+	DAEMON_SOCKET_OTHER, DAEMON_SOCKET_INET, DAEMON_SOCKET_UNIX_PATH, DAEMON_SOCKET_UNIX_ABSTRACT
+};
+
+static int proxy_peer_allowed(int fd, enum daemon_socket transport)
 {
 	const char *host = undetermined_hostname;
-	const char *addr = client_addr(fd);
+	BOOL unix_path = transport == DAEMON_SOCKET_UNIX_PATH;
+	const char *addr;
 
-	if (!allow_proxy_protocol_peer(lp_proxy_protocol_hosts(), addr, &host, named_unix)) {
-		rprintf(FLOG, "proxy protocol rejected from untrusted peer %s (%s)\n", host, named_unix ? "unix:" : addr);
+	if (transport == DAEMON_SOCKET_UNIX_ABSTRACT) {
+		rprintf(FLOG, "proxy protocol rejected from abstract Unix socket\n");
+		return 0;
+	}
+	addr = unix_path ? "unix:" : client_addr(fd);
+	if (!allow_proxy_protocol_peer(lp_proxy_protocol_hosts(), addr, &host, unix_path)) {
+		rprintf(FLOG, "proxy protocol rejected from untrusted peer %s (%s)\n", host, addr);
 		return 0;
 	}
 	return 1;
@@ -1466,12 +1476,13 @@ static int load_config(int globals_only)
 /* this is called when a connection is established to a client
    and we want to start talking. The setup of the system is done from
    here */
-static int start_daemon_session(int f_in, int f_out, BOOL named_unix)
+static int start_daemon_session(int f_in, int f_out, enum daemon_socket transport)
 {
 	char line[1024];
 	const char *addr, *host;
 	char *p;
 	int i;
+	BOOL named_unix = transport == DAEMON_SOCKET_UNIX_PATH || transport == DAEMON_SOCKET_UNIX_ABSTRACT;
 
 	/* At this point, am_server is only set for a daemon started via rsh.
 	 * Because am_server gets forced on soon, we'll set am_daemon to -1 as
@@ -1497,7 +1508,7 @@ static int start_daemon_session(int f_in, int f_out, BOOL named_unix)
 		set_daemon_handshake_timeout(daemon_handshake_timeout(-1));
 
 	if (lp_proxy_protocol()) {
-		if (!proxy_peer_allowed(f_in, named_unix) || !read_proxy_protocol_header(f_in))
+		if (!proxy_peer_allowed(f_in, transport) || !read_proxy_protocol_header(f_in))
 			return -1;
 		/* Module rules apply to the forwarded client, not the proxy transport. */
 		named_unix = False;
@@ -1637,7 +1648,7 @@ static int start_daemon_session(int f_in, int f_out, BOOL named_unix)
 
 int start_daemon(int f_in, int f_out)
 {
-	return start_daemon_session(f_in, f_out, False);
+	return start_daemon_session(f_in, f_out, DAEMON_SOCKET_OTHER);
 }
 
 static void create_pid_file(void)
@@ -1812,60 +1823,50 @@ static void become_daemon(void)
  * supply a connected Unix stream whose local endpoint has a name. Other
  * launchers may use an unnamed local socket for process I/O, which must not
  * select inetd mode. */
-static int is_inetd_socket(int fd, BOOL *named_unix)
+static enum daemon_socket inetd_socket_type(int fd)
 {
 	int type;
 	struct sockaddr_storage peer = {0};
 	socklen_t type_len = sizeof type;
 	socklen_t peer_len = sizeof peer;
 
-	*named_unix = False;
 	if (getsockopt(fd, SOL_SOCKET, SO_TYPE, (char *)&type, &type_len) != 0
 	 || type != SOCK_STREAM
 	 || getpeername(fd, (struct sockaddr *)&peer, &peer_len) != 0)
-		return 0;
+		return DAEMON_SOCKET_OTHER;
 
 	if (peer.ss_family == AF_INET
 #ifdef INET6
 	 || peer.ss_family == AF_INET6
 #endif
 	)
-		return 1;
+		return DAEMON_SOCKET_INET;
 
 #ifdef HAVE_SYS_UN_H
 	if (peer.ss_family == AF_UNIX) {
 		struct sockaddr_storage local = {0};
 		struct sockaddr_un *local_un = (struct sockaddr_un *)&local;
 		socklen_t local_len = sizeof local;
-		size_t path_len, i;
-
 		if (getsockname(fd, (struct sockaddr *)&local, &local_len) != 0
-		 || local.ss_family != AF_UNIX)
-			return 0;
-
-		if (local_len <= (socklen_t)offsetof(struct sockaddr_un, sun_path))
-			return 0;
-		path_len = (size_t)local_len - offsetof(struct sockaddr_un, sun_path);
-		if (path_len > sizeof local_un->sun_path)
-			path_len = sizeof local_un->sun_path;
-		for (i = 0; i < path_len; i++) {
-			if (local_un->sun_path[i] != '\0') {
-				*named_unix = True;
-				return 1;
-			}
-		}
-		return 0;
+		 || local.ss_family != AF_UNIX
+		 || local_len <= (socklen_t)offsetof(struct sockaddr_un, sun_path))
+			return DAEMON_SOCKET_OTHER;
+		if (local_un->sun_path[0] != '\0')
+			return DAEMON_SOCKET_UNIX_PATH;
+#ifdef __linux__
+		return DAEMON_SOCKET_UNIX_ABSTRACT;
+#endif
 	}
 #endif
 
-	return 0;
+	return DAEMON_SOCKET_OTHER;
 }
 
 int daemon_main(void)
 {
-	BOOL named_unix;
+	enum daemon_socket transport = inetd_socket_type(STDIN_FILENO);
 
-	if (is_inetd_socket(STDIN_FILENO, &named_unix)) {
+	if (transport != DAEMON_SOCKET_OTHER) {
 		int i;
 
 		/* we are running via inetd - close off stdout and
@@ -1876,7 +1877,7 @@ int daemon_main(void)
 			open("/dev/null", O_RDWR);
 		}
 
-		return start_daemon_session(STDIN_FILENO, STDIN_FILENO, named_unix);
+		return start_daemon_session(STDIN_FILENO, STDIN_FILENO, transport);
 	}
 
 	if (!load_config(1)) {

@@ -32,9 +32,9 @@ jobs:
         timeout-minutes: 10
         run: |
           set -- qemu-utils qemu-system-x86 ovmf
-          sudo apt-get install -y -q -o Acquire::Retries=3 --no-install-recommends "$@" || {
-            sudo apt-get update -q
-            sudo apt-get install -y -q -o Acquire::Retries=3 --no-install-recommends "$@"
+          sh .github/scripts/ubuntu-apt.sh install -y -q -o Acquire::Retries=3 --no-install-recommends "$@" || {
+            sh .github/scripts/ubuntu-apt.sh update -q
+            sh .github/scripts/ubuntu-apt.sh install -y -q -o Acquire::Retries=3 --no-install-recommends "$@"
           }
       - name: Run VM and collect results
         uses: vmactions/freebsd-vm@c46abacb49f09938ca4e1702d15d836285d694cc # v1.5.9
@@ -96,9 +96,9 @@ jobs:
         timeout-minutes: 10
         run: |
           set -- autoconf automake qemu-utils qemu-system-x86 ovmf
-          sudo apt-get install -y -q -o Acquire::Retries=3 --no-install-recommends "$@" || {
-            sudo apt-get update -q
-            sudo apt-get install -y -q -o Acquire::Retries=3 --no-install-recommends "$@"
+          sh .github/scripts/ubuntu-apt.sh install -y -q -o Acquire::Retries=3 --no-install-recommends "$@" || {
+            sh .github/scripts/ubuntu-apt.sh update -q
+            sh .github/scripts/ubuntu-apt.sh install -y -q -o Acquire::Retries=3 --no-install-recommends "$@"
           }
       - name: Prepare source
         run: ./prepare-source
@@ -168,9 +168,9 @@ jobs:
         timeout-minutes: 10
         run: |
           set -- qemu-utils qemu-system-x86 ovmf
-          sudo apt-get install -y -q -o Acquire::Retries=3 --no-install-recommends "$@" || {
-            sudo apt-get update -q
-            sudo apt-get install -y -q -o Acquire::Retries=3 --no-install-recommends "$@"
+          sh .github/scripts/ubuntu-apt.sh install -y -q -o Acquire::Retries=3 --no-install-recommends "$@" || {
+            sh .github/scripts/ubuntu-apt.sh update -q
+            sh .github/scripts/ubuntu-apt.sh install -y -q -o Acquire::Retries=3 --no-install-recommends "$@"
           }
       - name: Run VM and collect results
         uses: vmactions/openbsd-vm@f1ca8bc8ecc5b6ef7218e5b914836e067e1546d3 # v1.4.9

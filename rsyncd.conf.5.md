@@ -323,10 +323,12 @@ in the values of parameters.  See that section for details.
     to supply a `proxy protocol` header.  The syntax is the same token format
     used by `hosts allow`.  When `proxy protocol = true`, this list must match
     the direct peer before rsync trusts the forwarded client address.
-    The `unix:` rule can be used to trust a peer connected through a named Unix
-    domain socket. Ensure that the socket's filesystem permissions restrict
-    access to trusted proxy processes, since any process that can connect can
-    supply a forwarded address.
+    For an inetd connection to a filesystem-named Unix domain socket, only
+    `unix:` and `*` match. Restrict access to the socket's containing directory
+    to trusted proxy processes. Any process that can connect can supply a
+    forwarded address. Abstract Unix sockets cannot carry PROXY headers even
+    with `*` configured. This does not change how `unix:` matches in module
+    access rules when the proxy protocol is disabled.
 
 0.  `name converter`
 

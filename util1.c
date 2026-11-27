@@ -36,6 +36,7 @@ extern int modify_window;
 extern int relative_paths;
 extern int preserve_xattrs;
 extern int omit_link_times;
+extern int open_noatime;
 extern int preallocate_files;
 extern int operator_path_resolve;
 extern char *module_dir;
@@ -373,6 +374,89 @@ int open_copy_destination(const char *dest, mode_t mode)
 		return -1;
 	}
 	return ofd;
+}
+
+/* Resolve a regular per-directory basis below the selected destination root.
+ * Compute the requested ancestor from the destination name so missing
+ * containing directories don't change the result of a dry run. */
+int open_per_dir_basis(int root_fd, const char *dir, const char *fname,
+		       char *path, STRUCT_STAT *st)
+{
+#if defined AT_FDCWD && defined O_NOFOLLOW && defined O_DIRECTORY && !defined __CYGWIN__
+	char name[MAXPATHLEN], parent[MAXPATHLEN];
+	const char *slash, *leaf;
+	int len, dfd, fd = -1, e;
+	int flags = O_RDONLY | O_NONBLOCK | O_NOFOLLOW | O_NOCTTY | O_BINARY | O_CLOEXEC;
+	size_t prefix;
+	STRUCT_STAT before;
+
+	if (root_fd < 0) {
+		errno = EBADF;
+		return -1;
+	}
+	if (strlcpy(name, fname, sizeof name) >= sizeof name) {
+		errno = ENAMETOOLONG;
+		return -1;
+	}
+	if (*name == '/' || clean_fname(name, CFN_REFUSE_DOT_DOT_DIRS) < 0) {
+		errno = EINVAL;
+		return -1;
+	}
+	slash = strrchr(name, '/');
+	leaf = slash ? slash + 1 : name;
+	prefix = slash ? (size_t)(slash - name) : 0;
+	while (dir[0] == '.' && dir[1] == '.' && (dir[2] == '/' || dir[2] == '\0')) {
+		if (!prefix) {
+			errno = ENOENT;
+			return -1;
+		}
+		do {
+			prefix--;
+		} while (prefix && name[prefix] != '/');
+		dir += dir[2] == '/' ? 3 : 2;
+	}
+	if (strcmp(dir, ".") == 0)
+		dir++;
+	len = snprintf(parent, sizeof parent, "%.*s%s%s",
+		       (int)prefix, name, prefix && *dir ? "/" : "", dir);
+	if (len < 0 || (size_t)len >= sizeof parent
+	 || pathjoin(path, MAXPATHLEN, len ? parent : ".", leaf) >= MAXPATHLEN) {
+		errno = ENAMETOOLONG;
+		return -1;
+	}
+
+	dfd = secure_relative_dirfd_at_beneath(root_fd, len ? parent : ".");
+	if (dfd < 0)
+		return -1;
+#ifdef O_NOATIME
+	if (open_noatime)
+		flags |= O_NOATIME;
+#endif
+	if (do_lstat_atfd(dfd, leaf, &before) == 0) {
+		if (S_ISREG(before.st_mode))
+			fd = openat(dfd, leaf, flags);
+		else
+			errno = ENOENT;
+	}
+	e = errno;
+	close(dfd);
+	errno = e;
+	if (fd < 0)
+		return -1;
+	if (do_fstat(fd, st) < 0)
+		e = errno;
+	else if (!S_ISREG(st->st_mode) || before.st_ino != st->st_ino || before.st_dev != st->st_dev)
+		e = EAGAIN;
+	else
+		return fd;
+	close(fd);
+	errno = e;
+	return -1;
+#else
+	(void)root_fd; (void)dir; (void)fname; (void)path; (void)st;
+	errno = ENOSYS;
+	return -1;
+#endif
 }
 
 /* Copy contents of file @source to file @dest with mode @mode.

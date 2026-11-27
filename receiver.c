@@ -46,6 +46,8 @@ extern int preserve_xattrs;
 extern int crtimes_ndx;
 extern int do_fsync;
 extern int basis_dir_cnt;
+extern int per_dir_basis;
+extern int per_dir_basis_root_fd;
 extern int make_backups;
 extern int cleanup_got_literal;
 extern int remove_source_files;
@@ -712,7 +714,17 @@ static void discard_receive_data(int f_in, struct file_struct *file)
 	receive_data(f_in, NULL, -1, 0, NULL, -1, file, 0);
 }
 
-static void handle_delayed_updates(char *local_name)
+static void record_placement(int *log_fd, const char *name)
+{
+	if (*log_fd >= 0 && full_write(*log_fd, name, strlen(name) + 1) < 0) {
+		int error = errno;
+		close(*log_fd);
+		*log_fd = -1;
+		rsyserr(FERROR_XFER, error, "cannot write placement log");
+	}
+}
+
+static void handle_delayed_updates(char *local_name, int *log_fd)
 {
 	char *fname, *partialptr;
 	int ndx;
@@ -741,6 +753,8 @@ static void handle_delayed_updates(char *local_name)
 					"rename failed for %s (from %s)",
 					full_fname(fname), partialptr);
 			} else {
+				if (S_ISREG(file->mode))
+					record_placement(log_fd, fname);
 				if (remove_source_files || (preserve_hard_links && F_IS_HLINKED(file)))
 					send_msg_success(fname, ndx);
 				handle_partial_dir(partialptr, PDIR_DELETE);
@@ -822,7 +836,7 @@ static int gen_wants_ndx(int desired_ndx, int flist_num)
  * main routine for receiver process.
  *
  * Receiver process runs on the same host as the generator process. */
-int recv_files(int f_in, int f_out, char *local_name)
+int recv_files(int f_in, int f_out, char *local_name, int placement_fd)
 {
 	int fd1,fd2;
 	STRUCT_STAT st;
@@ -859,6 +873,7 @@ int recv_files(int f_in, int f_out, char *local_name)
 
 	while (1) {
 		const char *basedir = NULL;
+		int per_dir_basis_ndx = -1;
 
 		cleanup_disable();
 
@@ -888,7 +903,7 @@ int recv_files(int f_in, int f_out, char *local_name)
 			if (DEBUG_GTE(RECV, 1))
 				rprintf(FINFO, "recv_files phase=%d\n", phase);
 			if (phase == 2 && delay_updates)
-				handle_delayed_updates(local_name);
+				handle_delayed_updates(local_name, &placement_fd);
 			write_int(f_out, NDX_DONE);
 			continue;
 		}
@@ -1049,7 +1064,8 @@ int recv_files(int f_in, int f_out, char *local_name)
 				fnamecmp = xname;
 				break;
 			default:
-				if (fnamecmp_type > FNAMECMP_FUZZY && fnamecmp_type-FNAMECMP_FUZZY <= basis_dir_cnt) {
+				if (!per_dir_basis && fnamecmp_type > FNAMECMP_FUZZY
+				 && fnamecmp_type-FNAMECMP_FUZZY <= basis_dir_cnt) {
 					fnamecmp_type -= FNAMECMP_FUZZY + 1;
 					if (file->dirname) {
 						pathjoin(fnamecmpbuf, sizeof fnamecmpbuf, basis_dir[fnamecmp_type], file->dirname);
@@ -1063,6 +1079,9 @@ int recv_files(int f_in, int f_out, char *local_name)
 						"invalid basis_dir index: %d.\n",
 						fnamecmp_type);
 					exit_cleanup(RERR_PROTOCOL);
+				} else if (per_dir_basis) {
+					per_dir_basis_ndx = fnamecmp_type;
+					fnamecmp = fname;
 				} else {
 					basedir = basis_dir[fnamecmp_type];
 					fnamecmp = fname;
@@ -1094,7 +1113,21 @@ int recv_files(int f_in, int f_out, char *local_name)
 		 * planted one avoids both an escape and a basis-content info-leak.
 		 * Otherwise use secure_basis_open, which also tolerates an operator-
 		 * trusted absolute fnamecmp (e.g. an absolute --partial-dir basis). */
-		{
+		if (per_dir_basis_ndx >= 0) {
+			fd1 = open_per_dir_basis(per_dir_basis_root_fd, basis_dir[per_dir_basis_ndx],
+						 fname, fnamecmpbuf, &st);
+			if (fd1 < 0 || st.st_size <= 0) {
+				int e = fd1 < 0 ? errno : EIO;
+				if (fd1 >= 0)
+					close(fd1);
+				rsyserr(FERROR_XFER, e, "cannot read per-directory delta basis for %s", fname);
+				discard_receive_data(f_in, file);
+				if (inc_recurse)
+					send_msg_int(MSG_NO_SEND, ndx);
+				continue;
+			}
+			fnamecmp = fnamecmpbuf;
+		} else {
 			int bdfd;
 			BOOL backup_basis = fnamecmp_type == FNAMECMP_BACKUP && inplace && make_backups > 0;
 
@@ -1185,7 +1218,7 @@ int recv_files(int f_in, int f_out, char *local_name)
 		if (fd1 == -1) {
 			st.st_mode = 0;
 			st.st_size = 0;
-		} else if (do_fstat(fd1,&st) != 0) {
+		} else if (per_dir_basis_ndx < 0 && do_fstat(fd1,&st) != 0) {
 			rsyserr(FERROR_XFER, errno, "fstat %s failed",
 				full_fname(fnamecmp));
 			discard_receive_data(f_in, file);
@@ -1222,7 +1255,8 @@ int recv_files(int f_in, int f_out, char *local_name)
 		/* If we're not preserving permissions, change the file-list's
 		 * mode based on the local permissions and some heuristics. */
 		if (!preserve_perms) {
-			int exists = fd1 != -1;
+			/* A per-directory basis is not an existing destination. */
+			int exists = fd1 != -1 && per_dir_basis_ndx < 0;
 #ifdef SUPPORT_ACLS
 			const char *dn = file->dirname ? file->dirname : ".";
 			if (parent_dirname != dn
@@ -1369,6 +1403,8 @@ int recv_files(int f_in, int f_out, char *local_name)
 		case 2:
 			break;
 		case 1:
+			if (S_ISREG(file->mode))
+				record_placement(&placement_fd, fname);
 			if (remove_source_files || inc_recurse || (preserve_hard_links && F_IS_HLINKED(file)))
 				send_msg_success(fname, ndx);
 			break;
@@ -1414,7 +1450,10 @@ int recv_files(int f_in, int f_out, char *local_name)
 		make_backups = -make_backups;
 
 	if (phase == 2 && delay_updates) /* for protocol_version < 29 */
-		handle_delayed_updates(local_name);
+		handle_delayed_updates(local_name, &placement_fd);
+
+	if (placement_fd >= 0 && close(placement_fd) < 0)
+		rsyserr(FERROR_XFER, errno, "cannot close placement log");
 
 	finish_progress();
 

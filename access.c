@@ -324,8 +324,10 @@ static int match_address(const char *addr, char *tok)
 	return ret;
 }
 
+enum unix_access { UNIX_ACCESS_NONE, UNIX_ACCESS_MODULE, UNIX_ACCESS_PROXY };
+
 static int access_match(const char *list, const char *addr, const char **host_ptr,
-			int deny, BOOL named_unix)
+			int deny, enum unix_access unix_access)
 {
 	char *tok;
 	char *list2 = strdup(list);
@@ -333,8 +335,13 @@ static int access_match(const char *list, const char *addr, const char **host_pt
 	strlower(list2);
 
 	for (tok = strtok(list2, " ,\t"); tok; tok = strtok(NULL, " ,\t")) {
-		int match = strcmp(tok, "unix:") == 0 ? named_unix
-			  : match_hostname(host_ptr, addr, tok, deny) || match_address(addr, tok);
+		int match;
+		if (strcmp(tok, "unix:") == 0)
+			match = unix_access != UNIX_ACCESS_NONE;
+		else if (unix_access == UNIX_ACCESS_PROXY)
+			match = strcmp(tok, "*") == 0;
+		else
+			match = match_hostname(host_ptr, addr, tok, deny) || match_address(addr, tok);
 		if (match) {
 			free(list2);
 			return 1;
@@ -349,6 +356,7 @@ int allow_access(const char *addr, const char **host_ptr, int i, BOOL named_unix
 {
 	const char *allow_list = lp_hosts_allow(i);
 	const char *deny_list = lp_hosts_deny(i);
+	enum unix_access unix_access = named_unix ? UNIX_ACCESS_MODULE : UNIX_ACCESS_NONE;
 
 	if (allow_list && !*allow_list)
 		allow_list = NULL;
@@ -359,7 +367,7 @@ int allow_access(const char *addr, const char **host_ptr, int i, BOOL named_unix
 
 	/* If we match an allow-list item, we always allow access. */
 	if (allow_list) {
-		if (access_match(allow_list, addr, host_ptr, 0, named_unix))
+		if (access_match(allow_list, addr, host_ptr, 0, unix_access))
 			return 1;
 		/* For an allow-list w/o a deny-list, disallow non-matches. */
 		if (!deny_list)
@@ -368,17 +376,18 @@ int allow_access(const char *addr, const char **host_ptr, int i, BOOL named_unix
 
 	/* If we match a deny-list item (and got past any allow-list
 	 * items), we always disallow access. */
-	if (deny_list && access_match(deny_list, addr, host_ptr, 1, named_unix))
+	if (deny_list && access_match(deny_list, addr, host_ptr, 1, unix_access))
 		return 0;
 
 	/* Allow all other access. */
 	return 1;
 }
 
-int allow_proxy_protocol_peer(const char *list, const char *addr, const char **host_ptr, BOOL named_unix)
+int allow_proxy_protocol_peer(const char *list, const char *addr, const char **host_ptr, BOOL unix_path)
 {
 	if (!list || !*list)
 		return 0;
 	allow_forward_dns = 0;
-	return access_match(list, addr, host_ptr, 0, named_unix);
+	/* A Unix transport has no IP identity to match against hostname rules. */
+	return access_match(list, addr, host_ptr, 0, unix_path ? UNIX_ACCESS_PROXY : UNIX_ACCESS_NONE);
 }

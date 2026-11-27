@@ -19,10 +19,12 @@ class Results(unittest.TestCase):
         self.selections = dict(self.expected, versions='true', asan='false', coverage='false',
                                static_analysis='false')
         self.versions_selected = 'true'
+        interop = {name: {'result': 'success', 'outputs': {'blocked': 'false'}}
+                   for name in ('linux', 'freebsd', 'netbsd', 'openbsd', 'macos', 'solaris', 'cygwin')}
+        interop['result'] = {'result': 'success'}
         self.data = {
             'changes': {'result': 'success', 'outputs': {}},
-            'interoperability': {'result': 'success', 'outputs': {'jobs': json.dumps({name: {'result': 'success'}
-                                  for name in ('linux', 'freebsd', 'netbsd', 'openbsd', 'macos', 'solaris', 'cygwin', 'result')})}},
+            'interoperability': {'result': 'success', 'outputs': {'jobs': json.dumps(interop)}},
             'archive': {'result': 'success', 'outputs': {'jobs': json.dumps({'archive': {'result': 'success'}})}},
             'linux': {'result': 'success', 'outputs': {
                 'jobs': json.dumps({'ubuntu': {'result': 'success'}, 'almalinux': {'result': 'skipped'}}),
@@ -208,6 +210,23 @@ class Results(unittest.TestCase):
         outputs['jobs'] = json.dumps(jobs)
         outputs['advisory'] = 'static_analysis'
         self.reject()
+
+    def test_interop_aggregate_is_required_even_when_endpoints_finish(self):
+        outputs = self.data['interoperability']['outputs']
+        jobs = json.loads(outputs['jobs'])
+        for name in jobs:
+            with self.subTest(missing=name):
+                outputs['jobs'] = json.dumps({key: value for key, value in jobs.items() if key != name})
+                self.reject()
+        outputs['jobs'] = json.dumps({**jobs, 'result': {'result': 'skipped'}})
+        outputs['inputs'] = json.dumps({'result': False})
+        self.reject()
+        del outputs['inputs']
+        for endpoint in ({'blocked': 'true'}, {}, None):
+            with self.subTest(endpoint=endpoint):
+                jobs['linux']['outputs'] = endpoint
+                outputs['jobs'] = json.dumps(jobs)
+                self.reject()
 
     def test_every_family_requires_nested_results(self):
         for name in ('linux', 'diagnostics', 'macos', 'other', 'android', 'archive', 'valgrind', 'interoperability'):

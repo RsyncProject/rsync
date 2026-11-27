@@ -43,7 +43,6 @@ jobs:
           path: ${{ runner.temp }}/interoperability/context.json
       - name: Issue single-use enrolment keys
         id: keys
-        continue-on-error: true
         if: ${{ steps.source.outputs.enabled == 'true' }}
         run: python3 -B -S .github/scripts/interop-broker.py broker --root "$RUNNER_TEMP/interoperability"
       - name: Upload encrypted enrolment

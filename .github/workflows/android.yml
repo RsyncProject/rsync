@@ -48,7 +48,7 @@ jobs:
           persist-credentials: false
 
       - name: Install dependencies
-        run: sudo apt-get update && sudo apt-get install -y autoconf automake gawk ${{ matrix.packages }}
+        run: sh .github/scripts/ubuntu-apt.sh update && sh .github/scripts/ubuntu-apt.sh install -y autoconf automake gawk ${{ matrix.packages }}
 
       - &build
         name: Build
@@ -107,7 +107,7 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
       - name: Install dependencies
-        run: sudo apt-get update && sudo apt-get install -y autoconf automake gawk
+        run: sh .github/scripts/ubuntu-apt.sh update && sh .github/scripts/ubuntu-apt.sh install -y autoconf automake gawk
       - *build
       - name: Tests
         run: python3 -S .github/scripts/android.py test --executor direct
@@ -128,8 +128,8 @@ jobs:
       - &emulator-dependencies
         name: Install dependencies
         run: |
-          sudo apt-get update
-          sudo apt-get install -y acl libpulse0
+          sh .github/scripts/ubuntu-apt.sh update
+          sh .github/scripts/ubuntu-apt.sh install -y acl libpulse0
           sudo setfacl -m "u:$(id -un):rw" /dev/kvm
           "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" 'system-images;android-36;google_apis;x86_64' emulator
       - &download

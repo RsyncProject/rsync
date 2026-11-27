@@ -188,6 +188,27 @@ def stop(root, role):
         raise NetworkError('; '.join(errors))
 
 
+def check_endpoint_jobs(jobs):
+    if not isinstance(jobs, dict) or set(jobs) != set(ROLES):
+        raise NetworkError('Incomplete endpoint job set')
+    failed, blocked = [], []
+    for role in ROLES:
+        job = jobs[role]
+        outputs = job.get('outputs') if isinstance(job, dict) else None
+        outcome = outputs.get('blocked') if isinstance(outputs, dict) else None
+        if not isinstance(job, dict) or job.get('result') != 'success' or outcome not in ('true', 'false'):
+            failed.append(role)
+        elif outcome == 'true':
+            blocked.append(role)
+    errors = []
+    if failed:
+        errors.append('Failed or incomplete endpoint jobs: ' + ', '.join(failed))
+    if blocked:
+        errors.append('Blocked endpoints: ' + ', '.join(blocked))
+    if errors:
+        raise NetworkError('; '.join(errors))
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('phase', choices=('install', 'recipient', 'connect', 'prepare', 'forward', 'quarantine', 'admit',
@@ -210,8 +231,6 @@ def main():
                 raise NetworkError('Invalid endpoint outcome')
             with open(os.environ['GITHUB_OUTPUT'], 'a') as stream:
                 stream.write('blocked=' + blocked + '\n')
-            if blocked == 'true':
-                raise NetworkError('Endpoint did not complete interoperability')
             return 0
         if phase == 'forward':
             forward(root, role)
@@ -295,13 +314,7 @@ def main():
                       metadata_initial_verified=initial_check['metadata_verified'],
                       metadata_verified=result['metadata_verified'], metadata_restored=updated['metadata_restored'])
         else:
-            jobs = json.loads(os.environ['INTEROP_JOBS'])
-            if set(jobs) != set(ROLES):
-                raise NetworkError('Incomplete endpoint job set')
-            incomplete = [role for role, job in jobs.items()
-                          if job.get('result') != 'success' or job.get('outputs', {}).get('blocked') != 'false']
-            if incomplete:
-                raise NetworkError('Failed or blocked endpoints: ' + ', '.join(incomplete))
+            check_endpoint_jobs(json.loads(os.environ['INTEROP_JOBS']))
             broker = runpy.run_path(str(Path(__file__).with_name('interop-broker.py')))
             broker['verify_cases'](records('result'), state['source_sha'])
             proof = published('result')
