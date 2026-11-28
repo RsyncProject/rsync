@@ -15,6 +15,7 @@ if [ ! -s "$sources" ]; then
     exit 2
 fi
 
-# Use the runner's signed Ubuntu archives for both update and install.
+# Use only the runner's signed Ubuntu archives by default. An isolated
+# SourceParts directory can add an explicitly required archive.
 exec sudo apt-get -o "Dir::Etc::SourceList=$sources" -o Dir::Etc::SourceParts=- \
     -o APT::Get::List-Cleanup=false -o APT::Update::Error-Mode=any "$@"
