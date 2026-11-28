@@ -23,6 +23,11 @@
   verified sender root. Avoid a redundant directory probe for sender file
   reads. Set close-on-exec at open time where supported.
 - Avoid redundant stats when creating children of a fresh receiver directory.
+- Keep the `--info=progress2` time field as an estimate on intermediate rows
+  with an `xfr#` suffix. Earlier releases showed elapsed progress time on
+  those rows. Now only the final summary shows elapsed progress time. An ETA
+  with data left to transfer and a zero measured rate is shown as
+  `??:??:??`. The time field's format is unchanged.
 - Without incremental recursion (for example with `--no-inc-recursive`), the
   `--info=progress2` percentage and time remaining leave out files that
   needed no transfer once the transfer has passed them. Pushes with `--iconv`
