@@ -80,6 +80,7 @@ static void rprint_progress(OFF_T ofs, double size, struct timeval *now,
 	double rate, remain;
 	int pct, rate_human_level;
 	BOOL overall = INFO_GTE(PROGRESS, 2);
+	BOOL show_elapsed = transfer_done || (is_last && !overall);
 
 	if (is_last) {
 		int len = snprintf(eol, sizeof eol,
@@ -108,12 +109,12 @@ static void rprint_progress(OFF_T ofs, double size, struct timeval *now,
 		rate = (double) (ofs - ph_list[oldest_hpos].ofs) * 1000.0 / diff;
 	}
 
-	if (transfer_done || (is_last && !overall))
+	if (show_elapsed)
 		remain = (double) diff / 1000.0;
 	else
 		remain = rate ? (double) (size - ofs) / rate : 0.0;
 
-	if (remain < 0 || remain > 9999.0 * 3600.0)
+	if ((!show_elapsed && !rate && ofs < size) || remain < 0 || remain > 9999.0 * 3600.0)
 		strlcpy(rembuf, "  ??:??:??", sizeof rembuf);
 	else {
 		snprintf(rembuf, sizeof rembuf, "%4u:%02u:%02u",

@@ -11,6 +11,7 @@ from harness.rsync import rsh_cmd, rsync_argv, rsync_path_arg
 
 
 COMPLETED_ROW = re.compile(r'\b(\d+):(\d\d):(\d\d) \(xfr#1, (?:ir|to)-chk=(\d+)/\d+\)')
+IN_PROGRESS_ROW = re.compile(r'^[ \t]*\S+B[ \t]+\d+%[ \t]+(\S+B/s)[ \t]+(\S+)[ \t]*$', re.MULTILINE)
 
 
 @requires(features={'linux_interpose'}, transports={'pipe'},
@@ -42,6 +43,10 @@ def test(context: TestContext):
         )
         if result.returncode or not (destination / 'a-new').is_file():
             test_fail(f'{label}: transfer failed: {result.returncode}\n{result.stdout}{result.stderr}')
+        estimates = IN_PROGRESS_ROW.findall(result.stdout)
+        if not estimates or estimates[0] != ('0B/s', '??:??:??'):
+            test_fail(f'{label}: expected an unknown ETA before measuring progress\n'
+                      f'{result.stdout}{result.stderr}')
         rows = [(3600 * hours + 60 * minutes + seconds, left)
                 for hours, minutes, seconds, left in
                 (map(int, row) for row in COMPLETED_ROW.findall(result.stdout))]
