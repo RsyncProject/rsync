@@ -209,15 +209,17 @@ jobs:
           persist-credentials: false
       - name: Install dependencies
         run: |
+          llvm_sources=$(mktemp -d "$RUNNER_TEMP/rsync-llvm.XXXXXXXX")
+          trap 'rm -f -- "$llvm_sources/llvm.list"; rmdir -- "$llvm_sources"' EXIT
           curl --fail --silent --show-error --location --proto '=https' --retry 3 --max-time 30 \
             --output "$RUNNER_TEMP/llvm.asc" https://apt.llvm.org/llvm-snapshot.gpg.key
           sudo install -D -m 644 "$RUNNER_TEMP/llvm.asc" /etc/apt/keyrings/llvm.asc
           printf '%s %s\n' \
             'deb [signed-by=/etc/apt/keyrings/llvm.asc,6084F3CF814B57C1CF12EFD515CF4D18AF4F7421] https://apt.llvm.org/resolute/' \
-            "llvm-toolchain-resolute-$LLVM_MAJOR main" |
-            sudo tee /etc/apt/sources.list.d/llvm.list > /dev/null
-          sh .github/scripts/ubuntu-apt.sh -o Acquire::Retries=3 update
-          sh .github/scripts/ubuntu-apt.sh -o Acquire::Retries=3 install -y --no-install-recommends \
+            "llvm-toolchain-resolute-$LLVM_MAJOR main" > "$llvm_sources/llvm.list"
+          set -- -o "Dir::Etc::SourceParts=$llvm_sources" -o Acquire::Retries=3
+          sh .github/scripts/ubuntu-apt.sh "$@" update
+          sh .github/scripts/ubuntu-apt.sh "$@" install -y --no-install-recommends \
             "clang-$LLVM_MAJOR" "clang-tools-$LLVM_MAJOR" cppcheck acl libacl1-dev attr libattr1-dev \
             liblz4-dev libidn2-dev libzstd-dev libxxhash-dev libpopt-dev libssl-dev openssl
       - name: Tool versions
