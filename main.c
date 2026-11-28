@@ -47,6 +47,7 @@ extern int blocking_io;
 extern int always_checksum;
 extern int time_only;
 extern struct chmod_mode_struct *dest_chmod_modes;
+extern OFF_T file_transfer_budget;
 extern int remove_source_files;
 extern int output_needs_newline;
 extern int called_from_signal_handler;
@@ -1609,6 +1610,10 @@ static int start_client(int argc, char *argv[])
 	if (local_server) {
 		old_style_args = 2;
 		trust_sender_args = trust_sender_filter = 1;
+	}
+	if (file_transfer_budget >= 0 && !local_server) {
+		rprintf(FERROR, "--file-transfer-budget requires a local copy\n");
+		exit_cleanup(RERR_SYNTAX);
 	}
 	if (time_only && am_sender && !local_server) {
 		rprintf(FERROR, "--time-only requires a local receiver or a remote source\n");

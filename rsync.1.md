@@ -619,6 +619,7 @@ has its own detailed description later in this manpage.
 --force                  force deletion of directories even if not empty
 --max-delete=NUM         don't delete more than NUM files
 --max-size=SIZE          don't transfer any file larger than SIZE
+--file-transfer-budget=SIZE  limit total admitted regular-file length
 --min-size=SIZE          don't transfer any file smaller than SIZE
 --max-alloc=SIZE         change a limit relating to memory alloc
 --partial                keep partially transferred files
@@ -2444,6 +2445,28 @@ sign) if you want the local shell to expand it.
 
     Examples: `--max-size=1.5mb-1` is 1499999 bytes, and `--max-size=2g+1` is
     2147483649 bytes.
+
+0.  `--file-transfer-budget=SIZE`
+
+    Limit the sum of the full lengths of regular files admitted for data
+    transfer in a local copy. The size syntax is the same as for
+    [`--max-size`](#opt). This counts logical file lengths, not socket
+    traffic, bytes written or unmatched delta data. Unchanged files do
+    not count and a retry of an admitted file is not charged again.
+
+    Files that fit exactly are admitted. A zero budget can admit empty
+    files. At the first file that does not fit, rsync leaves that entry
+    alone, stops scheduling new entries and gives exit status 23 after
+    handling work already admitted. Directories prepared before refusal
+    still receive their final metadata. Untouched later entries are left
+    alone. Directory or metadata changes already made are not rolled back.
+    A dry run applies the same budget to its proposed file transfers.
+    Admission is accounted for even if a file later fails to transfer.
+
+    Use ordinary temporary-file transfers. This option does not combine
+    with deletion, backups, in-place writes, partial retention, alternate
+    temporary directories or basis directories, fuzzy matching, copying
+    devices, preserving hard links, batch mode or remote options.
 
 0.  `--min-size=SIZE`
 

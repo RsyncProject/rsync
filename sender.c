@@ -44,6 +44,7 @@ extern int flist_eof;
 extern int whole_file;
 extern int allowed_lull;
 extern int copy_devices;
+extern OFF_T file_transfer_budget;
 extern int preserve_xattrs;
 extern int protocol_version;
 extern int remove_source_files;
@@ -747,6 +748,17 @@ void send_files(int f_in, int f_out)
 			free_sums(s);
 			if (protocol_version >= 30)
 				send_msg_int(MSG_NO_SEND, ndx);
+			continue;
+		}
+
+		if (file_transfer_budget >= 0 && (!S_ISREG(st.st_mode) || st.st_size != F_LENGTH(file))) {
+			rprintf(FERROR_XFER, "source type or size changed before budgeted transfer of %s\n",
+				full_fname(fname));
+			free_sums(s);
+			close(fd);
+			if (protocol_version < 30)
+				exit_cleanup(RERR_PARTIAL);
+			send_msg_int(MSG_NO_SEND, ndx);
 			continue;
 		}
 

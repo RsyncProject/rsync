@@ -150,6 +150,7 @@ int ignore_non_existing_dirs = 0;
 int need_messages_from_generator = 0;
 int max_delete = INT_MIN;
 OFF_T max_size = -1;
+OFF_T file_transfer_budget = -1;
 OFF_T min_size = -1;
 int ignore_errors = 0;
 int modify_window = 0;
@@ -618,7 +619,7 @@ enum {OPT_SERVER = 1000, OPT_DAEMON, OPT_SENDER, OPT_EXCLUDE, OPT_EXCLUDE_FROM,
       OPT_USERMAP, OPT_GROUPMAP, OPT_CHOWN, OPT_BWLIMIT, OPT_STDERR,
       OPT_OLD_COMPRESS, OPT_NEW_COMPRESS, OPT_NO_COMPRESS, OPT_OLD_ARGS,
       OPT_STOP_AFTER, OPT_STOP_AT, OPT_NICE, OPT_NO_NICE, OPT_CHMOD_DEST,
-      OPT_PLACEMENT_LOG,
+      OPT_PLACEMENT_LOG, OPT_FILE_TRANSFER_BUDGET,
       OPT_REFUSED_BASE = 9000};
 
 static struct poptOption long_options[] = {
@@ -730,6 +731,7 @@ static struct poptOption long_options[] = {
   {"ignore-times",    'I', POPT_ARG_NONE,   &ignore_times, 0, 0, 0 },
   {"size-only",        0,  POPT_ARG_NONE,   &size_only, 0, 0, 0 },
   {"time-only",        0,  POPT_ARG_NONE,   &time_only, 0, 0, 0 },
+  {"file-transfer-budget", 0, POPT_ARG_STRING, 0, OPT_FILE_TRANSFER_BUDGET, 0, 0 },
   {"one-file-system", 'x', POPT_ARG_NONE,   0, 'x', 0, 0 },
   {"no-one-file-system",0, POPT_ARG_VAL,    &one_file_system, 0, 0, 0 },
   {"no-x",             0,  POPT_ARG_VAL,    &one_file_system, 0, 0, 0 },
@@ -1935,6 +1937,16 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 			min_size_arg = strdup(do_big_num(min_size, 0, NULL));
 			break;
 
+		case OPT_FILE_TRANSFER_BUDGET:
+			if (am_server || am_daemon) {
+				snprintf(err_buf, sizeof err_buf, "--file-transfer-budget requires a local copy\n");
+				goto cleanup;
+			}
+			arg = poptGetOptArg(pc);
+			if ((file_transfer_budget = parse_size_arg(arg, 'b', "file-transfer-budget", 0, -1, False)) < 0)
+				goto cleanup;
+			break;
+
 		case OPT_BWLIMIT: {
 			size_t rate_max = INT_MAX;
 			ssize_t bytes_max = SIZE_ARG_MAX;
@@ -2351,6 +2363,11 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 	/* Don't let the client reset protect_args if it was already processed */
 	if (orig_protect_args == 2 && am_server)
 		protect_args = orig_protect_args;
+
+	if (file_transfer_budget >= 0 && (am_server || am_daemon)) {
+		snprintf(err_buf, sizeof err_buf, "--file-transfer-budget requires a local copy\n");
+		goto cleanup;
+	}
 
 	if (per_dir_basis && (am_server || am_daemon)) {
 		snprintf(err_buf, sizeof err_buf, "%s requires a local transfer\n", alt_dest_opt(0));
@@ -2935,6 +2952,16 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 				goto cleanup;
 			}
 		}
+	}
+
+	if (file_transfer_budget >= 0
+	 && (list_only || delete_mode || missing_args == 2 || force_delete || remove_source_files
+	  || inplace || keep_partial || make_backups || tmpdir || basis_dir_cnt || fuzzy_basis
+	  || preserve_hard_links || copy_devices || read_batch || write_batch || remote_option_cnt)) {
+		snprintf(err_buf, sizeof err_buf,
+			 "--file-transfer-budget requires ordinary local temporary-file transfers;"
+			 " deletion, backup, partial, basis, device, hard-link and batch modes are incompatible\n");
+		goto cleanup;
 	}
 
 	if (placement_log && (list_only || inplace || tmpdir || backup_dir || keep_dirlinks

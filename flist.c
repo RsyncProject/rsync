@@ -49,6 +49,7 @@ extern int xfer_dirs;
 extern int filesfrom_fd;
 extern char *files_from;
 extern char *skip_dir_marker;
+extern OFF_T file_transfer_budget;
 extern int one_file_system;
 extern int copy_devices;
 extern int copy_dirlinks;
@@ -1391,6 +1392,8 @@ static struct file_struct *recv_file_entry(int f, struct file_list *flist, int x
 			/* Room to save the dir's device for -x */
 			extra_len += DEV_EXTRA_CNT * EXTRA_LEN;
 		}
+		if (file_transfer_budget >= 0)
+			extra_len += BUDGET_DIR_EXTRA_CNT * EXTRA_LEN;
 		pool = dir_flist->file_pool;
 	} else
 		pool = flist->file_pool;

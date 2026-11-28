@@ -28,6 +28,8 @@
   needed no transfer once the transfer has passed them. Pushes with `--iconv`
   retain the previous estimate because filename conversion can change the
   check order. The file list, the transfer and `--stats` are unchanged.
+- Add `--file-transfer-budget` to bound the logical size of regular files
+  admitted for transfer in a local copy.
 - Try an exact `--link-dest` match without a destination stat in new
   incremental directories. Use the normal lookup path if the link fails.
 - Keep the checked root of a single absolute alternate destination open

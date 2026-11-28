@@ -77,6 +77,7 @@ extern int ignore_times;
 extern int size_only;
 extern int time_only;
 extern OFF_T max_size;
+extern OFF_T file_transfer_budget;
 extern OFF_T min_size;
 extern int io_error;
 extern int flist_eof;
@@ -1719,7 +1720,25 @@ static BOOL create_incremental_dir(char *fname, struct file_struct *file)
 	if (gen_entry_mkdir(fname, file, mode) < 0)
 		return False;
 	file->flags |= FLAG_DIR_CREATED;
+	if (file_transfer_budget >= 0 && !dry_run) {
+		STRUCT_STAT st;
+		if (gen_entry_stat(fname, file, &st, 0) == 0 && S_ISDIR(st.st_mode)) {
+			struct budget_dir_identity id = { st.st_dev, st.st_ino, st.st_ctime, True };
+			memcpy(F_DIR_BUDGET_ID_P(file, one_file_system), &id, sizeof id);
+		}
+	}
 	return True;
+}
+
+static BOOL budget_placeholder_matches(const struct file_struct *file, const STRUCT_STAT *st)
+{
+	struct budget_dir_identity id;
+
+	if (!S_ISDIR(st->st_mode))
+		return False;
+	memcpy(&id, F_DIR_BUDGET_ID_P(file, one_file_system), sizeof id);
+	return id.recorded && id.device == st->st_dev && id.inode == st->st_ino
+	    && id.changed == st->st_ctime;
 }
 
 static BOOL incremental_parent_created(void)
@@ -1937,6 +1956,26 @@ static int gen_entry_copy_xattrs(const char *src, const char *fname, struct file
 }
 #endif
 
+static BOOL budget_refused, budget_redo;
+
+static BOOL admit_file(const char *fname, const struct file_struct *file, BOOL charge)
+{
+	OFF_T length;
+
+	if (file_transfer_budget < 0 || budget_redo)
+		return True;
+	length = F_LENGTH(file);
+	if (length < 0 || length > file_transfer_budget) {
+		rprintf(FERROR_XFER, "file transfer budget cannot admit %s; no further files will be scheduled\n",
+			full_fname(fname));
+		budget_refused = True;
+		return False;
+	}
+	if (charge)
+		file_transfer_budget -= length;
+	return True;
+}
+
 static void recv_generator(char *fname, struct file_struct *file, int ndx,
 			   int itemizing, enum logcode code, int f_out, BOOL replacing_hlink)
 {
@@ -1967,10 +2006,20 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 	int is_dir = ftype != FT_DIR ? 0
 		   : inc_recurse && ndx != cur_flist->ndx_start - 1 ? -1
 		   : 1;
+	BOOL finishing_budget_dir = False;
 
 #ifndef SUPPORT_HARD_LINKS
 	(void)replacing_hlink;
 #endif
+	if (budget_refused && !budget_redo) {
+		/* No contents will be scheduled and a surviving placeholder is
+		 * finished here, so these directories need no later touch-up. */
+		if (is_dir)
+			file->flags |= FLAG_MISSING_DIR;
+		if (is_dir <= 0 || !(file->flags & FLAG_DIR_CREATED))
+			return;
+		finishing_budget_dir = True;
+	}
 
 	if (DEBUG_GTE(GENR, 1))
 		rprintf(FINFO, "recv_generator(%s,%d)\n", fname, ndx);
@@ -2055,7 +2104,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 					exit_cleanup(RERR_PROTOCOL);
 				}
 			}
-			if (relative_paths && !implied_dirs && file->mode != 0) {
+			if (relative_paths && !implied_dirs && file->mode != 0 && !finishing_budget_dir) {
 				int parent_stat = do_stat_at(dn, &sx.st);
 				if (ignore_non_existing_dirs > 0
 				 && (parent_stat < 0 || !S_ISDIR(sx.st.st_mode))) {
@@ -2112,9 +2161,12 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 				fresh_link_fallback_flist = cur_flist->flist_num;
 		}
 #endif
-		statret = gen_entry_stat(fname, file, &sx.st, keep_dirlinks && is_dir);
+		statret = gen_entry_stat(fname, file, &sx.st, !finishing_budget_dir && keep_dirlinks && is_dir);
 		stat_errno = errno;
 	}
+
+	if (finishing_budget_dir && (statret != 0 || !budget_placeholder_matches(file, &sx.st)))
+		goto cleanup;
 
 	if (missing_args == 2 && file->mode == 0) {
 		if (filter_list.head && check_filter(&filter_list, FINFO, fname, is_dir) < 0)
@@ -2289,7 +2341,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 		 * putting files within them.  This is then restored to the
 		 * former permissions after the transfer is done. */
 #ifdef HAVE_CHMOD
-		if (!am_root && (file->mode & S_IRWXU) != S_IRWXU && dir_tweaking) {
+		if (!am_root && !finishing_budget_dir && (file->mode & S_IRWXU) != S_IRWXU && dir_tweaking) {
 			mode_t mode = file->mode | S_IRWXU;
 			if (gen_entry_chmod(fname, file, mode) < 0) {
 				rsyserr(FERROR_XFER, errno,
@@ -2538,6 +2590,9 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 	fnamecmp_type = FNAMECMP_FNAME;
 
 	if (statret == 0 && !(stype == FT_REG || (write_devices && stype == FT_DEVICE))) {
+		/* Refusal must leave the original destination entry in place. */
+		if (!admit_file(fname, file, False))
+			goto cleanup;
 		if (delete_item(fname, sx.st.st_mode, del_opts | DEL_FOR_FILE) != 0)
 			goto cleanup;
 		statret = -1;
@@ -2750,6 +2805,8 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 		rprintf(FINFO, "generating and sending sums for %d\n", ndx);
 
   notify_others:
+	if (!admit_file(fname, file, True))
+		goto cleanup;
 	if (remove_source_files && !delay_updates && !phase && !dry_run)
 		increment_active_files(ndx, itemizing, code);
 	if (inc_recurse && (!dry_run || write_batch < 0))
@@ -3045,7 +3102,9 @@ void check_for_finished_files(int itemizing, enum logcode code, int check_redo)
 				strlcpy(fbuf, solo_file, sizeof fbuf);
 			else
 				f_name(file, fbuf);
+			budget_redo = True;
 			recv_generator(fbuf, file, ndx, itemizing, code, sock_f_out, False);
+			budget_redo = False;
 			cur_flist->to_redo--;
 
 			cur_flist = flist;
